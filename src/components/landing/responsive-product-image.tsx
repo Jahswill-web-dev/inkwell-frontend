@@ -1,5 +1,4 @@
 import { getImageProps } from "next/image";
-import styles from "./responsive-product-image.module.css";
 
 type ResponsiveProductImageProps = {
   desktopSrc: string;
@@ -37,9 +36,9 @@ export function ResponsiveProductImage({
   });
 
   return (
-    <picture className={styles.frame}>
+    <picture className="block w-full overflow-hidden rounded-lg border border-ink-navy/10 bg-white shadow-product max-[720px]:rounded-[7px] max-[720px]:shadow-[0_18px_42px_rgba(7,25,79,0.12)]">
       <source media="(max-width: 720px)" srcSet={mobileImage.srcSet} />
-      <img {...desktopImage} alt={alt} className={styles.image} />
+      <img {...desktopImage} alt={alt} className="block h-auto w-full" />
     </picture>
   );
 }

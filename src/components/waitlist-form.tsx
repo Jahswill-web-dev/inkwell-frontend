@@ -9,6 +9,8 @@ type Fields = {
 };
 
 const initialFields: Fields = { name: "", email: "" };
+const inputClass =
+  "min-h-12 rounded-md border border-ink-navy/25 bg-white px-4 text-ink-navy outline-none transition-colors placeholder:text-ink-muted/70 focus:border-ink-crimson aria-invalid:border-ink-crimson";
 
 export function WaitlistForm() {
   const [fields, setFields] = useState<Fields>(initialFields);
@@ -54,9 +56,11 @@ export function WaitlistForm() {
   }
 
   return (
-    <form className="waitlist-form" onSubmit={handleSubmit} noValidate>
-      <div className="field">
-        <label htmlFor="waitlist-name">Full name</label>
+    <form className="grid gap-4" onSubmit={handleSubmit} noValidate>
+      <div className="grid gap-1.5">
+        <label className="text-sm font-bold" htmlFor="waitlist-name">
+          Full name
+        </label>
         <input
           id="waitlist-name"
           name="name"
@@ -67,16 +71,19 @@ export function WaitlistForm() {
           aria-invalid={Boolean(fieldErrors.name?.length)}
           aria-describedby={fieldErrors.name?.length ? "name-error" : undefined}
           onChange={(event) => updateField("name", event.target.value)}
+          className={inputClass}
         />
         {fieldErrors.name?.[0] ? (
-          <p id="name-error" className="field__error">
+          <p id="name-error" className="m-0 text-sm text-ink-crimson">
             {fieldErrors.name[0]}
           </p>
         ) : null}
       </div>
 
-      <div className="field">
-        <label htmlFor="waitlist-email">Email address</label>
+      <div className="grid gap-1.5">
+        <label className="text-sm font-bold" htmlFor="waitlist-email">
+          Email address
+        </label>
         <input
           id="waitlist-email"
           name="email"
@@ -90,22 +97,26 @@ export function WaitlistForm() {
             fieldErrors.email?.length ? "email-error" : undefined
           }
           onChange={(event) => updateField("email", event.target.value)}
+          className={inputClass}
         />
         {fieldErrors.email?.[0] ? (
-          <p id="email-error" className="field__error">
+          <p id="email-error" className="m-0 text-sm text-ink-crimson">
             {fieldErrors.email[0]}
           </p>
         ) : null}
       </div>
 
       <button
-        className="button button--light"
+        className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md border border-transparent bg-white px-6 py-3 font-bold text-ink-navy transition-colors hover:bg-ink-blue-soft disabled:cursor-not-allowed disabled:opacity-60"
         type="submit"
         disabled={isSubmitting}
       >
         {isSubmitting ? (
           <>
-            <span className="spinner" aria-hidden="true" />
+            <span
+              className="size-4 animate-spin rounded-full border-2 border-ink-navy/25 border-t-ink-navy"
+              aria-hidden="true"
+            />
             Joining…
           </>
         ) : (
@@ -116,8 +127,8 @@ export function WaitlistForm() {
       <div aria-live="polite" aria-atomic="true">
         {status ? (
           <p
-            className={`form-status ${
-              status.success ? "form-status--success" : "form-status--error"
+            className={`m-0 text-sm font-semibold ${
+              status.success ? "text-ink-green" : "text-ink-crimson"
             }`}
             role={status.success ? "status" : "alert"}
           >

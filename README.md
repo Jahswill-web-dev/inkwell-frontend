@@ -8,7 +8,7 @@ review, and export without losing their voice.
 
 - Next.js 16 App Router
 - React 19 and TypeScript
-- CSS Modules with shared design tokens
+- Tailwind CSS 4 with shared theme tokens
 - Phosphor icons
 - Vitest, React Testing Library, and Playwright
 
@@ -39,8 +39,9 @@ Visit [http://localhost:3000](http://localhost:3000).
 
 The landing page is composed from small components under
 `src/components/landing`. Copy and repeated product content live in a typed
-configuration file, while each visual section owns an isolated CSS Module.
-The page is server-rendered except for the accessible mobile navigation.
+configuration file. Styling uses Tailwind utilities backed by the Inkwell
+theme tokens in `src/app/globals.css`. The page is server-rendered except for
+the accessible mobile navigation.
 
 Approved desktop and mobile product mockups live under
 `public/images/product`. The responsive image component selects the

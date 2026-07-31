@@ -1,0 +1,95 @@
+.feature {
+  display: grid;
+  grid-template-columns: minmax(0, 1.62fr) minmax(260px, 0.68fr);
+  gap: 70px;
+  align-items: center;
+  padding: 52px 0;
+  border-bottom: 1px solid var(--ink-line);
+}
+
+.reverse {
+  grid-template-columns: minmax(260px, 0.68fr) minmax(0, 1.62fr);
+}
+
+.reverse .visual {
+  order: 2;
+}
+
+.visual {
+  min-width: 0;
+}
+
+.copy h2 {
+  max-width: 420px;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2.65rem, 4.5vw, 4.7rem);
+  font-weight: 500;
+  line-height: 0.98;
+  letter-spacing: -0.02em;
+}
+
+.copy > p:not(:global(.eyebrow)) {
+  max-width: 390px;
+  margin: 20px 0 0;
+  color: var(--ink-muted);
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.signals {
+  display: grid;
+  gap: 11px;
+  margin: 24px 0 0;
+  padding-left: 22px;
+  color: var(--ink-navy);
+  font-weight: 700;
+  list-style: disc;
+}
+
+.signals li[data-tone="amber"]::marker {
+  color: var(--ink-orange);
+}
+
+.signals li[data-tone="crimson"]::marker {
+  color: var(--ink-crimson);
+}
+
+.signals li[data-tone="green"]::marker {
+  color: var(--ink-green);
+}
+
+@media (max-width: 900px) {
+  .feature,
+  .reverse {
+    gap: 36px;
+  }
+}
+
+@media (max-width: 720px) {
+  .feature,
+  .reverse {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    padding: 54px 0;
+  }
+
+  .reverse .visual {
+    order: 0;
+  }
+
+  .copy {
+    order: -1;
+  }
+
+  .copy h2 {
+    max-width: 340px;
+    font-size: clamp(2.45rem, 11vw, 3.25rem);
+    line-height: 1.02;
+  }
+
+  .copy > p:not(:global(.eyebrow)) {
+    max-width: 350px;
+    margin-top: 16px;
+  }
+}

@@ -1,40 +1,51 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Inkwell
 
-## Getting Started
+Inkwell is a responsive product landing page for a guided AI writing workspace.
+It shows how writers move from an initial idea through planning, drafting,
+review, and export without losing their voice.
 
-First, run the development server:
+## Stack
+
+- Next.js 16 App Router
+- React 19 and TypeScript
+- CSS Modules with shared design tokens
+- Phosphor icons
+- Vitest, React Testing Library, and Playwright
+
+Node.js 20.9 or newer and npm are required.
+
+## Local setup
 
 ```bash
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Visit [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `pages/index.js`. The page auto-updates as you edit the file.
+## Commands
 
-[API routes](https://nextjs.org/docs/api-routes/introduction) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.js`.
+| Command                | Purpose                      |
+| ---------------------- | ---------------------------- |
+| `npm run dev`          | Start the development server |
+| `npm run build`        | Create a production build    |
+| `npm run lint`         | Run ESLint                   |
+| `npm run typecheck`    | Check TypeScript             |
+| `npm test`             | Run unit and component tests |
+| `npm run test:e2e`     | Run Playwright tests         |
+| `npm run format:check` | Check formatting             |
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/api-routes/introduction) instead of React pages.
+## Architecture
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+The landing page is composed from small components under
+`src/components/landing`. Copy and repeated product content live in a typed
+configuration file, while each visual section owns an isolated CSS Module.
+The page is server-rendered except for the accessible mobile navigation.
 
-## Learn More
+Approved desktop and mobile product mockups live under
+`public/images/product`. The responsive image component selects the
+appropriate artwork for the current viewport.
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+The existing waitlist route and validation remain available as isolated legacy
+infrastructure, but the public landing page now points to `/signup`, `/login`,
+and `/pricing`.

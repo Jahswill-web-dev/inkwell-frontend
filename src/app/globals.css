@@ -1,43 +1,48 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-ink-navy: #07194f;
-  --color-ink-navy-deep: #030b24;
-  --color-ink-crimson: #c50032;
-  --color-ink-crimson-dark: #a70029;
-  --color-ink-paper: #fffdfa;
-  --color-ink-surface: #ffffff;
-  --color-ink-muted: #59627a;
-  --color-ink-line: #e4e1dd;
-  --color-ink-blue-soft: #eaf1ff;
-  --color-ink-green: #35a45f;
-  --color-ink-orange: #f0a000;
-  --font-sans: var(--font-manrope), "Segoe UI", sans-serif;
-  --font-display: var(--font-newsreader), Georgia, serif;
-  --shadow-product: 0 24px 64px rgba(7, 25, 79, 0.13);
+  --color-ink-navy: #07194f;  /*Primary color*/
+  --color-ink-navy-deep: #030b24; /*Dark Primary color*/
+  --color-ink-crimson: #c50032; /*Secondary color*/
+  --color-ink-crimson-dark: #a70029; /*Dark Secondary*/
+  --color-ink-paper: #fffdfa; /*Warm page background*/
+  --color-ink-surface: #ffffff; /*Cards, inputs, and elevated surfaces*/
+  --color-ink-muted: #59627a; /*Secondary text and placeholders*/
+  --color-ink-line: #e4e1dd; /*Subtle borders and section dividers*/
+  --color-ink-blue-soft: #eaf1ff; /*Soft hover and selected backgrounds*/
+  --color-ink-green: #35a45f; /*Success and completed states*/
+  --color-ink-orange: #f0a000; /*Warning and attention states*/
+  --font-sans: var(--font-manrope), "Segoe UI", sans-serif; /*Body and UI text*/
+  --font-display: var(--font-newsreader), Georgia, serif; /*Editorial headings*/
+  --shadow-product: 0 24px 64px rgba(7, 25, 79, 0.13); /*Product screenshots and previews*/
 }
 
 @layer base {
+  /*Smooth scrolling for in-page navigation links*/
   html {
     scroll-behavior: smooth;
   }
 
+  /*Shared page background, body typography, and default text color*/
   body {
     @apply m-0 overflow-x-hidden bg-ink-paper font-sans leading-[1.6] text-ink-navy antialiased;
     text-rendering: optimizeLegibility;
   }
 
+  /*Removes the default mobile tap highlight from interactive elements*/
   button,
   a {
     -webkit-tap-highlight-color: transparent;
   }
 
+  /*Visible keyboard-focus indicator for accessible navigation*/
   :focus-visible {
     outline: 3px solid #f06789;
     outline-offset: 4px;
   }
 }
 
+/*Reduces animation when a user enables reduced-motion preferences*/
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

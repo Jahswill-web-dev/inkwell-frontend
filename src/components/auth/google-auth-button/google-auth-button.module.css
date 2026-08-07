@@ -1,0 +1,15 @@
+.button {
+  gap: 17px;
+}
+
+.logo {
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+
+@media (max-width: 800px) {
+  .button {
+    gap: 18px;
+  }
+}

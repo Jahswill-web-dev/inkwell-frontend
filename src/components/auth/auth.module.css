@@ -1,0 +1,309 @@
+.authPage {
+  min-height: 100svh;
+  display: grid;
+  grid-template-columns: minmax(0, 52.45%) minmax(0, 47.55%);
+  background: var(--color-ink-paper);
+}
+
+.storyPanel {
+  min-width: 0;
+  position: relative;
+  padding: 221px 58px 64px 73px;
+  background: #fffcf9;
+}
+
+.brandLink {
+  position: absolute;
+  top: -2px;
+  left: 10px;
+  display: block;
+  width: 245px;
+  height: 144px;
+}
+
+.brandLogo {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.storyContent {
+  max-width: 632px;
+}
+
+.promiseTitle {
+  margin: 0;
+  color: var(--color-ink-navy);
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: clamp(3.6rem, 4.68vw, 4.4rem);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  line-height: 1.08;
+}
+
+.promiseLine {
+  display: block;
+  white-space: nowrap;
+}
+
+.promiseLine:last-child {
+  width: 101%;
+  transform: scaleX(0.99);
+  transform-origin: left center;
+}
+
+.titlePeriod {
+  color: inherit;
+}
+
+.desktopPromiseCopy,
+.mobilePromiseCopy {
+  margin: 15px 0 0;
+  color: #26375f;
+  font-size: 1.43rem;
+  line-height: 1.52;
+}
+
+.mobilePromiseCopy {
+  display: none;
+}
+
+.editorialExcerpt {
+  max-width: 535px;
+  margin-top: 63px;
+  color: #142851;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 1.27rem;
+  line-height: 1.44;
+}
+
+.editorialExcerpt p {
+  margin: 0;
+}
+
+.pullQuote {
+  position: relative;
+  padding-left: 29px;
+}
+
+.pullQuote::before {
+  position: absolute;
+  top: -7px;
+  bottom: -7px;
+  left: 0;
+  width: 4px;
+  background: var(--color-ink-crimson);
+  content: "";
+}
+
+.editorialExcerpt > p + p {
+  margin: 38px 0 0 29px;
+}
+
+.articleSection {
+  margin: 31px 0 0 29px;
+  padding-top: 30px;
+  border-top: 1px solid #a7acb8;
+}
+
+.articleSection h2 {
+  margin: 0 0 4px;
+  font-family: var(--font-manrope), "Segoe UI", sans-serif;
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.formPanel {
+  min-width: 0;
+  padding: 189px 5.55vw 72px;
+  background: #fff;
+}
+
+.formPanelInner {
+  width: min(100%, 540px);
+}
+
+.formHeader h2 {
+  margin: 0;
+  color: var(--color-ink-navy);
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 2.65rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.formHeader p {
+  margin: 14px 0 0;
+  color: #27375d;
+  font-size: 1.12rem;
+  line-height: 1.5;
+}
+
+.googleAction {
+  margin-top: 37px;
+}
+
+.authForm {
+  display: grid;
+  gap: 27px;
+}
+
+.submitAction {
+  margin-top: 7px;
+}
+
+.formNotice {
+  margin: 12px 0 -4px;
+  color: #2f7650;
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.accountPrompt {
+  margin: 29px 0 0;
+  color: #304064;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.accountPrompt a,
+.legalCopy a {
+  color: var(--color-ink-crimson);
+  text-decoration: none;
+}
+
+.accountPrompt a:hover,
+.legalCopy a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.legalCopy {
+  margin: 40px 0 0;
+  color: #4f5d7d;
+  font-size: 0.78rem;
+  line-height: 1.7;
+  text-align: center;
+}
+
+.legalCopy a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 800px) {
+  .authPage {
+    display: block;
+    min-height: 100svh;
+    padding-bottom: 54px;
+    background: #fffcf9;
+  }
+
+  .storyPanel {
+    padding: 187px clamp(24px, 8vw, 44px) 0;
+    background: transparent;
+    text-align: center;
+  }
+
+  .brandLink {
+    top: 42px;
+    left: 50%;
+    width: 238px;
+    height: 139px;
+    transform: translateX(-50%);
+  }
+
+  .storyContent {
+    max-width: none;
+  }
+
+  .promiseTitle {
+    font-size: clamp(2.05rem, 8.2vw, 2.3rem);
+    line-height: 1.08;
+  }
+
+  .promiseLine:last-child {
+    width: 102%;
+    transform: scaleX(0.98);
+    transform-origin: center;
+  }
+
+  .titlePeriod {
+    color: var(--color-ink-crimson);
+  }
+
+  .desktopPromiseCopy {
+    display: none;
+  }
+
+  .mobilePromiseCopy {
+    display: block;
+    margin-top: 14px;
+    font-size: clamp(0.92rem, 3.65vw, 1rem);
+    line-height: 1.65;
+  }
+
+  .editorialExcerpt {
+    display: none;
+  }
+
+  .formPanel {
+    padding: 37px clamp(24px, 10.3vw, 44px) 0;
+    background: transparent;
+  }
+
+  .formPanelInner {
+    width: 100%;
+    max-width: 540px;
+    margin: 0 auto;
+  }
+
+  .formHeader h2 {
+    font-family: var(--font-manrope), "Segoe UI", sans-serif;
+    font-size: clamp(1.35rem, 5.25vw, 1.45rem);
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    line-height: 1.2;
+  }
+
+  .formHeader p {
+    display: none;
+  }
+
+  .googleAction {
+    margin-top: 18px;
+  }
+
+  .authForm {
+    gap: 20px;
+  }
+
+  .submitAction {
+    margin-top: 2px;
+  }
+
+  .accountPrompt {
+    margin-top: 21px;
+    font-size: 0.91rem;
+  }
+
+  .legalCopy {
+    margin-top: 27px;
+    font-size: 0.77rem;
+    line-height: 1.68;
+  }
+}
+
+@media (max-width: 360px) {
+  .storyPanel {
+    padding-inline: 18px;
+  }
+
+  .formPanel {
+    padding-inline: 22px;
+  }
+}

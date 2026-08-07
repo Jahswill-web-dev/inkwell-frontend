@@ -1,0 +1,31 @@
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin: 29px 0 36px;
+  color: #4f5a72;
+  font-size: 0.96rem;
+  white-space: nowrap;
+}
+
+.divider::before,
+.divider::after {
+  height: 1px;
+  flex: 1;
+  background: #9ca3b3;
+  content: "";
+}
+
+@media (max-width: 800px) {
+  .divider {
+    margin: 22px 0 25px;
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .divider {
+    gap: 10px;
+    font-size: 0.75rem;
+  }
+}

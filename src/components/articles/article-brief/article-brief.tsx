@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
@@ -127,6 +128,7 @@ function BriefField({
 }
 
 export function ArticleBrief() {
+  const router = useRouter();
   const [brief, setBrief] = useState<ArticleBriefState>(defaultBrief);
   const [errors, setErrors] = useState<Partial<Record<BriefTextField, string>>>(
     {},
@@ -197,9 +199,14 @@ export function ArticleBrief() {
     }
 
     setIsGenerating(true);
+    window.sessionStorage.setItem(
+      "inkwell:article-brief",
+      JSON.stringify(brief),
+    );
     window.setTimeout(() => {
       setIsGenerating(false);
-      setStatus("Outline generated. The outline builder is coming next.");
+      setStatus("Outline generated.");
+      router.push("/articles/new/outline");
     }, 600);
   };
 

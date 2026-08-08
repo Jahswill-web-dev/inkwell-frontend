@@ -1,132 +1,48 @@
-# Dashboard and Onboarding Design QA
+# Outline Builder Design QA
 
-## Targets and evidence
+## Evidence
 
-- Desktop dashboard reference: `public/designs/mvp/dashboard-desktop.png` (1486 × 1059)
-- Desktop implementation: `design-reference/dashboard-implementation-desktop.png` (1486 × 1059, DPR 1)
-- Mobile dashboard reference: `public/designs/mvp/dashboard-mobile.png` (853 × 1844)
-- Mobile implementation: `design-reference/dashboard-implementation-mobile.png` (853 × 1844, normalized at DPR 2)
-- Onboarding behavior: one writing-goals screen, with no intermediate onboarding steps, followed by `/dashboard`.
+- Source visual truth:
+  - `public/designs/mvp/outline-builder-desktop.png`
+  - `public/designs/mvp/outline-builder-mobile.png`
+- Browser-rendered implementation:
+  - `design-reference/outline-implementation-desktop-final.png`
+  - `design-reference/outline-implementation-mobile-final.png`
+- Combined comparison evidence:
+  - `design-reference/qa-comparison-outline-desktop-final.png`
+  - `design-reference/qa-comparison-outline-mobile-final.png`
+- Desktop normalization: source `1487 × 1058` pixels normalized by one horizontal pixel to the `1488 × 1058` CSS viewport; implementation captured at `1488 × 1058`, device scale factor 1.
+- Mobile normalization: source `853 × 1844` pixels treated as a 2× design export and normalized to `426 × 922`; implementation captured at a `426 × 922` CSS viewport, device scale factor 1.
+- State: first section expanded, remaining four collapsed, outline health passing, no menu or dialog open.
+- Focused comparison: the expanded section served as the focused region because it contains the densest typography, icons, dividers, textarea, list markers, and action controls.
 
-The desktop and mobile references were opened alongside their matching implementation captures. The comparison covered page structure, typography, responsive navigation, CTA and quick-action geometry, article density, dividers, colors, icons, portrait crop, fixed mobile navigation, and horizontal overflow.
+## Findings
 
-## Iteration history
+- No actionable P0, P1, or P2 differences remain.
+- Fonts and typography: Newsreader and Manrope match the editorial/UI split, with equivalent hierarchy, wrapping, weights, and line heights at both viewports.
+- Spacing and layout: desktop editor/health proportions and mobile card/CTA vertical positions match the normalized references. Borders, radii, dividers, and section rhythm are consistent.
+- Colors and tokens: the navy, crimson, warm-paper, success-green, border, and link colors map to the existing Inkwell tokens and closely match the references.
+- Image quality and assets: the existing Inkwell logo assets remain sharp; all interface icons use the established Phosphor family. No placeholder art, CSS art, or custom SVG substitutes were introduced.
+- Copy and content: section content is coherent and shared across viewports. The canonical 1,060-word total and article-flow mobile progress are intentional decisions from the approved plan.
+- Accessibility and behavior: accordions, notes, saving, regeneration, reordering, health dialog focus/Escape behavior, status announcements, reduced motion, and overflow were exercised. Automated browser checks reported no page or console errors.
 
-### First comparison
+## Comparison History
 
-- P2: Desktop main content was too high and the quick-start rail started too far left.
-- P2: The desktop active-navigation row and brand sizing differed from the reference.
-- P2: Mobile content rhythm and article-row density pushed the final article too low.
+1. Initial mobile capture was substantially taller than the normalized reference, with oversized headers, open-section spacing, collapsed rows, and CTA gaps. Mobile dimensions and rhythm were reduced to align the card and CTA with the source.
+2. The next comparison exposed missing question bullets, an under-spread desktop progress track, and mobile heading/metadata alignment drift. Explicit list markers, a wider progress layout, and adjusted mobile typography/padding fixed those P2 differences.
+3. Final desktop and mobile combined comparisons show no remaining actionable P0/P1/P2 findings.
 
-The desktop content offset, grid width, navigation measurements, mobile spacing, and article-row sizing were corrected.
+## Follow-up Polish
 
-### Final comparison
+- P3: the mobile header retains the established Inkwell article-flow alignment and labels instead of the conflicting outline-substep treatment in the supplied mobile mock.
+- P3: reference-specific example notes and the desktop-only `1,248 words` value were intentionally replaced by the shared editable notes state and derived `1,060 words` total.
 
-- P0 findings: none.
-- P1 findings: none.
-- P2 findings: none.
-- P3 notes: Minor raster antialiasing differences remain in browser-rendered text and icons. The generated profile portrait matches the reference's composition and scale but is not the original photographed subject.
+## Verification
 
-## Functional and accessibility verification
-
-- Onboarding retains six native checkbox controls, whole-row selection, initial selected goals, and required-selection validation.
-- Onboarding Continue and Skip both navigate to `/dashboard`; desktop Back returns to `/signup`.
-- Dashboard search filters articles and visible primary actions provide accessible mocked feedback.
-- Desktop sidebar and mobile bottom navigation expose labeled interactive controls.
-- Exact desktop and normalized mobile viewport checks passed without horizontal overflow.
-- Browser console and uncaught page-error checks passed.
-- ESLint, TypeScript, 35 Vitest tests, 10 Playwright tests, and the production build passed.
+- Primary interactions tested: brief-to-outline navigation, accordion expansion, notes editing, outline health dialog, save/start drafting, regeneration, and section ordering.
+- Console errors checked: none.
+- Unit tests: 52 passed.
+- Playwright suite: 36 passed and 2 intentionally skipped across desktop and mobile Chromium, including all 4 outline-builder scenarios.
+- Production build: passed.
 
 final result: passed
-
----
-
-# New Article Design QA
-
-## Targets and evidence
-
-- Desktop source: `public/designs/mvp/new-article-desktop.png` (1487 × 1058 px).
-- Mobile source: `public/designs/mvp/new-article-mobile.png` (853 × 1844 px).
-- Implementation route: `/articles/new`, including `/articles/new?mode=notes`.
-- Intended comparison viewports: 1487 × 1058 CSS px at DPR 1 and 426.5 × 922 CSS px at DPR 2.
-- Implementation screenshots: unavailable because the in-app browser returned no available browser instances.
-- State: empty Idea form and empty Notes form.
-
-## Functional verification
-
-- Desktop and mobile Playwright projects passed navigation, responsive chrome, two-tab behavior, query-selected Notes mode, state preservation, draft feedback, horizontal overflow, console-error, and uncaught-error checks.
-- The complete 42-test Vitest suite, ESLint, TypeScript, and production build passed.
-
-## Findings
-
-- [P2] Browser-rendered visual comparison could not be completed.
-  - Evidence: both source images opened successfully, but the required in-app browser could not provide a rendered implementation screenshot.
-  - Impact: typography, spacing, colors, logo rendering, copy wrapping, and exact responsive fidelity cannot be signed off from browser evidence.
-  - Fix: reconnect an in-app browser, capture both reference-sized views, compare each source and implementation together, and address any visible P0–P2 differences.
-
-## Fidelity surfaces
-
-- Fonts and typography: implemented with the existing Manrope and Newsreader project fonts; browser comparison blocked.
-- Spacing and layout rhythm: responsive desktop/mobile structures are implemented and overflow tests pass; pixel comparison blocked.
-- Colors and visual tokens: existing Inkwell color tokens are used; rendered comparison blocked.
-- Image quality and assets: supplied Inkwell logo assets and Phosphor icons are used; rendered comparison blocked.
-- Copy and content: the two requested modes and guided Notes copy are present; no Template tab is rendered.
-
-## Comparison history
-
-- Initial pass: source references inspected; implementation capture blocked before a combined comparison could be produced.
-- No visual fixes were made from screenshot evidence because browser-rendered evidence was unavailable.
-
-## Implementation checklist
-
-- Reconnect the in-app browser.
-- Capture desktop and mobile implementation screenshots at matching sizes and states.
-- Run the combined visual comparison and fix any P0–P2 findings.
-
-final result: blocked
-
----
-
-# Guided Article Brief Design QA
-
-## Targets and evidence
-
-- Desktop source: `public/designs/mvp/article-brief-desktop.png` (1487 × 1058 px).
-- Mobile source: `public/designs/mvp/article-brief-mobile.png` (853 × 1844 px).
-- Implementation route: `/articles/new/brief`.
-- Intended comparison viewports: 1487 × 1058 CSS px at DPR 1 and 426.5 × 922 CSS px at DPR 2.
-- Implementation screenshots: unavailable because the in-app browser returned no available browser instances.
-- State: populated guided brief with Brief as the current workflow step and Standard length selected.
-
-## Functional verification
-
-- Desktop and mobile Playwright projects passed the New Article → Brief handoff, session-prefilled content, responsive navigation, progress state, editable fields, optional-section disclosure, preferred-length selection, draft saving, outline-generation feedback, horizontal overflow, console-error, and uncaught-error checks.
-- The complete 48-test Vitest suite, ESLint, and TypeScript passed.
-
-## Findings
-
-- [P2] Browser-rendered visual comparison could not be completed.
-  - Evidence: both source images opened successfully, but the required in-app browser did not provide a rendered implementation screenshot.
-  - Impact: exact typography, spacing, colors, logo rendering, field density, stepper geometry, and responsive fidelity cannot be signed off from browser evidence.
-  - Fix: reconnect an in-app browser, capture both reference-sized views, compare each source and implementation together, and address any visible P0–P2 differences.
-
-## Fidelity surfaces
-
-- Fonts and typography: implemented with the existing Manrope and Newsreader project fonts; browser comparison blocked.
-- Spacing and layout rhythm: responsive desktop grid, fixed desktop footer, mobile stacked form, and sticky mobile CTA are implemented; pixel comparison blocked.
-- Colors and visual tokens: existing Inkwell navy, crimson, paper, surface, and divider tokens are used; rendered comparison blocked.
-- Image quality and assets: supplied Inkwell logo assets and Phosphor interface icons are used; rendered comparison blocked.
-- Copy and content: title summary, required brief prompts, mobile optional sections, length controls, and workflow labels match the supplied direction.
-
-## Comparison history
-
-- Initial pass: source references inspected; implementation capture blocked before a combined comparison could be produced.
-- No visual fixes were made from screenshot evidence because browser-rendered evidence was unavailable.
-
-## Implementation checklist
-
-- Reconnect the in-app browser.
-- Capture desktop and mobile implementation screenshots at matching sizes and states.
-- Run the combined visual comparison and fix any P0–P2 findings.
-
-final result: blocked

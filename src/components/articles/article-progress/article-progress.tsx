@@ -26,7 +26,9 @@ export function ArticleProgress({ currentStep }: { currentStep: number }) {
 
           return (
             <li
-              className={isCurrent ? styles.current : ""}
+              className={
+                isCurrent ? styles.current : isComplete ? styles.complete : ""
+              }
               key={step.desktopLabel}
               aria-current={isCurrent ? "step" : undefined}
             >

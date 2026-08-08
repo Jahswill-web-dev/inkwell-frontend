@@ -5,7 +5,7 @@
 
 .progress ol {
   display: flex;
-  max-width: 710px;
+  max-width: 1100px;
   height: 100%;
   align-items: center;
   justify-content: center;
@@ -95,7 +95,7 @@
     color: #667188;
   }
 
-  .progress li:first-child .marker {
+  .complete .marker {
     border-color: var(--color-ink-navy);
     background: var(--color-ink-navy);
     color: #fff;

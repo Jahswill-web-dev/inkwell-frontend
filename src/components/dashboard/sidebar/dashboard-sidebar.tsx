@@ -19,10 +19,18 @@ const dashboardNavigation = [
   { label: "Settings", icon: Gear, href: "/dashboard?section=settings" },
 ] as const;
 
-export function DashboardSidebar({ activeHref }: { activeHref: string }) {
+export function DashboardSidebar({
+  activeHref,
+  showSettings = true,
+}: {
+  activeHref: string;
+  showSettings?: boolean;
+}) {
   return (
     <Sidebar
-      items={dashboardNavigation}
+      items={
+        showSettings ? dashboardNavigation : dashboardNavigation.slice(0, 4)
+      }
       activeHref={activeHref}
       user={{ name: "Nina Koskinen", initials: "NK" }}
     />

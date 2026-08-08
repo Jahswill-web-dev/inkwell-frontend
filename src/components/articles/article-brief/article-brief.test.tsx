@@ -1,12 +1,20 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ArticleBrief } from "./article-brief";
+
+const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: pushMock }),
+}));
 
 afterEach(() => {
   cleanup();
   window.sessionStorage.clear();
 });
+
+beforeEach(() => pushMock.mockClear());
 
 describe("ArticleBrief", () => {
   it("renders the reference brief and marks Brief as the current step", () => {
@@ -100,5 +108,7 @@ describe("ArticleBrief", () => {
         "Outline generated.",
       ),
     );
+    expect(pushMock).toHaveBeenCalledWith("/articles/new/outline");
+    expect(window.sessionStorage.getItem("inkwell:article-brief")).toBeTruthy();
   });
 });

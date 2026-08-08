@@ -1,0 +1,838 @@
+.page {
+  min-height: 100svh;
+  background: var(--color-ink-paper);
+  color: var(--color-ink-navy);
+}
+
+.workspace {
+  min-height: 100svh;
+  margin-left: 215px;
+  padding-bottom: 94px;
+}
+
+.mobileHeader,
+.mobileMetadata,
+.mobileSectionMeta,
+.mobileSectionActions,
+.mobileDraftAction,
+.healthOverlay {
+  display: none;
+}
+
+.layout {
+  display: grid;
+  min-height: calc(100svh - 185px);
+  grid-template-columns: minmax(0, 1fr) 326px;
+}
+
+.mainContent {
+  min-width: 0;
+  padding: 42px 32px 30px;
+}
+
+.intro,
+.sections,
+.status {
+  width: min(100%, 900px);
+  margin-inline: auto;
+}
+
+.intro h1 {
+  margin: 0;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: clamp(2.5rem, 3.25vw, 3.25rem);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+}
+
+.desktopMetadata {
+  display: grid;
+  align-items: start;
+  margin-top: 33px;
+  grid-template-columns: 1.5fr 1fr auto;
+  gap: 42px;
+}
+
+.desktopMetadata > div {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.desktopMetadata span,
+.notes > span,
+.sectionDetails h3 {
+  font-size: 0.73rem;
+  font-weight: 700;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.mobilePurposeLabel {
+  display: none;
+}
+
+.desktopMetadata strong {
+  overflow: hidden;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 1.03rem;
+  font-weight: 500;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktopMetadata > div:nth-child(2) strong,
+.desktopMetadata > div:nth-child(3) strong {
+  font-family: var(--font-manrope), "Segoe UI", sans-serif;
+  font-size: 0.85rem;
+}
+
+.sections {
+  margin-top: 34px;
+  overflow: visible;
+  border: 1px solid #dedbd7;
+  border-radius: 5px;
+  background: #fffefa;
+}
+
+.sectionCard {
+  position: relative;
+  border-bottom: 1px solid #dedbd7;
+  transition: opacity 150ms ease;
+}
+
+.sectionCard:last-child {
+  border-bottom: 0;
+}
+
+.dragging {
+  opacity: 0.48;
+}
+
+.sectionHeader {
+  display: grid;
+  min-height: 71px;
+  box-sizing: border-box;
+  align-items: center;
+  padding: 0 18px;
+  grid-template-columns: 32px 47px minmax(0, 1fr) auto;
+}
+
+.openSection .sectionHeader {
+  min-height: 72px;
+}
+
+.dragHandle {
+  display: inline-flex;
+  color: #31466f;
+  cursor: grab;
+}
+
+.sectionNumber {
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 1.24rem;
+}
+
+.sectionNumber::after {
+  content: ".";
+}
+
+.sectionHeader h2 {
+  overflow: hidden;
+  margin: 0;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 1.22rem;
+  font-weight: 500;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sectionActions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.sectionActions button,
+.mobileSectionActions button {
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-navy);
+  cursor: pointer;
+}
+
+.sectionActions button:disabled,
+.mobileSectionActions button:disabled,
+.regenerateApproach:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.desktopRegenerate,
+.desktopMenuButton,
+.expandButton {
+  display: inline-flex;
+  padding: 6px;
+}
+
+.wordCount {
+  width: 102px;
+  color: #26385c;
+  font-size: 0.81rem;
+  text-align: right;
+}
+
+.expandButton svg {
+  transition: transform 160ms ease;
+}
+
+.openSection .expandButton svg {
+  transform: rotate(180deg);
+}
+
+.menuWrap {
+  position: relative;
+}
+
+.actionMenu {
+  position: absolute;
+  z-index: 6;
+  top: calc(100% + 5px);
+  right: 0;
+  display: grid;
+  width: 132px;
+  padding: 5px;
+  border: 1px solid #d8d5d0;
+  border-radius: 5px;
+  background: #fff;
+  box-shadow: 0 10px 28px rgb(7 25 79 / 14%);
+}
+
+.actionMenu button {
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 3px;
+  font:
+    0.78rem var(--font-manrope),
+    "Segoe UI",
+    sans-serif;
+  text-align: left;
+}
+
+.actionMenu button:hover:not(:disabled) {
+  background: var(--color-ink-blue-soft);
+}
+
+.sectionContent {
+  padding: 11px 62px 22px 111px;
+}
+
+.sectionDetails {
+  display: grid;
+  grid-template-columns: 1fr 1.16fr;
+  gap: 48px;
+}
+
+.sectionDetails h3 {
+  margin: 0 0 12px;
+}
+
+.sectionDetails p,
+.sectionDetails ul {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.75;
+}
+
+.sectionDetails ul {
+  padding-left: 18px;
+  list-style: disc;
+}
+
+.notes {
+  display: grid;
+  margin-top: 31px;
+  gap: 9px;
+}
+
+.notes small {
+  font: inherit;
+}
+
+.notes textarea {
+  width: 100%;
+  height: 70px;
+  box-sizing: border-box;
+  resize: vertical;
+  border: 1px solid #d8d5d0;
+  border-radius: 5px;
+  background: #fffefa;
+  color: var(--color-ink-navy);
+  font:
+    0.85rem/1.5 var(--font-manrope),
+    "Segoe UI",
+    sans-serif;
+  padding: 13px 14px;
+}
+
+.notes textarea::placeholder {
+  color: #7b88a2;
+}
+
+.notes textarea:focus {
+  border-color: var(--color-ink-navy);
+  box-shadow: 0 0 0 3px rgb(7 25 79 / 10%);
+  outline: 0;
+}
+
+.status {
+  min-height: 20px;
+  margin-top: 12px;
+  color: #2f7650;
+  font-size: 0.78rem;
+  text-align: right;
+}
+
+.healthPanel {
+  border-left: 1px solid var(--color-ink-line);
+  background: #fffefa;
+}
+
+.healthContent {
+  padding: 43px 32px;
+}
+
+.healthContent h2 {
+  margin: 0 0 25px;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+
+.healthChecks {
+  display: grid;
+}
+
+.healthCheck {
+  display: grid;
+  padding: 21px 0 29px;
+  border-bottom: 1px solid #dcd9d5;
+  grid-template-columns: 35px 1fr;
+  gap: 10px;
+}
+
+.healthCheck:first-child {
+  padding-top: 12px;
+}
+
+.healthCheck > span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+}
+
+.passed {
+  background: #e5f2df;
+  color: #247541;
+}
+
+.pending {
+  background: #f4e8e5;
+  color: var(--color-ink-crimson);
+}
+
+.healthCheck strong {
+  font-size: 0.79rem;
+}
+
+.healthCheck p {
+  margin: 5px 0 0;
+  color: #334568;
+  font-size: 0.75rem;
+  line-height: 1.65;
+}
+
+.regenerateApproach {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-top: 30px;
+  padding: 9px 0;
+  border: 0;
+  background: transparent;
+  color: #0645b7;
+  font:
+    0.82rem var(--font-manrope),
+    "Segoe UI",
+    sans-serif;
+  cursor: pointer;
+  text-align: left;
+}
+
+.desktopFooter {
+  position: fixed;
+  z-index: 4;
+  right: 326px;
+  bottom: 0;
+  left: 215px;
+  display: flex;
+  height: 94px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 max(42px, calc((100vw - 215px - 326px - 900px) / 2));
+  border-top: 1px solid var(--color-ink-line);
+  background: rgb(255 253 250 / 98%);
+}
+
+.desktopFooter > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: #063f9c;
+  font-size: 0.86rem;
+  text-decoration: none;
+}
+
+.desktopFooter > div {
+  display: flex;
+  gap: 16px;
+}
+
+.desktopFooter button {
+  min-width: 88px;
+  min-height: 50px;
+  padding: 0 25px;
+  border: 1px solid #8e98ad;
+  border-radius: 4px;
+  background: #fffefa;
+  color: var(--color-ink-navy);
+  font:
+    0.86rem var(--font-manrope),
+    "Segoe UI",
+    sans-serif;
+  cursor: pointer;
+}
+
+.desktopFooter button:last-child {
+  min-width: 160px;
+  border-color: var(--color-ink-navy);
+  background: var(--color-ink-navy);
+  color: #fff;
+}
+
+.spinning {
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 1100px) and (min-width: 801px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) 280px;
+  }
+
+  .healthContent {
+    padding-inline: 24px;
+  }
+
+  .desktopFooter {
+    right: 280px;
+  }
+
+  .sectionContent {
+    padding-left: 65px;
+  }
+}
+
+@media (max-width: 800px) {
+  .page {
+    background: #fff;
+  }
+
+  .workspace {
+    margin-left: 0;
+    padding-bottom: 0;
+  }
+
+  .mobileHeader {
+    display: grid;
+    height: 64px;
+    align-items: center;
+    padding: 0 24px;
+    grid-template-columns: 1fr auto 1fr;
+  }
+
+  .mobileHeader > a {
+    display: inline-flex;
+    width: max-content;
+    color: var(--color-ink-navy);
+  }
+
+  .mobileTitle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--font-newsreader), Georgia, serif;
+    font-size: 1.2rem;
+  }
+
+  .mobileTitle img {
+    width: 22px;
+    height: 31px;
+    object-fit: contain;
+  }
+
+  .mobileHeader > button {
+    justify-self: end;
+    padding: 9px 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-ink-navy);
+    font:
+      0.95rem var(--font-manrope),
+      "Segoe UI",
+      sans-serif;
+    cursor: pointer;
+  }
+
+  .layout {
+    display: block;
+    min-height: auto;
+  }
+
+  .mainContent {
+    padding: 7px 18px 19px;
+  }
+
+  .intro,
+  .sections,
+  .status {
+    width: auto;
+    margin-inline: 0;
+  }
+
+  .intro h1 {
+    font-size: clamp(1.55rem, 6vw, 1.65rem);
+    line-height: 1.08;
+  }
+
+  .intro {
+    padding-inline: 10px;
+  }
+
+  .desktopMetadata,
+  .healthPanel,
+  .desktopFooter,
+  .desktopRegenerate,
+  .desktopMenuButton,
+  .wordCount {
+    display: none;
+  }
+
+  .mobileMetadata {
+    display: flex;
+    min-height: 43px;
+    align-items: center;
+    margin-top: 4px;
+    gap: 9px;
+    color: #172850;
+    white-space: nowrap;
+  }
+
+  .mobileMetadata > span:not(.divider) {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: clamp(0.7rem, 3vw, 0.8rem);
+  }
+
+  .mobileMetadata i,
+  .mobileSectionMeta i {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    flex: none;
+    place-items: center;
+    border-radius: 50%;
+    background: #f1f3f6;
+    font-style: normal;
+  }
+
+  .mobileMetadata .divider {
+    width: 1px;
+    height: 28px;
+    background: #d9dde5;
+  }
+
+  .mobileMetadata button {
+    padding: 8px 0;
+    border: 0;
+    background: transparent;
+    color: #0752c7;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .sections {
+    margin-top: 1px;
+    border-radius: 6px;
+  }
+
+  .sectionHeader {
+    min-height: 53px;
+    padding: 0 16px 0 11px;
+    grid-template-columns: 28px 38px minmax(0, 1fr) auto;
+  }
+
+  .openSection .sectionHeader {
+    min-height: 53px;
+  }
+
+  .dragHandle svg {
+    width: 23px;
+  }
+
+  .sectionNumber {
+    display: grid;
+    width: 31px;
+    height: 31px;
+    place-items: center;
+    border-radius: 50%;
+    background: #f0f2f5;
+    font-size: 1.05rem;
+  }
+
+  .sectionNumber::after {
+    display: none;
+  }
+
+  .sectionHeader h2 {
+    padding-left: 7px;
+    font-size: clamp(0.98rem, 3.9vw, 1.08rem);
+    white-space: normal;
+  }
+
+  .sectionActions {
+    gap: 0;
+  }
+
+  .expandButton {
+    padding: 8px 0 8px 8px;
+  }
+
+  .sectionContent {
+    padding: 0 24px 9px 42px;
+  }
+
+  .sectionDetails {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .sectionDetails h3,
+  .notes > span {
+    margin-bottom: 6px;
+    font-size: 0.78rem;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .desktopPurposeLabel {
+    display: none;
+  }
+
+  .mobilePurposeLabel {
+    display: inline;
+  }
+
+  .sectionDetails p,
+  .sectionDetails ul {
+    font-size: 0.82rem;
+    line-height: 1.55;
+  }
+
+  .sectionDetails ul {
+    padding-left: 20px;
+  }
+
+  .sectionDetails li {
+    padding-left: 4px;
+  }
+
+  .sectionDetails li::marker {
+    color: var(--color-ink-crimson);
+  }
+
+  .notes {
+    margin-top: 13px;
+    gap: 2px;
+  }
+
+  .notes small {
+    display: none;
+  }
+
+  .notes textarea {
+    height: 42px;
+    min-height: 42px;
+    padding: 3px 0 10px;
+    border: 0;
+    border-bottom: 1px solid #d6dae1;
+    border-radius: 0;
+    background: transparent;
+    font-size: 0.8rem;
+  }
+
+  .notes textarea:focus {
+    border-color: var(--color-ink-navy);
+    box-shadow: none;
+  }
+
+  .mobileSectionMeta {
+    display: block;
+    padding: 7px 0;
+    border-bottom: 1px solid #d6dae1;
+  }
+
+  .mobileSectionMeta > span {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+  }
+
+  .mobileSectionActions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 4px;
+  }
+
+  .mobileSectionActions button {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 0;
+    color: #0752c7;
+    font:
+      0.8rem var(--font-manrope),
+      "Segoe UI",
+      sans-serif;
+  }
+
+  .openSection .actionMenu {
+    top: auto;
+    right: 4px;
+    bottom: 51px;
+  }
+
+  .status {
+    margin-top: 8px;
+    font-size: 0.75rem;
+    text-align: center;
+  }
+
+  .status:empty {
+    display: none;
+  }
+
+  .mobileDraftAction {
+    display: block;
+    margin-top: 20px;
+    padding: 0 3px;
+  }
+
+  .mobileDraftAction button {
+    width: 100%;
+    min-height: 53px;
+    border: 0;
+    border-radius: 5px;
+    background: var(--color-ink-navy);
+    color: #fff;
+    font:
+      1rem var(--font-manrope),
+      "Segoe UI",
+      sans-serif;
+    cursor: pointer;
+  }
+
+  .healthOverlay {
+    position: fixed;
+    z-index: 20;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 16px;
+    background: rgb(3 11 36 / 45%);
+  }
+
+  .healthDialog {
+    position: relative;
+    width: min(100%, 430px);
+    max-height: calc(100svh - 32px);
+    overflow-y: auto;
+    border-radius: 12px;
+    background: var(--color-ink-paper);
+    box-shadow: 0 20px 60px rgb(3 11 36 / 24%);
+  }
+
+  .healthDialog .healthContent {
+    padding: 30px 27px;
+  }
+
+  .closeHealth {
+    position: absolute;
+    z-index: 2;
+    top: 22px;
+    right: 20px;
+    display: inline-flex;
+    padding: 6px;
+    border: 0;
+    background: transparent;
+    color: var(--color-ink-navy);
+    cursor: pointer;
+  }
+}
+
+@media (max-width: 430px) {
+  .mobileHeader {
+    height: 64px;
+    padding-inline: 24px;
+  }
+
+  .mainContent {
+    padding-inline: 16px;
+  }
+
+  .mobileMetadata {
+    gap: 8px;
+  }
+
+  .mobileMetadata i {
+    width: 28px;
+    height: 28px;
+  }
+
+  .sectionContent {
+    padding-left: 42px;
+    padding-right: 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinning {
+    animation: none;
+  }
+}

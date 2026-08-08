@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button/button";
 import { FormField } from "@/components/ui/form-field/form-field";
@@ -31,6 +32,7 @@ function getSignupErrors(form: HTMLFormElement): SignupErrors {
 }
 
 export function SignupForm() {
+  const router = useRouter();
   const [errors, setErrors] = useState<SignupErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notice, setNotice] = useState("");
@@ -45,8 +47,7 @@ export function SignupForm() {
 
     setIsSubmitting(true);
     window.setTimeout(() => {
-      setIsSubmitting(false);
-      setNotice("Your account is ready. Onboarding will open next.");
+      router.push("/onboarding");
     }, 500);
   };
 

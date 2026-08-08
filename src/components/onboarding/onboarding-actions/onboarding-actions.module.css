@@ -1,0 +1,48 @@
+.footer {
+  margin-top: 61px;
+  padding: 36px 65px 55px;
+  border-top: 1px solid #e0dbd4;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 78px;
+}
+
+.back {
+  color: var(--color-ink-navy);
+  font-size: 1rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.continue {
+  width: 196px;
+  min-height: 76px;
+  border-radius: 6px;
+  font-size: 1.08rem;
+}
+
+@media (max-width: 800px) {
+  .footer {
+    margin-top: 52.5px;
+    padding: 25px 34px 33px;
+  }
+
+  .actions {
+    display: block;
+  }
+
+  .back {
+    display: none;
+  }
+
+  .continue {
+    width: 100%;
+    min-height: 60px;
+    border-radius: 7px;
+    font-size: 1.25rem;
+  }
+}

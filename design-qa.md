@@ -1,49 +1,40 @@
-# Login Design QA
+# Dashboard and Onboarding Design QA
 
 ## Targets and evidence
 
-- Desktop reference: `public/designs/mvp/login-desktop.png` (1486 × 1059)
-- Desktop implementation: `design-reference/login-implementation-desktop.png` (1486 × 1059, DPR 1)
-- Mobile reference: `public/designs/mvp/login-mobile.png` (853 × 1844, approximately 426.5 × 922 CSS pixels at DPR 2)
-- Mobile implementation: `design-reference/login-implementation-mobile.png` (852 × 1844, captured from a 426.5-pixel clip at DPR 2; the one-pixel source-width difference is capture rounding)
-- Compared state: initial `/login` screen with empty fields and no notices.
+- Desktop dashboard reference: `public/designs/mvp/dashboard-desktop.png` (1486 × 1059)
+- Desktop implementation: `design-reference/dashboard-implementation-desktop.png` (1486 × 1059, DPR 1)
+- Mobile dashboard reference: `public/designs/mvp/dashboard-mobile.png` (853 × 1844)
+- Mobile implementation: `design-reference/dashboard-implementation-mobile.png` (853 × 1844, normalized at DPR 2)
+- Onboarding behavior: one writing-goals screen, with no intermediate onboarding steps, followed by `/dashboard`.
 
-The reference and implementation captures were opened together for each full-page comparison. Focused checks covered the brand/story region, form column, form control geometry, options row, prompts, typography, and responsive stacking.
+The desktop and mobile references were opened alongside their matching implementation captures. The comparison covered page structure, typography, responsive navigation, CTA and quick-action geometry, article density, dividers, colors, icons, portrait crop, fixed mobile navigation, and horizontal overflow.
 
 ## Iteration history
 
 ### First comparison
 
-- P2: The desktop form column was too narrow.
-- P2: The desktop editorial headline was undersized.
-- P2: The mobile content stack was oversized and sat too low.
+- P2: Desktop main content was too high and the quick-start rail started too far left.
+- P2: The desktop active-navigation row and brand sizing differed from the reference.
+- P2: Mobile content rhythm and article-row density pushed the final article too low.
 
-The shared auth measurements, logo sizing, headline scale, form width, and mobile vertical rhythm were corrected.
-
-### Second comparison
-
-- P2: The desktop editorial title wrapped to three lines instead of two.
-- P2: Divider and field spacing did not match the reference rhythm.
-
-The title received explicit responsive line grouping, and divider/field spacing was adjusted.
+The desktop content offset, grid width, navigation measurements, mobile spacing, and article-row sizing were corrected.
 
 ### Final comparison
 
 - P0 findings: none.
 - P1 findings: none.
 - P2 findings: none.
-- P3 notes: Small font-rendering and antialiasing differences remain between the raster references and browser output. The normalized mobile capture is one physical pixel narrower because the 853-pixel reference maps to a half CSS pixel at DPR 2.
+- P3 notes: Minor raster antialiasing differences remain in browser-rendered text and icons. The generated profile portrait matches the reference's composition and scale but is not the original photographed subject.
 
 ## Functional and accessibility verification
 
-- Email and required-password validation passed.
-- Password visibility toggle passed.
-- Remember-me checkbox passed with native keyboard-accessible behavior.
-- Google action and mocked login loading/success states passed in component tests.
-- `/forgot-password` and `/signup` link targets passed.
-- Desktop and mobile horizontal-overflow checks passed.
-- Accessible labels and roles passed.
+- Onboarding retains six native checkbox controls, whole-row selection, initial selected goals, and required-selection validation.
+- Onboarding Continue and Skip both navigate to `/dashboard`; desktop Back returns to `/signup`.
+- Dashboard search filters articles and visible primary actions provide accessible mocked feedback.
+- Desktop sidebar and mobile bottom navigation expose labeled interactive controls.
+- Exact desktop and normalized mobile viewport checks passed without horizontal overflow.
 - Browser console and uncaught page-error checks passed.
-- Production build and production-mode Playwright tests passed.
+- ESLint, TypeScript, 35 Vitest tests, 10 Playwright tests, and the production build passed.
 
 final result: passed

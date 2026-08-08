@@ -12,7 +12,7 @@ describe("DashboardHome", () => {
       screen.getByRole("heading", { name: "Good morning, Nina." }),
     ).toBeVisible();
     expect(
-      screen.getByRole("button", { name: /Create new article/ }),
+      screen.getByRole("link", { name: /Create new article/ }),
     ).toBeVisible();
     expect(screen.getAllByText("Continue writing").length).toBeGreaterThan(0);
   });
@@ -26,13 +26,22 @@ describe("DashboardHome", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("provides mocked feedback for primary dashboard actions", async () => {
+  it("links each new-article action to the correct starting mode", () => {
     render(<DashboardHome />);
-    await userEvent.click(
-      screen.getByRole("button", { name: /Create new article/ }),
+
+    expect(
+      screen.getByRole("link", { name: /Create new article/ }),
+    ).toHaveAttribute("href", "/articles/new");
+    expect(
+      screen.getAllByRole("link", { name: /Start from an idea/ }),
+    ).toSatisfy((links: HTMLElement[]) =>
+      links.every((link) => link.getAttribute("href") === "/articles/new"),
     );
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "New article setup will open next.",
+    expect(screen.getAllByRole("link", { name: /Paste your notes/ })).toSatisfy(
+      (links: HTMLElement[]) =>
+        links.every(
+          (link) => link.getAttribute("href") === "/articles/new?mode=notes",
+        ),
     );
   });
 });

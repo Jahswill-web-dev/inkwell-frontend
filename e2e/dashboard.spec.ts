@@ -14,7 +14,7 @@ test("renders the responsive dashboard without browser errors or overflow", asyn
     page.getByRole("heading", { name: "Good morning, Nina." }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: /Create new article/ }),
+    page.getByRole("link", { name: /Create new article/ }),
   ).toBeVisible();
   const isMobile = (page.viewportSize()?.width ?? 0) <= 800;
   if (isMobile) {
@@ -48,6 +48,9 @@ test("supports search and primary dashboard actions", async ({ page }) => {
     ).toBeVisible();
     await expect(page.getByText("Designing a Life of Meaning")).toHaveCount(0);
   }
-  await page.getByRole("button", { name: /Create new article/ }).click();
-  await expect(page.getByRole("status")).toContainText("New article setup");
+  await page.getByRole("link", { name: /Create new article/ }).click();
+  await expect(page).toHaveURL(/\/articles\/new$/);
+  await expect(
+    page.getByRole("heading", { name: "What would you like to write about?" }),
+  ).toBeVisible();
 });

@@ -23,6 +23,18 @@
   font-size: 0.9rem;
 }
 
+.progress li > a,
+.stepContent {
+  display: flex;
+  align-items: center;
+  color: inherit;
+  text-decoration: none;
+}
+
+.progress li > a:hover {
+  color: var(--color-ink-crimson);
+}
+
 .progress li:not(:last-child)::after {
   width: 86px;
   height: 1px;
@@ -58,6 +70,21 @@
   display: none;
 }
 
+.compact {
+  width: min(100%, 620px);
+  height: 90px;
+  border-bottom: 0;
+}
+
+.compact ol {
+  max-width: none;
+}
+
+.compact li:not(:last-child)::after {
+  width: clamp(22px, 3vw, 56px);
+  margin-inline: 10px;
+}
+
 @media (max-width: 800px) {
   .progress {
     height: 87px;
@@ -70,13 +97,25 @@
     padding: 18px 28px 0;
   }
 
+  .compact ol {
+    padding-top: 5px;
+  }
+
   .progress li {
     position: relative;
     display: grid;
     flex: 1;
     justify-items: center;
     gap: 5px;
-    font-size: 0.72rem;
+    font-size: 0.65rem;
+  }
+
+  .progress li > a,
+  .stepContent {
+    display: grid;
+    justify-items: center;
+    gap: 5px;
+    padding-inline: 2px;
   }
 
   .progress li:not(:last-child)::after {

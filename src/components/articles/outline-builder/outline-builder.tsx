@@ -447,7 +447,7 @@ export function OutlineBuilder() {
           </button>
         </header>
 
-        <ArticleProgress currentStep={3} />
+        <ArticleProgress currentStep="outline" />
 
         <div className={styles.layout}>
           <section className={styles.mainContent}>

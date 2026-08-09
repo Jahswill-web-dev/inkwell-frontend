@@ -1,8 +1,16 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DraftEditor } from "./draft-editor";
 import { DRAFT_STORAGE_KEY } from "./draft-editor-data";
+
+const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: pushMock }),
+}));
+
+beforeEach(() => pushMock.mockClear());
 
 afterEach(() => {
   cleanup();
@@ -69,6 +77,7 @@ describe("DraftEditor", () => {
       "Draft saved and ready for review.",
     );
     expect(window.sessionStorage.getItem(DRAFT_STORAGE_KEY)).toBeTruthy();
+    expect(pushMock).toHaveBeenCalledWith("/articles/new/review");
   });
 
   it("persists checklist changes through autosave", async () => {

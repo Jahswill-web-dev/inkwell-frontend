@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
@@ -44,6 +45,7 @@ import {
 } from "lexical";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
+import { ArticleProgress } from "../article-progress/article-progress";
 import { Checkbox } from "@/components/ui/checkbox/checkbox";
 import {
   countDraftWords,
@@ -141,6 +143,7 @@ function elapsedLabel(savedAt: string | null) {
 }
 
 export function DraftEditor() {
+  const router = useRouter();
   const [draft, setDraft] = useState<DraftArticleState>(() =>
     createDefaultDraft(),
   );
@@ -472,6 +475,7 @@ export function DraftEditor() {
   const reviewArticle = () => {
     if (saveDraft("saved", "Draft saved and ready for review.")) {
       setStatusMessage("Draft saved and ready for review.");
+      router.push("/articles/new/review");
     }
   };
 
@@ -746,6 +750,7 @@ export function DraftEditor() {
                 ) : null}
                 <span>{wordCount.toLocaleString()} words</span>
               </div>
+              <ArticleProgress currentStep="draft" compact />
               <div className={styles.topActions}>
                 <button onClick={() => setPreviewOpen(true)} type="button">
                   Preview
@@ -828,6 +833,7 @@ export function DraftEditor() {
               <DotsThree size={27} weight="bold" aria-hidden />
             </button>
           </header>
+          <ArticleProgress currentStep="draft" compact />
           <article className={styles.mobileArticle}>
             {draft.sections.map((section, index) => (
               <DraftRichSection

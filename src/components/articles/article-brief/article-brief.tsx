@@ -233,7 +233,7 @@ export function ArticleBrief() {
           </button>
         </header>
 
-        <ArticleProgress currentStep={2} />
+        <ArticleProgress currentStep="brief" />
 
         <div className={styles.content}>
           <section className={styles.summary} aria-label="Article summary">

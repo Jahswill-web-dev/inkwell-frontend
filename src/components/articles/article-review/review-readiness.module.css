@@ -1,0 +1,183 @@
+.readiness {
+  position: fixed;
+  inset: 91px 0 0 auto;
+  width: 523px;
+  overflow-y: auto;
+  border-left: 1px solid var(--color-ink-line);
+  background: var(--color-ink-paper);
+  padding: 58px 50px 45px;
+}
+
+.readinessIntro {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  align-items: center;
+  gap: 20px;
+  padding-bottom: 29px;
+  border-bottom: 1px solid var(--color-ink-line);
+}
+
+.readinessIntro h2,
+.checklist h3,
+.resolve h3 {
+  margin: 0;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-weight: 600;
+}
+
+.readinessIntro h2 {
+  font-size: 1.55rem;
+}
+
+.readinessIntro p {
+  margin: 10px 0 0;
+  color: #40527a;
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.score {
+  position: relative;
+  display: grid;
+  width: 116px;
+  height: 116px;
+  place-items: center;
+  color: #2ea861;
+}
+
+.score svg,
+.score strong {
+  grid-area: 1 / 1;
+}
+
+.score strong {
+  z-index: 1;
+  color: var(--color-ink-navy);
+  font-size: 2.15rem;
+  font-weight: 500;
+}
+
+.checklist,
+.resolve {
+  margin-top: 32px;
+}
+
+.checklist h3,
+.resolve h3 {
+  margin-bottom: 14px;
+  font-size: 1rem;
+}
+
+.checklist > div {
+  display: grid;
+  min-height: 55px;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--color-ink-line);
+  border-bottom: 0;
+  padding: 0 15px;
+}
+
+.checklist > div:last-child {
+  border-bottom: 1px solid var(--color-ink-line);
+}
+
+.checklist span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #ee8a00;
+  font-size: 0.82rem;
+}
+
+.checklist .good {
+  color: var(--color-ink-green);
+}
+
+.resolve {
+  padding-top: 22px;
+  border-top: 1px solid var(--color-ink-line);
+}
+
+.resolve button {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 27px 1fr 20px;
+  align-items: center;
+  gap: 10px;
+  margin-top: 9px;
+  border: 1px solid #f6ce92;
+  border-radius: 6px;
+  background: #fffaf1;
+  color: inherit;
+  padding: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.resolve button > svg:first-child {
+  color: #ee8a00;
+}
+
+.resolve button span {
+  display: grid;
+  gap: 5px;
+}
+
+.resolve button small {
+  color: #40527a;
+  line-height: 1.5;
+}
+
+.readinessActions {
+  display: grid;
+  grid-template-columns: 1fr 1.45fr;
+  gap: 16px;
+  margin-top: 29px;
+}
+
+.readinessActions button {
+  min-height: 47px;
+  border: 1px solid #cbd3e1;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.readinessActions button:last-child {
+  border-color: var(--color-ink-crimson);
+  background: var(--color-ink-crimson);
+  color: #fff;
+}
+
+@media (max-width: 800px) {
+  .readiness {
+    position: fixed;
+    inset: 62px 0 0;
+    z-index: 12;
+    width: auto;
+    overflow-y: auto;
+    border: 1px solid var(--color-ink-line);
+    border-radius: 0;
+    background: rgba(255, 255, 255, 0.98);
+    padding: 32px 26px 40px;
+  }
+
+  .readinessIntro {
+    grid-template-columns: 95px 1fr;
+  }
+
+  .score,
+  .score svg {
+    width: 92px;
+    height: 92px;
+  }
+
+  .score strong {
+    font-size: 1.65rem;
+  }
+}

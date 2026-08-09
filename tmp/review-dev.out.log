@@ -1,0 +1,71 @@
+
+> inkwell-frontend2@1.0.0 dev
+> next dev -p 3100
+
+▲ Next.js 16.2.12 (Turbopack)
+- Local:         http://localhost:3100
+- Network:       http://10.113.5.171:3100
+✓ Ready in 804ms
+Creating turbopack project {
+  dir: 'C:\\Users\\Dell\\Documents\\useinkwell\\inkwell-frontend',
+  testMode: true
+}
+
+ GET /articles/new/review 200 in 2.6s (next.js: 2.0s, application-code: 610ms)
+ GET / 200 in 715ms (next.js: 87ms, application-code: 628ms)
+ GET / 200 in 290ms (next.js: 9ms, application-code: 281ms)
+ GET /articles/new/review 200 in 507ms (next.js: 7ms, application-code: 500ms)
+ GET /articles/new/review 200 in 426ms (next.js: 19ms, application-code: 407ms)
+ GET /articles/new/review 200 in 489ms (next.js: 11ms, application-code: 477ms)
+ GET /articles/new/review 200 in 364ms (next.js: 16ms, application-code: 348ms)
+ GET / 200 in 256ms (next.js: 7ms, application-code: 248ms)
+ GET / 200 in 226ms (next.js: 9ms, application-code: 217ms)
+ GET /articles/new/review 200 in 464ms (next.js: 7ms, application-code: 457ms)
+ GET /articles/new/review 200 in 365ms (next.js: 20ms, application-code: 345ms)
+ GET /articles/new/review 200 in 531ms (next.js: 11ms, application-code: 520ms)
+ GET /articles/new/review 200 in 488ms (next.js: 14ms, application-code: 475ms)
+ GET / 200 in 252ms (next.js: 10ms, application-code: 242ms)
+ GET / 200 in 246ms (next.js: 6ms, application-code: 240ms)
+ GET /articles/new/review 200 in 212ms (next.js: 6ms, application-code: 206ms)
+ GET /articles/new/review 200 in 1033ms (next.js: 119ms, application-code: 914ms)
+ GET /articles/new/review 200 in 836ms (next.js: 34ms, application-code: 802ms)
+ GET /articles/new/review 200 in 844ms (next.js: 90ms, application-code: 754ms)
+ GET /articles/new/review 200 in 963ms (next.js: 19ms, application-code: 943ms)
+ GET /articles/new/review 200 in 615ms (next.js: 57ms, application-code: 557ms)
+ GET / 200 in 112ms (next.js: 8ms, application-code: 104ms)
+ GET / 200 in 117ms (next.js: 4ms, application-code: 113ms)
+ GET /articles/new/review 200 in 205ms (next.js: 7ms, application-code: 198ms)
+ GET /articles/new/review 200 in 141ms (next.js: 7ms, application-code: 134ms)
+ GET / 200 in 110ms (next.js: 7ms, application-code: 103ms)
+ GET / 200 in 99ms (next.js: 2ms, application-code: 96ms)
+ GET /articles/new/review 200 in 308ms (next.js: 8ms, application-code: 300ms)
+ GET /articles/new/review 200 in 235ms (next.js: 23ms, application-code: 212ms)
+ GET / 200 in 104ms (next.js: 14ms, application-code: 90ms)
+ GET / 200 in 158ms (next.js: 2ms, application-code: 155ms)
+ GET /articles/new/review 200 in 230ms (next.js: 12ms, application-code: 219ms)
+ GET /articles/new/review 200 in 150ms (next.js: 14ms, application-code: 136ms)
+ GET / 200 in 105ms (next.js: 3ms, application-code: 102ms)
+ GET / 200 in 99ms (next.js: 3ms, application-code: 97ms)
+ GET /articles/new/review 200 in 167ms (next.js: 6ms, application-code: 161ms)
+ GET /articles/new/review 200 in 112ms (next.js: 9ms, application-code: 103ms)
+ GET /articles/new/draft 200 in 261ms (next.js: 89ms, application-code: 172ms)
+ GET / 200 in 391ms (next.js: 42ms, application-code: 350ms)
+ GET / 200 in 454ms (next.js: 19ms, application-code: 435ms)
+ GET /articles/new/review 200 in 1060ms (next.js: 7ms, application-code: 1053ms)
+ GET /articles/new/review 200 in 1728ms (next.js: 42ms, application-code: 1686ms)
+ GET /articles/new/review 200 in 1596ms (next.js: 38ms, application-code: 1558ms)
+ GET /articles/new/review 200 in 1599ms (next.js: 170ms, application-code: 1429ms)
+ GET /articles/new/review 200 in 1088ms (next.js: 30ms, application-code: 1059ms)
+ GET /articles/new/review 200 in 1148ms (next.js: 25ms, application-code: 1123ms)
+ GET /articles/new/draft 200 in 917ms (next.js: 67ms, application-code: 849ms)
+✓ Compiled in 200ms
+ GET / 200 in 333ms (next.js: 85ms, application-code: 247ms)
+ GET / 200 in 122ms (next.js: 4ms, application-code: 118ms)
+ GET /articles/new/review 200 in 682ms (next.js: 146ms, application-code: 536ms)
+ GET /articles/new/review 200 in 418ms (next.js: 19ms, application-code: 399ms)
+ GET /articles/new/review 200 in 421ms (next.js: 106ms, application-code: 315ms)
+ GET /articles/new/review 200 in 425ms (next.js: 60ms, application-code: 365ms)
+ GET /articles/new/review 200 in 369ms (next.js: 6ms, application-code: 363ms)
+ GET /articles/new/review 200 in 301ms (next.js: 17ms, application-code: 284ms)
+ GET /articles/new/draft 200 in 396ms (next.js: 18ms, application-code: 378ms)
+[?25h

@@ -1,12 +1,20 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OutlineBuilder, type ArticleOutlineState } from "./outline-builder";
+
+const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: pushMock }),
+}));
 
 afterEach(() => {
   cleanup();
   window.sessionStorage.clear();
 });
+
+beforeEach(() => pushMock.mockClear());
 
 describe("OutlineBuilder", () => {
   it("renders the seeded outline and marks Outline as the current step", () => {
@@ -73,6 +81,19 @@ describe("OutlineBuilder", () => {
       saved.sections.find((section) => section.id === "introduction")?.notes,
     ).toBe("Open with a concrete example.");
     expect(screen.getByRole("status")).toHaveTextContent("Outline saved.");
+  });
+
+  it("persists the outline and opens the draft editor", async () => {
+    render(<OutlineBuilder />);
+
+    await userEvent.click(
+      screen.getAllByRole("button", { name: "Start drafting" })[0],
+    );
+
+    expect(
+      window.sessionStorage.getItem("inkwell:article-outline"),
+    ).toBeTruthy();
+    expect(pushMock).toHaveBeenCalledWith("/articles/new/draft");
   });
 
   it("expands sections, regenerates content, and opens mobile health details", async () => {

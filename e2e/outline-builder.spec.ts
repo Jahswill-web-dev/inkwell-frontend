@@ -40,9 +40,7 @@ test("supports the responsive outline-building flow", async ({ page }) => {
   const notes = page.getByRole("textbox", { name: /Notes/i });
   await notes.fill("Open with a concrete observation.");
   await page.getByRole("button", { name: "Start drafting" }).click();
-  await expect(page.getByRole("status")).toContainText(
-    "Your draft is ready to begin.",
-  );
+  await expect(page).toHaveURL(/\/articles\/new\/draft$/);
   await expect
     .poll(() =>
       page.evaluate(() =>

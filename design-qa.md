@@ -1,48 +1,46 @@
-# Outline Builder Design QA
+# Draft Editor Design QA
 
 ## Evidence
 
 - Source visual truth:
-  - `public/designs/mvp/outline-builder-desktop.png`
-  - `public/designs/mvp/outline-builder-mobile.png`
-- Browser-rendered implementation:
-  - `design-reference/outline-implementation-desktop-final.png`
-  - `design-reference/outline-implementation-mobile-final.png`
+  - `public/designs/mvp/draft-editor-desktop.png`
+  - `public/designs/mvp/draft-editor-mobile.png`
+- Browser-rendered implementation captures:
+  - `design-reference/draft-implementation-desktop.png`
+  - `design-reference/draft-implementation-mobile.png`
 - Combined comparison evidence:
-  - `design-reference/qa-comparison-outline-desktop-final.png`
-  - `design-reference/qa-comparison-outline-mobile-final.png`
-- Desktop normalization: source `1487 × 1058` pixels normalized by one horizontal pixel to the `1488 × 1058` CSS viewport; implementation captured at `1488 × 1058`, device scale factor 1.
-- Mobile normalization: source `853 × 1844` pixels treated as a 2× design export and normalized to `426 × 922`; implementation captured at a `426 × 922` CSS viewport, device scale factor 1.
-- State: first section expanded, remaining four collapsed, outline health passing, no menu or dialog open.
-- Focused comparison: the expanded section served as the focused region because it contains the densest typography, icons, dividers, textarea, list markers, and action controls.
+  - `design-reference/qa-comparison-draft-desktop.png`
+  - `design-reference/qa-comparison-draft-mobile.png`
+- Desktop normalization: source `1487 × 1058` pixels normalized to the `1488 × 1058` CSS viewport; implementation captured at `1488 × 1058`, device scale factor 1.
+- Mobile normalization: source `852 × 1846` pixels treated as a 2× design export and normalized to the `426 × 923` CSS viewport; implementation captured at `426 × 923`, device scale factor 1.
+- State: Introduction active, the reference sentence selected with native browser selection, writing assistant open, first checklist item complete, no suggestion or dialog open.
+- Focused comparison: desktop editor/toolbar and assistant panel plus the mobile selected-text region, bottom sheet, and bottom navigation were compared at readable scale in the combined images.
 
 ## Findings
 
-- No actionable P0, P1, or P2 differences remain.
-- Fonts and typography: Newsreader and Manrope match the editorial/UI split, with equivalent hierarchy, wrapping, weights, and line heights at both viewports.
-- Spacing and layout: desktop editor/health proportions and mobile card/CTA vertical positions match the normalized references. Borders, radii, dividers, and section rhythm are consistent.
-- Colors and tokens: the navy, crimson, warm-paper, success-green, border, and link colors map to the existing Inkwell tokens and closely match the references.
-- Image quality and assets: the existing Inkwell logo assets remain sharp; all interface icons use the established Phosphor family. No placeholder art, CSS art, or custom SVG substitutes were introduced.
-- Copy and content: section content is coherent and shared across viewports. The canonical 1,060-word total and article-flow mobile progress are intentional decisions from the approved plan.
-- Accessibility and behavior: accordions, notes, saving, regeneration, reordering, health dialog focus/Escape behavior, status announcements, reduced motion, and overflow were exercised. Automated browser checks reported no page or console errors.
+- No actionable P0, P1, or P2 visual differences remain in the local browser-rendered comparison evidence.
+- Fonts and typography: the implementation uses Newsreader for article content and Manrope for product UI, with matching editorial hierarchy, line lengths, and wrapping at both reference viewports.
+- Spacing and layout: the desktop sidebar, outline rail, editor, toolbar, and assistant proportions align with the source. The mobile header, article viewport, half-height assistant sheet, and fixed tool navigation align with the normalized source.
+- Colors and tokens: navy, crimson, paper, selection blue, borders, and muted copy use the existing Inkwell tokens and closely match the references.
+- Image and icon fidelity: the supplied Inkwell logo assets are used directly, and all interface icons use the established Phosphor family. No placeholder or custom-drawn image substitutes were introduced.
+- Copy and content: visible article and assistant copy matches the reference. The live seeded word count is `279` instead of the static reference value `1,248`; this is intentional because the implementation derives the count from the editable document.
+- Native selection handles are browser/platform-owned and therefore are not simulated in the desktop Playwright capture.
 
 ## Comparison History
 
-1. Initial mobile capture was substantially taller than the normalized reference, with oversized headers, open-section spacing, collapsed rows, and CTA gaps. Mobile dimensions and rhythm were reduced to align the card and CTA with the source.
-2. The next comparison exposed missing question bullets, an under-spread desktop progress track, and mobile heading/metadata alignment drift. Explicit list markers, a wider progress layout, and adjusted mobile typography/padding fixed those P2 differences.
-3. Final desktop and mobile combined comparisons show no remaining actionable P0/P1/P2 findings.
-
-## Follow-up Polish
-
-- P3: the mobile header retains the established Inkwell article-flow alignment and labels instead of the conflicting outline-substep treatment in the supplied mobile mock.
-- P3: reference-specific example notes and the desktop-only `1,248 words` value were intentionally replaced by the shared editable notes state and derived `1,060 words` total.
+1. Initial capture exposed a sans-serif article surface, centered desktop content drift, an obscured mobile article header, and overly tall mobile checklist rows.
+2. The editorial font was corrected to Newsreader, the desktop article and toolbar were aligned to the reference grid, the supplied pen logo was accurately cropped in its viewport, and mobile article/sheet spacing was normalized.
+3. Final combined comparisons show no remaining actionable P0/P1/P2 visual differences in the captured states.
 
 ## Verification
 
-- Primary interactions tested: brief-to-outline navigation, accordion expansion, notes editing, outline health dialog, save/start drafting, regeneration, and section ordering.
-- Console errors checked: none.
-- Unit tests: 52 passed.
-- Playwright suite: 36 passed and 2 intentionally skipped across desktop and mobile Chromium, including all 4 outline-builder scenarios.
+- Primary interactions tested: outline-to-draft navigation, editing, formatting toolbar visibility, section state, autosave and reload recovery, offline status, assistant suggestion/retry/reject, preview, ready-for-review confirmation, and mobile tab switching.
+- Console errors checked by Playwright: none.
+- Unit tests: 60 passed.
+- Playwright: 40 passed and 2 intentionally skipped across desktop and mobile Chromium.
+- Lint: passed.
+- Typecheck: passed.
 - Production build: passed.
+- Blocking limitation: neither the in-app browser nor connected Chrome browser was available to this session, so the Product Design browser-choice requirement could not be completed even though local Playwright captures and comparisons were produced.
 
-final result: passed
+final result: blocked

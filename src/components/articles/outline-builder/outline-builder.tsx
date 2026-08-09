@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowClockwise,
   ArrowLeft,
@@ -225,6 +226,7 @@ function OutlineHealth({
 }
 
 export function OutlineBuilder() {
+  const router = useRouter();
   const [outline, setOutline] = useState<ArticleOutlineState>(defaultOutline);
   const [openSectionId, setOpenSectionId] = useState("introduction");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -325,6 +327,11 @@ export function OutlineBuilder() {
       JSON.stringify(outline),
     );
     setStatus(message);
+  };
+
+  const startDrafting = () => {
+    saveOutline("Outline saved. Opening your draft.");
+    router.push("/articles/new/draft");
   };
 
   const updateNotes = (id: string, notes: string) => {
@@ -663,12 +670,7 @@ export function OutlineBuilder() {
             </p>
 
             <div className={styles.mobileDraftAction}>
-              <button
-                onClick={() =>
-                  saveOutline("Outline saved. Your draft is ready to begin.")
-                }
-                type="button"
-              >
+              <button onClick={startDrafting} type="button">
                 Start drafting
               </button>
             </div>
@@ -691,12 +693,7 @@ export function OutlineBuilder() {
             <button type="button" onClick={() => saveOutline()}>
               Save
             </button>
-            <button
-              type="button"
-              onClick={() =>
-                saveOutline("Outline saved. Your draft is ready to begin.")
-              }
-            >
+            <button type="button" onClick={startDrafting}>
               Start drafting
             </button>
           </div>

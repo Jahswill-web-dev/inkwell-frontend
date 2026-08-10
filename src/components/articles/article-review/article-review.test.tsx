@@ -90,9 +90,7 @@ describe("ArticleReview", () => {
     await userEvent.click(
       screen.getByRole("button", { name: "Prepare for publishing" }),
     );
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "ready for publishing details",
-    );
+    expect(pushMock).toHaveBeenCalledWith("/articles/new/export");
     await waitFor(() =>
       expect(window.sessionStorage.getItem(REVIEW_STORAGE_KEY)).toBeTruthy(),
     );

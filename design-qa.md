@@ -1,56 +1,56 @@
-# Article Review Design QA
+# Export page design QA
 
-## Evidence
+## Comparison target
 
-- Source visual truth:
-  - `public/designs/mvp/review-screen-editorial-triage-desktop.png`
-  - `public/designs/mvp/review-screen-readiness-overview-desktop.png`
-  - `public/designs/mvp/article-review-mobile.png`
-- Browser-rendered implementation:
-  - `design-reference/review-implementation-desktop.png`
-  - `design-reference/review-summary-implementation-desktop.png`
-  - `design-reference/review-implementation-mobile.png`
-  - `design-reference/draft-with-progress-desktop.png`
-- Combined comparison evidence:
-  - `design-reference/review-comparison-desktop.png`
-  - `design-reference/review-comparison-mobile.png`
-- Desktop normalization: source and implementation are both `1487 × 1058` pixels at a `1487 × 1058` CSS viewport and device scale factor 1.
-- Mobile normalization: source is `852 × 1846` pixels and treated as a 2× export of a `426 × 923` CSS viewport. The Pixel 5 Playwright capture is `1172 × 2538` pixels at device scale factor 2.75 and was resampled to `852 × 1846` for the combined comparison.
-- State: Review step current, All issues selected, issue 2 of 7 active, Abrupt transition highlighted, no dialog or manual-edit field open.
-- Focused evidence: the original-size desktop triage capture was inspected for the article highlight and right issue panel; the normalized mobile capture was inspected for header, progress, filter strip, article rhythm, and bottom sheet. The readiness and Draft progress captures were inspected separately at original size.
+- Desktop source: `public/designs/mvp/export-article-desktop.png`
+- Desktop implementation: `design-reference/export-implementation-desktop.png`
+- Desktop viewport: 1487 × 1058 CSS px, device scale factor 1; both images are 1487 × 1058 px.
+- Mobile source: `public/designs/mvp/export-article-mobile.png` (853 × 1844 px, treated as a 2× design asset).
+- Mobile normalized source: `design-reference/export-source-mobile-normalized.png` (426 × 922 px).
+- Mobile implementation: `design-reference/export-implementation-mobile.png`
+- Mobile viewport: 426 × 922 CSS px, device scale factor 1; normalized source and implementation are both 426 × 922 px.
+- State: default Copy formatted text selection, inclusion options expanded, Title/Author/Sources/Article summary selected, Publishing metadata unselected.
+
+## Evidence reviewed
+
+- Full-view side-by-side comparisons:
+  - `design-reference/export-comparison-desktop.png`
+  - `design-reference/export-comparison-mobile.png`
+- Focused regions reviewed within the full-resolution comparisons: desktop progress/header, format rows, inclusion controls, summary preview, fixed action bar; mobile header, selected/disabled format states, disclosure and checkbox rows, compact summary, primary CTA.
+- Fonts and typography: Manrope and Newsreader match the existing product and target hierarchy; wrapping, weights, line heights, and editorial title treatment remain stable at both viewports.
+- Spacing and layout: desktop sidebar, two-column grid, action bar, mobile stack, card dimensions, row rhythm, and normalized mobile density align without overlap or overflow.
+- Colors and tokens: navy, crimson, paper, blue selection, borders, disabled opacity, and warm summary surface map to the target and existing tokens.
+- Image and icon quality: existing Inkwell raster logos are used; all UI icons come from the installed Phosphor family. No placeholder imagery, custom SVG, CSS art, or generated asset substitutes are present.
+- Copy and content: static UI copy follows the target. Live word count, read time, estimated size, and preview text are derived from the current draft.
 
 ## Findings
 
-- No actionable P0, P1, or P2 visual or interaction differences remain in the captured states.
-- Fonts and typography: Newsreader and Manrope match the existing Inkwell references, including editorial heading scale, body line height, UI weights, wrapping, and hierarchy.
-- Spacing and layout: desktop sidebar, filters, article column, right panel, readiness split, and Draft header align with the source grid. Mobile header, compact progress, filters, article, and bottom-sheet boundaries remain usable without horizontal overflow.
-- Colors and tokens: navy, crimson, paper, selection blue, green readiness, orange attention, borders, and muted text use the existing product tokens and preserve accessible contrast.
-- Image and icon fidelity: the supplied Inkwell logo assets are reused directly and controls use the established Phosphor icon family. No placeholder imagery, custom SVG, or generated raster substitute was introduced.
-- Copy and content: target article and selected-issue copy match. Additional seeded issues are coherent with the review categories and remain deterministic.
-- Accessibility and behavior: progress uses semantic navigation links and `aria-current`; future Export is disabled; filters expose pressed state; issue, dialog, status, and manual-edit controls have accessible names; keyboard focus uses the global visible focus treatment.
+- No actionable P0, P1, or P2 issues remain.
+- Accepted intentional differences:
+  - Desktop uses the approved existing five-step Brief/Outline/Draft/Review/Export workflow instead of the mock's four alternate labels.
+  - Statistics show the real default draft values (279 words, 2 min read, ~2 KB) instead of hard-coded mock values.
+  - PDF and Word remain visibly disabled and include the approved “Coming soon” clarification.
+- P3: minor optical differences remain between several Phosphor document glyphs and the mock's source icon artwork; sizing, meaning, alignment, and family consistency are acceptable.
 
-## Comparison History
+## Interaction and accessibility verification
 
-1. Initial desktop capture showed the article centered too far right and excessive issue-panel inset. The article was left-aligned to the reference grid and panel padding was reduced; the revised desktop comparison aligns both major columns.
-2. Initial mobile capture placed the article too low and opened an oversized bottom sheet too high on the viewport. Header/progress/filter heights and the sheet maximum height were normalized; the revised comparison restores the source reading area and sheet boundary.
-3. Initial readiness capture centered the article more narrowly than the source. Summary padding and article alignment were corrected; the revised readiness view follows the source split.
+- Playwright tested Markdown selection and download, disabled PDF/Word controls, mobile inclusion disclosure, responsive visibility, and horizontal overflow in desktop and mobile Chromium projects.
+- Component tests cover clipboard fallback, HTML/Markdown downloads, session hydration/persistence, inclusion changes, back navigation, and Review-to-Export navigation.
+- Native radio/checkbox controls, semantic fieldsets, disclosure attributes, keyboard focus styles, disabled states, and live status messages are present.
+- Browser console and page errors were captured during desktop and mobile end-to-end runs: none were reported.
 
-## Intentional Differences and Follow-up Polish
+## Comparison history
 
-- The mobile reference shows an older three-stage indicator and a short “Prepare” label. The implementation intentionally uses the requested functional five-step Brief → Export navigation and full “Prepare for publishing” label.
-- Desktop triage includes a Review summary affordance so the second supplied state is reachable; the isolated triage reference does not show that control.
-- The readiness ring uses the closest Phosphor progress icon rather than custom SVG/CSS art, producing a small P3 shape difference.
-- The local development captures include the Next.js development indicator near the lower-left corner; it is development chrome and is absent from the production build.
+1. Initial mobile capture used the raw 853 px asset width as CSS width, exposing a P1 desktop-layout capture and oversized controls. The source was correctly normalized to 426 × 922 and the implementation was recaptured at that CSS viewport.
+2. First normalized pass found P2 vertical-density drift in the mobile format rows and action placement. Mobile row heights, spacing, summary metrics, and CTA dimensions were recalibrated.
+3. Second pass found P2 icon scale and small vertical offsets. Header/format icons and section spacing were adjusted, then both production views were recaptured.
+4. Final full-view and focused comparisons show no actionable P0/P1/P2 differences.
 
-## Verification
+## Implementation checklist
 
-- Primary interactions tested: Draft → Review routing, completed-step navigation, filtering, previous/next issue navigation, accept, ignore, manual revision, persistence across reload, stale-anchor protection, readiness summary, preview, publishing confirmation, and mobile overflow.
-- Console and page errors checked by Playwright: none.
-- Unit/component tests: 66 passed across 21 files.
-- Review Playwright: 4 passed across desktop and mobile Chromium.
-- Lint: passed.
-- Typecheck: passed.
-- Production build: passed.
-- In-app browser availability: unavailable in this session; the user-requested local Playwright Chromium run supplied the browser-rendered interaction and screenshot evidence.
+- [x] Desktop and mobile layouts match the selected sources.
+- [x] Primary selection, disclosure, save, copy, and download interactions work.
+- [x] Responsive overflow and console checks pass.
+- [x] Intentional product/data differences are documented.
 
 final result: passed

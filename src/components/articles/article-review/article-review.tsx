@@ -163,7 +163,8 @@ export function ArticleReview() {
 
   const prepare = () => {
     updateReview((current) => ({ ...current, completed: true }));
-    setStatus("Review saved. Your article is ready for publishing details.");
+    setStatus("Review saved. Opening export options.");
+    router.push("/articles/new/export");
   };
 
   if (!hydrated)

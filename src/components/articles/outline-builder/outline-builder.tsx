@@ -16,6 +16,7 @@ import {
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
+import { DEFAULT_AUTH_IDENTITY, type AuthIdentity } from "@/lib/auth/identity";
 import { ArticleProgress } from "../article-progress/article-progress";
 import styles from "./outline-builder.module.css";
 
@@ -225,7 +226,11 @@ function OutlineHealth({
   );
 }
 
-export function OutlineBuilder() {
+export function OutlineBuilder({
+  identity = DEFAULT_AUTH_IDENTITY,
+}: {
+  identity?: AuthIdentity;
+}) {
   const router = useRouter();
   const [outline, setOutline] = useState<ArticleOutlineState>(defaultOutline);
   const [openSectionId, setOpenSectionId] = useState("introduction");
@@ -424,6 +429,7 @@ export function OutlineBuilder() {
     <main className={styles.page}>
       <DashboardSidebar
         activeHref="/dashboard?section=articles"
+        identity={identity}
         showSettings={false}
       />
 

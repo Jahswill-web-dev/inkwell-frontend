@@ -163,6 +163,14 @@
   text-align: center;
 }
 
+.formError {
+  margin: 12px 0 -4px;
+  color: var(--color-ink-crimson);
+  font-size: 0.82rem;
+  line-height: 1.4;
+  text-align: center;
+}
+
 .accountPrompt {
   margin: 29px 0 0;
   color: #304064;

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
+import { DEFAULT_AUTH_IDENTITY, type AuthIdentity } from "@/lib/auth/identity";
 import { ArticleProgress } from "../article-progress/article-progress";
 import {
   createDefaultDraft,
@@ -71,7 +72,11 @@ async function copyExport(
   await navigator.clipboard.writeText(plain);
 }
 
-export function ArticleExport() {
+export function ArticleExport({
+  identity = DEFAULT_AUTH_IDENTITY,
+}: {
+  identity?: AuthIdentity;
+}) {
   const router = useRouter();
   const [draft, setDraft] = useState<DraftArticleState>(() =>
     createDefaultDraft(),
@@ -158,6 +163,7 @@ export function ArticleExport() {
     <main className={styles.page}>
       <DashboardSidebar
         activeHref="/dashboard?section=articles"
+        identity={identity}
         showSettings={false}
       />
       <div className={styles.workspace}>

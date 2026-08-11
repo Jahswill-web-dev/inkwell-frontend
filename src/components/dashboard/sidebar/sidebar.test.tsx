@@ -11,6 +11,17 @@ const items = [
   { label: "Ideas", icon: Lightbulb, href: "/dashboard/ideas" },
 ] as const;
 
+const { postMock, refreshMock, replaceMock } = vi.hoisted(() => ({
+  postMock: vi.fn().mockResolvedValue({ status: 204 }),
+  refreshMock: vi.fn(),
+  replaceMock: vi.fn(),
+}));
+
+vi.mock("axios", () => ({ default: { post: postMock } }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: replaceMock, refresh: refreshMock }),
+}));
+
 describe("Sidebar", () => {
   it("renders configurable navigation and marks the active destination", () => {
     render(
@@ -46,5 +57,24 @@ describe("Sidebar", () => {
       screen.getByRole("button", { name: "Open Ada Lovelace profile menu" }),
     );
     expect(onProfileClick).toHaveBeenCalledOnce();
+  });
+
+  it("signs out from the profile menu", async () => {
+    render(
+      <Sidebar
+        items={items}
+        activeHref="/dashboard"
+        user={{ name: "writer_01", initials: "WR" }}
+      />,
+    );
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Open writer_01 profile menu" }),
+    );
+    await userEvent.click(screen.getByRole("menuitem", { name: "Sign out" }));
+
+    expect(postMock).toHaveBeenCalledWith("/api/auth/logout");
+    expect(replaceMock).toHaveBeenCalledWith("/login");
+    expect(refreshMock).toHaveBeenCalled();
   });
 });

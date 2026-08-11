@@ -11,7 +11,7 @@ test("renders the responsive dashboard without browser errors or overflow", asyn
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/dashboard");
   await expect(
-    page.getByRole("heading", { name: "Good morning, Nina." }),
+    page.getByRole("heading", { name: "Good morning, writer_01." }),
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: /Create new article/ }),
@@ -22,7 +22,7 @@ test("renders the responsive dashboard without browser errors or overflow", asyn
       page.getByRole("navigation", { name: "Mobile navigation" }),
     ).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Open profile menu" }),
+      page.getByRole("button", { name: "Open writer_01 profile menu" }),
     ).toBeVisible();
   } else {
     await expect(
@@ -53,4 +53,25 @@ test("supports search and primary dashboard actions", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "What would you like to write about?" }),
   ).toBeVisible();
+});
+
+test("signs out from the authenticated profile menu", async ({ page }) => {
+  await page.route("**/api/auth/logout", async (route) => {
+    await route.fulfill({
+      status: 204,
+      headers: {
+        "Set-Cookie":
+          "inkwell_access_token=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax",
+      },
+    });
+  });
+  await page.goto("/dashboard");
+
+  await page
+    .getByRole("button", { name: "Open writer_01 profile menu" })
+    .last()
+    .click();
+  await page.getByRole("menuitem", { name: "Sign out" }).click();
+
+  await expect(page).toHaveURL(/\/login$/);
 });

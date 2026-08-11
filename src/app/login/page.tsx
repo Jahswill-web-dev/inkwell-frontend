@@ -7,10 +7,15 @@ export const metadata: Metadata = {
   description: "Sign in to Inkwell and continue writing.",
 };
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const { next } = await searchParams;
   return (
     <AuthLayout ariaLabel="Account login">
-      <LoginForm />
+      <LoginForm redirectTo={next} />
     </AuthLayout>
   );
 }

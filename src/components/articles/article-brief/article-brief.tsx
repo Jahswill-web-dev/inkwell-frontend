@@ -11,6 +11,7 @@ import {
 } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
+import { DEFAULT_AUTH_IDENTITY, type AuthIdentity } from "@/lib/auth/identity";
 import { ArticleProgress } from "../article-progress/article-progress";
 import styles from "./article-brief.module.css";
 
@@ -127,7 +128,11 @@ function BriefField({
   );
 }
 
-export function ArticleBrief() {
+export function ArticleBrief({
+  identity = DEFAULT_AUTH_IDENTITY,
+}: {
+  identity?: AuthIdentity;
+}) {
   const router = useRouter();
   const [brief, setBrief] = useState<ArticleBriefState>(defaultBrief);
   const [errors, setErrors] = useState<Partial<Record<BriefTextField, string>>>(
@@ -212,7 +217,10 @@ export function ArticleBrief() {
 
   return (
     <main className={styles.page}>
-      <DashboardSidebar activeHref="/dashboard?section=articles" />
+      <DashboardSidebar
+        activeHref="/dashboard?section=articles"
+        identity={identity}
+      />
       <div className={styles.workspace}>
         <header className={styles.mobileHeader}>
           <Link href="/articles/new" aria-label="Back to new article">

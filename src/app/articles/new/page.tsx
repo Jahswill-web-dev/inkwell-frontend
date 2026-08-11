@@ -3,6 +3,8 @@ import {
   NewArticleForm,
   type NewArticleMode,
 } from "@/components/articles/new-article/new-article-form";
+import { requireUser } from "@/lib/auth/session";
+import { toAuthIdentity } from "@/lib/auth/identity";
 
 export const metadata: Metadata = {
   title: "New article",
@@ -17,8 +19,13 @@ export default async function NewArticlePage({
   searchParams,
 }: NewArticlePageProps) {
   const params = await searchParams;
+  const returnTo =
+    params.mode === "notes" ? "/articles/new?mode=notes" : "/articles/new";
+  const user = await requireUser(returnTo);
   const initialMode: NewArticleMode =
     params.mode === "notes" ? "notes" : "idea";
 
-  return <NewArticleForm initialMode={initialMode} />;
+  return (
+    <NewArticleForm identity={toAuthIdentity(user)} initialMode={initialMode} />
+  );
 }

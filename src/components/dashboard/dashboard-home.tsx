@@ -10,8 +10,13 @@ import { MobileNav } from "./mobile-nav";
 import { QuickActions } from "./quick-actions";
 import { DashboardSidebar } from "./sidebar";
 import styles from "./dashboard.module.css";
+import { DEFAULT_AUTH_IDENTITY, type AuthIdentity } from "@/lib/auth/identity";
 
-export function DashboardHome() {
+export function DashboardHome({
+  user = DEFAULT_AUTH_IDENTITY,
+}: {
+  user?: AuthIdentity;
+}) {
   const [query, setQuery] = useState("");
   const [notice, setNotice] = useState("");
   const filter = query.trim().toLowerCase();
@@ -32,13 +37,17 @@ export function DashboardHome() {
 
   return (
     <main className={styles.dashboard}>
-      <DashboardSidebar activeHref="/dashboard" />
+      <DashboardSidebar activeHref="/dashboard" identity={user} />
       <div className={styles.workspace}>
-        <DashboardHeader query={query} onQueryChange={setQuery} />
+        <DashboardHeader
+          identity={user}
+          query={query}
+          onQueryChange={setQuery}
+        />
         <div className={styles.dashboardGrid}>
           <section className={styles.mainContent}>
             <header className={styles.welcome}>
-              <h1>Good morning, Nina.</h1>
+              <h1>Good morning, {user.username}.</h1>
               <p>What would you like to write today?</p>
               <Link className={styles.createButton} href="/articles/new">
                 <Sparkle size={31} weight="regular" aria-hidden />

@@ -6,6 +6,7 @@ import {
   SquaresFour,
 } from "@phosphor-icons/react";
 import { Sidebar } from "./sidebar";
+import { DEFAULT_AUTH_IDENTITY, type AuthIdentity } from "@/lib/auth/identity";
 
 const dashboardNavigation = [
   { label: "Home", icon: House, href: "/dashboard" },
@@ -21,9 +22,11 @@ const dashboardNavigation = [
 
 export function DashboardSidebar({
   activeHref,
+  identity = DEFAULT_AUTH_IDENTITY,
   showSettings = true,
 }: {
   activeHref: string;
+  identity?: AuthIdentity;
   showSettings?: boolean;
 }) {
   return (
@@ -32,7 +35,7 @@ export function DashboardSidebar({
         showSettings ? dashboardNavigation : dashboardNavigation.slice(0, 4)
       }
       activeHref={activeHref}
-      user={{ name: "Nina Koskinen", initials: "NK" }}
+      user={{ name: identity.username, initials: identity.initials }}
     />
   );
 }

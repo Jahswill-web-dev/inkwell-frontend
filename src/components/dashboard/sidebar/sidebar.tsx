@@ -1,19 +1,14 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
-import { CaretDown, type Icon } from "@phosphor-icons/react";
+import { CaretDown, SignOut, type Icon } from "@phosphor-icons/react";
+import { useState } from "react";
+import { useSignOut } from "@/components/auth/use-sign-out";
 import styles from "./sidebar.module.css";
 
-export type SidebarItem = {
-  label: string;
-  icon: Icon;
-  href: string;
-};
-
-export type SidebarUser = {
-  name: string;
-  initials: string;
-};
-
+export type SidebarItem = { label: string; icon: Icon; href: string };
+export type SidebarUser = { name: string; initials: string };
 export type SidebarProps = {
   items: readonly SidebarItem[];
   activeHref: string;
@@ -29,6 +24,9 @@ export function Sidebar({
   onProfileClick,
   ariaLabel = "Primary navigation",
 }: SidebarProps) {
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const { isSigningOut, signOut } = useSignOut();
+
   return (
     <aside className={styles.sidebar} aria-label={ariaLabel}>
       <Link className={styles.brand} href="/" aria-label="Inkwell home">
@@ -44,7 +42,6 @@ export function Sidebar({
       <nav className={styles.navigation}>
         {items.map(({ href, icon: IconComponent, label }) => {
           const isActive = href === activeHref;
-
           return (
             <Link
               aria-current={isActive ? "page" : undefined}
@@ -59,16 +56,36 @@ export function Sidebar({
         })}
       </nav>
 
-      <button
-        className={styles.profile}
-        type="button"
-        aria-label={`Open ${user.name} profile menu`}
-        onClick={onProfileClick}
-      >
-        <span className={styles.initials}>{user.initials}</span>
-        <span>{user.name}</span>
-        <CaretDown size={16} aria-hidden />
-      </button>
+      <div className={styles.profileWrap}>
+        {isProfileOpen ? (
+          <div className={styles.profileMenu} role="menu">
+            <button
+              type="button"
+              role="menuitem"
+              disabled={isSigningOut}
+              onClick={signOut}
+            >
+              <SignOut size={18} aria-hidden />
+              {isSigningOut ? "Signing out..." : "Sign out"}
+            </button>
+          </div>
+        ) : null}
+        <button
+          className={styles.profile}
+          type="button"
+          aria-label={`Open ${user.name} profile menu`}
+          aria-haspopup="menu"
+          aria-expanded={isProfileOpen}
+          onClick={() => {
+            setIsProfileOpen((open) => !open);
+            onProfileClick?.();
+          }}
+        >
+          <span className={styles.initials}>{user.initials}</span>
+          <span>{user.name}</span>
+          <CaretDown size={16} aria-hidden />
+        </button>
+      </div>
     </aside>
   );
 }

@@ -1,56 +1,124 @@
 "use client";
 
+import axios from "axios";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button/button";
-import { Checkbox } from "@/components/ui/checkbox/checkbox";
 import { FormField } from "@/components/ui/form-field/form-field";
+import { safeProtectedPath } from "@/lib/auth/constants";
+import {
+  authErrorResponseSchema,
+  loginMessages,
+  loginSchema,
+  type RegistrationSuccess,
+} from "@/lib/auth/registration";
 import { AuthDivider } from "../auth-divider/auth-divider";
 import { GoogleAuthButton } from "../google-auth-button/google-auth-button";
 import { PasswordField } from "../password-field/password-field";
 import authStyles from "../auth.module.css";
 import styles from "./login-form.module.css";
 
-type LoginErrors = {
-  email?: string;
-  password?: string;
-};
+type LoginErrors = { email?: string; password?: string };
 
-function getLoginErrors(form: HTMLFormElement): LoginErrors {
+function readLogin(form: HTMLFormElement) {
   const data = new FormData(form);
-  const email = String(data.get("email") ?? "").trim();
-  const password = String(data.get("password") ?? "");
+  return loginSchema.safeParse({
+    email: String(data.get("email") ?? ""),
+    password: String(data.get("password") ?? ""),
+  });
+}
+
+function validationErrors(result: ReturnType<typeof readLogin>): LoginErrors {
+  if (result.success) return {};
   const errors: LoginErrors = {};
-
-  if (!/^\S+@\S+\.\S+$/.test(email)) {
-    errors.email = "Enter a valid email address.";
+  for (const issue of result.error.issues) {
+    const field = issue.path[0];
+    if ((field === "email" || field === "password") && !errors[field]) {
+      errors[field] = issue.message;
+    }
   }
-  if (!password) {
-    errors.password = "Enter your password.";
-  }
-
   return errors;
 }
 
-export function LoginForm() {
+function apiFailure(error: unknown): { errors: LoginErrors; message: string } {
+  const generic = "We couldn't sign you in. Try again.";
+  if (!axios.isAxiosError(error)) return { errors: {}, message: generic };
+
+  const result = authErrorResponseSchema.safeParse(error.response?.data);
+  if (!result.success) return { errors: {}, message: generic };
+
+  if (result.data.error.code === "invalid_credentials") {
+    return { errors: {}, message: "Invalid email or password." };
+  }
+
+  if (result.data.error.code === "too_many_login_attempts") {
+    const retryAfter = error.response?.headers?.["retry-after"];
+    const seconds =
+      typeof retryAfter === "string" && /^\d+$/.test(retryAfter)
+        ? Number(retryAfter)
+        : null;
+    return {
+      errors: {},
+      message:
+        seconds === null
+          ? "Too many login attempts. Please try again later."
+          : `Too many login attempts. Try again in ${seconds} seconds.`,
+    };
+  }
+
+  if (
+    result.data.error.code === "validation_error" &&
+    result.data.error.details
+  ) {
+    const errors: LoginErrors = {};
+    for (const detail of result.data.error.details) {
+      const field = detail.loc.at(-1);
+      if (field === "email") errors.email = loginMessages.email;
+      if (field === "password") errors.password = loginMessages.password;
+    }
+    if (Object.keys(errors).length) return { errors, message: "" };
+  }
+
+  return { errors: {}, message: generic };
+}
+
+export function LoginForm({
+  redirectTo = "/dashboard",
+}: {
+  redirectTo?: string;
+}) {
+  const router = useRouter();
   const [errors, setErrors] = useState<LoginErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notice, setNotice] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const nextErrors = getLoginErrors(event.currentTarget);
+    if (isSubmitting) return;
+
+    const result = readLogin(event.currentTarget);
+    const nextErrors = validationErrors(result);
     setErrors(nextErrors);
     setNotice("");
-
-    if (Object.keys(nextErrors).length > 0) return;
+    setSubmitError("");
+    if (!result.success) return;
 
     setIsSubmitting(true);
-    window.setTimeout(() => {
+    try {
+      await axios.post<RegistrationSuccess>("/api/auth/login", result.data, {
+        headers: { "Content-Type": "application/json" },
+      });
+      router.replace(safeProtectedPath(redirectTo));
+      router.refresh();
+    } catch (error) {
+      const failure = apiFailure(error);
+      setErrors(failure.errors);
+      setSubmitError(failure.message);
+    } finally {
       setIsSubmitting(false);
-      setNotice("You’re signed in. Your dashboard will open next.");
-    }, 500);
+    }
   };
 
   return (
@@ -64,7 +132,6 @@ export function LoginForm() {
         className={authStyles.googleAction}
         onClick={() => setNotice("Google sign-in will be available soon.")}
       />
-
       <AuthDivider />
 
       <form className={authStyles.authForm} noValidate onSubmit={handleSubmit}>
@@ -78,21 +145,15 @@ export function LoginForm() {
           placeholder="you@example.com"
           error={errors.email}
         />
-
         <PasswordField
           id="login-password"
           autoComplete="current-password"
+          minLength={1}
+          maxLength={128}
           error={errors.password}
         />
 
         <div className={styles.optionsRow}>
-          <Checkbox
-            id="remember-me"
-            name="remember"
-            label="Remember me"
-            checked={rememberMe}
-            onChange={(event) => setRememberMe(event.target.checked)}
-          />
           <Link
             className={styles.forgotLink}
             href="/forgot-password"
@@ -107,12 +168,17 @@ export function LoginForm() {
           type="submit"
           fullWidth
           isLoading={isSubmitting}
-          loadingLabel="Signing in…"
+          loadingLabel="Signing in..."
         >
           Sign in
         </Button>
       </form>
 
+      {submitError ? (
+        <p className={authStyles.formError} role="alert">
+          {submitError}
+        </p>
+      ) : null}
       {notice ? (
         <p className={authStyles.formNotice} role="status">
           {notice}

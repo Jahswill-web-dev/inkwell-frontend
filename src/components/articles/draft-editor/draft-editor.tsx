@@ -45,6 +45,7 @@ import {
 } from "lexical";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
+import { DEFAULT_AUTH_IDENTITY, type AuthIdentity } from "@/lib/auth/identity";
 import { ArticleProgress } from "../article-progress/article-progress";
 import { Checkbox } from "@/components/ui/checkbox/checkbox";
 import {
@@ -142,7 +143,11 @@ function elapsedLabel(savedAt: string | null) {
   return minutes < 1 ? "Autosaved just now" : `Autosaved ${minutes}m ago`;
 }
 
-export function DraftEditor() {
+export function DraftEditor({
+  identity = DEFAULT_AUTH_IDENTITY,
+}: {
+  identity?: AuthIdentity;
+}) {
   const router = useRouter();
   const [draft, setDraft] = useState<DraftArticleState>(() =>
     createDefaultDraft(),
@@ -734,6 +739,7 @@ export function DraftEditor() {
         <>
           <DashboardSidebar
             activeHref="/dashboard?section=articles"
+            identity={identity}
             showSettings={false}
           />
           <div className={styles.desktopWorkspace}>

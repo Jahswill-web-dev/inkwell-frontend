@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, X } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
+import { DEFAULT_AUTH_IDENTITY, type AuthIdentity } from "@/lib/auth/identity";
 import { ArticleProgress } from "../article-progress/article-progress";
 import {
   createDefaultDraft,
@@ -33,7 +34,11 @@ function persistReview(review: ReviewState) {
   window.sessionStorage.setItem(REVIEW_STORAGE_KEY, JSON.stringify(review));
 }
 
-export function ArticleReview() {
+export function ArticleReview({
+  identity = DEFAULT_AUTH_IDENTITY,
+}: {
+  identity?: AuthIdentity;
+}) {
   const router = useRouter();
   const [draft, setDraft] = useState<DraftArticleState>(() =>
     createDefaultDraft(),
@@ -174,6 +179,7 @@ export function ArticleReview() {
     <main className={styles.page}>
       <DashboardSidebar
         activeHref="/dashboard?section=articles"
+        identity={identity}
         showSettings={false}
       />
       <div className={styles.workspace}>

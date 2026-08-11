@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, type KeyboardEvent } from "react";
 import { ArrowLeft, ClipboardText, Lightbulb } from "@phosphor-icons/react";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
+import { DEFAULT_AUTH_IDENTITY, type AuthIdentity } from "@/lib/auth/identity";
 import styles from "./new-article-form.module.css";
 
 export type NewArticleMode = "idea" | "notes";
@@ -19,6 +20,7 @@ export type NewArticleFormState = {
 };
 
 type NewArticleFormProps = {
+  identity?: AuthIdentity;
   initialMode?: NewArticleMode;
 };
 
@@ -55,7 +57,10 @@ const initialState: NewArticleFormState = {
   articleGoal: "",
 };
 
-export function NewArticleForm({ initialMode = "idea" }: NewArticleFormProps) {
+export function NewArticleForm({
+  identity = DEFAULT_AUTH_IDENTITY,
+  initialMode = "idea",
+}: NewArticleFormProps) {
   const router = useRouter();
   const [mode, setMode] = useState<NewArticleMode>(initialMode);
   const [form, setForm] = useState<NewArticleFormState>(initialState);
@@ -131,7 +136,10 @@ export function NewArticleForm({ initialMode = "idea" }: NewArticleFormProps) {
 
   return (
     <main className={styles.page}>
-      <DashboardSidebar activeHref="/dashboard?section=articles" />
+      <DashboardSidebar
+        activeHref="/dashboard?section=articles"
+        identity={identity}
+      />
 
       <div className={styles.workspace}>
         <header className={styles.desktopHeader}>

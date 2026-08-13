@@ -38,7 +38,7 @@ export function ArticleList({
           <Link className={styles.desktopArticleRow} href={`/articles/${article.id}`} key={article.id}>
             <strong>{article.working_title}</strong>
             <span>{articleGoalLabels[article.article_goal]}</span>
-            <span className={styles.audienceCell}>{article.target_audience}</span>
+            <span className={styles.audienceCell}>{article.target_audience.join(", ")}</span>
             <span>{updatedLabel(article.updated_at)}</span>
             <CaretRight size={20} aria-hidden />
           </Link>

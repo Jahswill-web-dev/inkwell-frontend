@@ -11,8 +11,8 @@ vi.mock("@/lib/articles/client", async (importOriginal) => ({
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }) }));
 
 const articles = [
-  { id: "be5579e3-24fd-4272-a35f-f74740c3887e", user_id: "46a42280-6ad8-4bb6-a29c-1604adbf0c31", notes: "Notes one", working_title: "The Case for Slower Thinking", target_audience: "Writers", article_goal: "inform_and_inspire", created_at: "2026-08-12T12:00:00Z", updated_at: "2026-08-12T12:00:00Z" },
-  { id: "36dc2b27-f474-4d43-b8cc-c122ef782cd6", user_id: "46a42280-6ad8-4bb6-a29c-1604adbf0c31", notes: "Notes two", working_title: "Designing a Life of Meaning", target_audience: "Creators", article_goal: "entertain_with_a_compelling_story", created_at: "2026-08-11T12:00:00Z", updated_at: "2026-08-11T12:00:00Z" },
+  { id: "be5579e3-24fd-4272-a35f-f74740c3887e", user_id: "46a42280-6ad8-4bb6-a29c-1604adbf0c31", notes: "Notes one", working_title: "The Case for Slower Thinking", target_audience: ["Writers"], article_goal: "inform_and_inspire", created_at: "2026-08-12T12:00:00Z", updated_at: "2026-08-12T12:00:00Z" },
+  { id: "36dc2b27-f474-4d43-b8cc-c122ef782cd6", user_id: "46a42280-6ad8-4bb6-a29c-1604adbf0c31", notes: "Notes two", working_title: "Designing a Life of Meaning", target_audience: ["Creators"], article_goal: "entertain_with_a_compelling_story", created_at: "2026-08-11T12:00:00Z", updated_at: "2026-08-11T12:00:00Z" },
 ] as const;
 
 beforeEach(() => { listMock.mockReset().mockResolvedValue({ items: articles, total: 2, offset: 0, limit: 20 }); });

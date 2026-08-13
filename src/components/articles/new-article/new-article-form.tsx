@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { ArrowLeft } from "@phosphor-icons/react";
+import { ArrowLeft, X } from "@phosphor-icons/react";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import {
   articleGoalLabels,
@@ -36,7 +36,7 @@ type NewArticleFormProps = {
 const emptyForm: ArticleFormValues = {
   notes: "",
   workingTitle: "",
-  targetAudience: "",
+  targetAudience: [],
   articleGoal: "",
 };
 
@@ -78,6 +78,7 @@ export function NewArticleForm({
     [article],
   );
   const [form, setForm] = useState<ArticleFormValues>(initialValues);
+  const [audienceInput, setAudienceInput] = useState("");
   const [errors, setErrors] = useState<FormErrors>({});
   const [status, setStatus] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -89,15 +90,55 @@ export function NewArticleForm({
     setStatus("");
   };
 
+  const addAudience = (value: string) => {
+    const audiences = value
+      .split(/\s+/)
+      .map((audience) => audience.trim())
+      .filter(Boolean);
+
+    if (audiences.length === 0) return;
+    updateField("targetAudience", [
+      ...form.targetAudience,
+      ...audiences.filter(
+        (audience) =>
+          !form.targetAudience.some(
+            (existing) => existing.toLocaleLowerCase() === audience.toLocaleLowerCase(),
+          ),
+      ),
+    ]);
+    setAudienceInput("");
+  };
+
+  const removeAudience = (audience: string) => {
+    updateField(
+      "targetAudience",
+      form.targetAudience.filter((item) => item !== audience),
+    );
+  };
+
   const validInput = () => {
-    const nextErrors = validateForm(form);
+    const pendingAudience = audienceInput.trim();
+    const values = pendingAudience
+      ? {
+          ...form,
+          targetAudience: [
+            ...form.targetAudience,
+            ...pendingAudience.split(/\s+/).filter(Boolean),
+          ],
+        }
+      : form;
+    if (pendingAudience) {
+      setForm(values);
+      setAudienceInput("");
+    }
+    const nextErrors = validateForm(values);
     setErrors(nextErrors);
     const firstError = Object.keys(nextErrors)[0] as FieldName | undefined;
     if (firstError) {
       document.getElementById(`article-${firstError}`)?.focus();
       return null;
     }
-    return articleInputSchema.parse(toArticleInput(form));
+    return articleInputSchema.parse(toArticleInput(values));
   };
 
   const save = async (continueToBrief: boolean) => {
@@ -214,11 +255,56 @@ export function NewArticleForm({
                 <input id="article-workingTitle" maxLength={200} aria-invalid={Boolean(errors.workingTitle)} onChange={(event) => updateField("workingTitle", event.target.value)} value={form.workingTitle} />
                 {errors.workingTitle ? <small className={styles.error}>{errors.workingTitle}</small> : <small>Up to 200 characters.</small>}
               </label>
-              <label className={styles.field} htmlFor="article-targetAudience">
-                <span>Target audience *</span>
-                <input id="article-targetAudience" maxLength={500} aria-invalid={Boolean(errors.targetAudience)} onChange={(event) => updateField("targetAudience", event.target.value)} value={form.targetAudience} />
-                {errors.targetAudience ? <small className={styles.error}>{errors.targetAudience}</small> : <small>Who is this article for?</small>}
-              </label>
+              <div className={styles.field}>
+                <label htmlFor="article-targetAudience">Target audience *</label>
+                <div
+                  className={styles.tagInput}
+                  data-invalid={Boolean(errors.targetAudience)}
+                  onClick={() => document.getElementById("article-targetAudience")?.focus()}
+                >
+                  {form.targetAudience.map((audience) => (
+                    <span className={styles.tag} key={audience}>
+                      {audience}
+                      <button
+                        type="button"
+                        aria-label={`Remove ${audience}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          removeAudience(audience);
+                        }}
+                      >
+                        <X size={12} weight="bold" aria-hidden />
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    id="article-targetAudience"
+                    aria-invalid={Boolean(errors.targetAudience)}
+                    aria-describedby="target-audience-helper"
+                    autoComplete="off"
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      if (/\s/.test(value)) addAudience(value);
+                      else setAudienceInput(value);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && audienceInput.trim()) {
+                        event.preventDefault();
+                        addAudience(audienceInput);
+                      } else if (
+                        event.key === "Backspace" &&
+                        !audienceInput &&
+                        form.targetAudience.length > 0
+                      ) {
+                        removeAudience(form.targetAudience.at(-1)!);
+                      }
+                    }}
+                    onBlur={() => addAudience(audienceInput)}
+                    value={audienceInput}
+                  />
+                </div>
+                {errors.targetAudience ? <small className={styles.error} id="target-audience-helper">{errors.targetAudience}</small> : <small id="target-audience-helper">Type a word, then press space to add it.</small>}
+              </div>
               <label className={`${styles.field} ${styles.goalField}`} htmlFor="article-articleGoal">
                 <span>Article goal *</span>
                 <select id="article-articleGoal" aria-invalid={Boolean(errors.articleGoal)} onChange={(event) => updateField("articleGoal", event.target.value as ArticleFormValues["articleGoal"])} value={form.articleGoal}>

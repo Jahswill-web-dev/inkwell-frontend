@@ -29,7 +29,11 @@ const requiredText = (field: string, maximum: number) =>
 export const articleInputSchema = z.object({
   notes: requiredText("Notes", 20_000),
   working_title: requiredText("Working title", 200),
-  target_audience: requiredText("Target audience", 500),
+  target_audience: z
+    .array(requiredText("Target audience", 500), {
+      error: "Target audience is required.",
+    })
+    .min(1, "Target audience is required."),
   article_goal: articleGoalSchema,
 });
 
@@ -80,7 +84,7 @@ export type ArticleApiError = z.infer<typeof articleApiErrorSchema>;
 export type ArticleFormValues = {
   notes: string;
   workingTitle: string;
-  targetAudience: string;
+  targetAudience: string[];
   articleGoal: ArticleGoal | "";
 };
 
@@ -110,7 +114,10 @@ export function changedArticleFields(
   const patch: Partial<ArticleInput> = {};
 
   for (const key of Object.keys(next) as (keyof ArticleInput)[]) {
-    if (next[key] !== original[key]) {
+    const changed = Array.isArray(next[key])
+      ? JSON.stringify(next[key]) !== JSON.stringify(original[key])
+      : next[key] !== original[key];
+    if (changed) {
       Object.assign(patch, { [key]: next[key] });
     }
   }

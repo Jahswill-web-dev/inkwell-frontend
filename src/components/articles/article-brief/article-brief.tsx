@@ -161,8 +161,10 @@ export function ArticleBrief({
             String(seed.workingTitle ?? "").trim() || current.workingTitle,
           goal: goalLabels[String(seed.articleGoal ?? "")] || current.goal,
           mainTopic: source.trim() || current.mainTopic,
-          targetAudience:
-            String(seed.targetAudience ?? "").trim() || current.targetAudience,
+          targetAudience: Array.isArray(seed.targetAudience)
+            ? seed.targetAudience.filter((item) => typeof item === "string").join(", ") ||
+              current.targetAudience
+            : String(seed.targetAudience ?? "").trim() || current.targetAudience,
         }));
       }, 0);
 

@@ -18,7 +18,7 @@ const article = {
   user_id: "46a42280-6ad8-4bb6-a29c-1604adbf0c31",
   notes: "Research notes and an early idea",
   working_title: "Original title",
-  target_audience: "Independent writers",
+  target_audience: ["Independent", "writers"],
   article_goal: "educate_with_practical_guidance" as const,
   created_at: "2026-08-12T12:00:00Z",
   updated_at: "2026-08-12T12:00:00Z",
@@ -53,11 +53,21 @@ describe("NewArticleForm", () => {
     expect(createMock).not.toHaveBeenCalled();
   });
 
+  it("turns space-delimited audience values into removable pills", async () => {
+    render(<NewArticleForm />);
+    const input = screen.getByRole("textbox", { name: /Target audience/ });
+    await userEvent.type(input, "writers founders ");
+    expect(screen.getByRole("button", { name: "Remove writers" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Remove founders" })).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Remove writers" }));
+    expect(screen.queryByRole("button", { name: "Remove writers" })).not.toBeInTheDocument();
+  });
+
   it("creates and opens a saved intake", async () => {
     render(<NewArticleForm />);
     await fillRequiredForm();
     await userEvent.click(screen.getByRole("button", { name: "Save as draft" }));
-    await waitFor(() => expect(createMock).toHaveBeenCalledWith({ notes: "Useful research notes", working_title: "A useful title", target_audience: "Independent writers", article_goal: "educate_with_practical_guidance" }));
+    await waitFor(() => expect(createMock).toHaveBeenCalledWith({ notes: "Useful research notes", working_title: "A useful title", target_audience: ["Independent", "writers"], article_goal: "educate_with_practical_guidance" }));
     expect(pushMock).toHaveBeenCalledWith(`/articles/${article.id}`);
   });
 

@@ -9,8 +9,8 @@ vi.mock("axios", () => ({
   default: { create: createMock, isAxiosError: (error: unknown) => Boolean(error && typeof error === "object" && "isAxiosError" in error) },
 }));
 
-const article = { id: "be5579e3-24fd-4272-a35f-f74740c3887e", user_id: "46a42280-6ad8-4bb6-a29c-1604adbf0c31", notes: "Notes", working_title: "Title", target_audience: "Writers", article_goal: "inform_and_inspire", created_at: "2026-08-12T12:00:00Z", updated_at: "2026-08-12T12:00:00Z" };
-const input = { notes: "Notes", working_title: "Title", target_audience: "Writers", article_goal: "inform_and_inspire" };
+const article = { id: "be5579e3-24fd-4272-a35f-f74740c3887e", user_id: "46a42280-6ad8-4bb6-a29c-1604adbf0c31", notes: "Notes", working_title: "Title", target_audience: ["Writers"], article_goal: "inform_and_inspire", created_at: "2026-08-12T12:00:00Z", updated_at: "2026-08-12T12:00:00Z" };
+const input = { notes: "Notes", working_title: "Title", target_audience: ["Writers"], article_goal: "inform_and_inspire" };
 
 beforeEach(() => {
   process.env.AUTH_API_URL = "http://127.0.0.1:8000";

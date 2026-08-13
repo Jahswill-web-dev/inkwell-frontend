@@ -104,7 +104,7 @@
 }
 
 .form {
-  padding-top: 24px;
+  padding-top: 32px;
 }
 
 .sourceField textarea {
@@ -215,6 +215,39 @@
   text-align: right;
 }
 
+.requestError {
+  min-height: 21px;
+  margin: 12px 0 0;
+  color: var(--color-ink-crimson);
+  font-size: 0.8rem;
+  text-align: right;
+}
+
+.deleteConfirm {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-right: auto;
+  color: var(--color-ink-crimson);
+  font-size: 0.82rem;
+}
+
+.deletePanel {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.dangerAction {
+  padding: 10px 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-crimson);
+  font: inherit;
+  cursor: pointer;
+}
+
 .desktopActions {
   display: flex;
   align-items: center;
@@ -254,6 +287,40 @@
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
+}
+
+.statePage {
+  display: grid;
+  min-height: 100svh;
+  place-content: center;
+  justify-items: center;
+  padding: 32px;
+  background: var(--color-ink-paper);
+  color: var(--color-ink-navy);
+  text-align: center;
+}
+
+.statePage h1 {
+  margin: 0;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 2.5rem;
+  font-weight: 500;
+}
+
+.statePage p {
+  color: #556684;
+}
+
+.statePage a,
+.statePage button {
+  padding: 12px 20px;
+  border: 0;
+  border-radius: 5px;
+  background: var(--color-ink-navy);
+  color: white;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
 }
 
 @media (max-width: 800px) {
@@ -417,6 +484,15 @@
     margin-top: 8px;
     font-size: 0.72rem;
     text-align: center;
+  }
+
+  .requestError {
+    text-align: center;
+  }
+
+  .deletePanel {
+    justify-content: center;
+    margin-bottom: 8px;
   }
 
   .desktopActions {

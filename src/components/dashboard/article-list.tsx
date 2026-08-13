@@ -1,110 +1,60 @@
-import { CaretRight, DotsThreeVertical } from "@phosphor-icons/react";
-import type { DashboardArticle } from "./dashboard-data";
+import Link from "next/link";
+import { CaretRight } from "@phosphor-icons/react";
+import { articleGoalLabels, type Article } from "@/lib/articles/article";
 import styles from "./dashboard.module.css";
 
 type ArticleListProps = {
-  desktopArticles: readonly DashboardArticle[];
-  mobileArticles: readonly DashboardArticle[];
-  onOpen: (title: string) => void;
+  articles: readonly Article[];
+  total: number;
+  isLoadingMore: boolean;
+  loadError: string;
+  onLoadMore: () => void;
+  onRetry: () => void;
 };
 
-function DesktopArticleRow({
-  article,
-  onOpen,
-}: {
-  article: DashboardArticle;
-  onOpen: (title: string) => void;
-}) {
-  return (
-    <button
-      className={styles.desktopArticleRow}
-      type="button"
-      onClick={() => onOpen(article.title)}
-    >
-      <strong>{article.title}</strong>
-      <span className={`${styles.stage} ${styles[`stage${article.stage}`]}`}>
-        {article.stage}
-      </span>
-      <span className={styles.desktopProgress}>
-        <span>{article.progress}%</span>
-        <i>
-          <b style={{ width: `${article.progress}%` }} />
-        </i>
-      </span>
-      <span>{article.words}</span>
-      <span>{article.edited}</span>
-      <DotsThreeVertical size={24} aria-hidden />
-    </button>
-  );
-}
-
-function MobileArticleRow({
-  article,
-  onOpen,
-}: {
-  article: DashboardArticle;
-  onOpen: (title: string) => void;
-}) {
-  return (
-    <button
-      className={styles.mobileArticleRow}
-      type="button"
-      onClick={() => onOpen(article.title)}
-    >
-      <strong>{article.title}</strong>
-      <span className={styles.mobileStage}>
-        <i className={styles[`dot${article.stage}`]} />
-        {article.stage}
-      </span>
-      <span className={styles.mobileProgress}>
-        <i>
-          <b style={{ width: `${article.progress}%` }} />
-        </i>
-        <span>{article.progress}%</span>
-        <small>{article.edited}</small>
-        <CaretRight size={24} aria-hidden />
-      </span>
-    </button>
-  );
+function updatedLabel(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 
 export function ArticleList({
-  desktopArticles,
-  mobileArticles,
-  onOpen,
+  articles,
+  total,
+  isLoadingMore,
+  loadError,
+  onLoadMore,
+  onRetry,
 }: ArticleListProps) {
   return (
-    <section
-      className={styles.articleSection}
-      aria-labelledby="continue-writing-title"
-    >
+    <section className={styles.articleSection} aria-labelledby="continue-writing-title">
       <h2 id="continue-writing-title">Continue writing</h2>
       <div className={styles.desktopTable}>
         <div className={styles.tableHeader}>
-          <span>Title</span>
-          <span>Stage</span>
-          <span>Progress</span>
-          <span>Words</span>
-          <span>Last edited</span>
-          <span />
+          <span>Title</span><span>Goal</span><span>Target audience</span><span>Last edited</span><span />
         </div>
-        {desktopArticles.map((article) => (
-          <DesktopArticleRow
-            article={article}
-            key={article.title}
-            onOpen={onOpen}
-          />
+        {articles.map((article) => (
+          <Link className={styles.desktopArticleRow} href={`/articles/${article.id}`} key={article.id}>
+            <strong>{article.working_title}</strong>
+            <span>{articleGoalLabels[article.article_goal]}</span>
+            <span className={styles.audienceCell}>{article.target_audience}</span>
+            <span>{updatedLabel(article.updated_at)}</span>
+            <CaretRight size={20} aria-hidden />
+          </Link>
         ))}
       </div>
       <div className={styles.mobileList}>
-        {mobileArticles.map((article) => (
-          <MobileArticleRow
-            article={article}
-            key={article.title}
-            onOpen={onOpen}
-          />
+        {articles.map((article) => (
+          <Link className={styles.mobileArticleRow} href={`/articles/${article.id}`} key={article.id}>
+            <strong>{article.working_title}</strong>
+            <span className={styles.mobileStage}>{articleGoalLabels[article.article_goal]}</span>
+            <span className={styles.mobileArticleMeta}><small>{updatedLabel(article.updated_at)}</small><CaretRight size={24} aria-hidden /></span>
+          </Link>
         ))}
       </div>
+      {loadError ? <div className={styles.listFeedback} role="alert"><span>{loadError}</span><button type="button" onClick={onRetry}>Try again</button></div> : null}
+      {!loadError && articles.length < total ? <button className={styles.loadMore} type="button" disabled={isLoadingMore} onClick={onLoadMore}>{isLoadingMore ? "Loading…" : "Load more"}</button> : null}
     </section>
   );
 }

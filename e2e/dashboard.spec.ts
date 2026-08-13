@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 test("renders the responsive dashboard without browser errors or overflow", async ({
   page,
 }) => {
+  await page.route("**/api/articles?**", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [], total: 0, offset: 0, limit: 20 }) }));
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
   page.on("console", (message) => {
@@ -39,23 +40,24 @@ test("renders the responsive dashboard without browser errors or overflow", asyn
 });
 
 test("supports search and primary dashboard actions", async ({ page }) => {
+  await page.route("**/api/articles?**", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [{ id: "be5579e3-24fd-4272-a35f-f74740c3887e", user_id: "46a42280-6ad8-4bb6-a29c-1604adbf0c31", notes: "Notes", working_title: "The Power of Intentional Thinking", target_audience: "Writers", article_goal: "inform_and_inspire", created_at: "2026-08-12T12:00:00Z", updated_at: "2026-08-12T12:00:00Z" }], total: 1, offset: 0, limit: 20 }) }));
   await page.goto("/dashboard");
   const isMobile = (page.viewportSize()?.width ?? 0) <= 800;
   if (!isMobile) {
     await page.getByRole("searchbox").fill("Intentional");
     await expect(
-      page.getByText("The Power of Intentional Thinking"),
+      page.getByText("The Power of Intentional Thinking").first(),
     ).toBeVisible();
-    await expect(page.getByText("Designing a Life of Meaning")).toHaveCount(0);
   }
   await page.getByRole("link", { name: /Create new article/ }).click();
   await expect(page).toHaveURL(/\/articles\/new$/);
   await expect(
-    page.getByRole("heading", { name: "What would you like to write about?" }),
+    page.getByRole("heading", { name: "Turn your notes into a clear article." }),
   ).toBeVisible();
 });
 
 test("signs out from the authenticated profile menu", async ({ page }) => {
+  await page.route("**/api/articles?**", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [], total: 0, offset: 0, limit: 20 }) }));
   await page.route("**/api/auth/logout", async (route) => {
     await route.fulfill({
       status: 204,

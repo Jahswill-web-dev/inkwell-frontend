@@ -241,7 +241,7 @@
 .tableHeader,
 .desktopArticleRow {
   display: grid;
-  grid-template-columns: 2.15fr 0.9fr 1.6fr 0.75fr 1fr 32px;
+  grid-template-columns: 1.5fr 1.25fr 1.5fr 1fr 24px;
   align-items: center;
   column-gap: 12px;
 }
@@ -265,12 +265,51 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+  text-decoration: none;
 }
 .desktopArticleRow strong {
   max-width: 220px;
   font-size: 1rem;
   line-height: 1.55;
 }
+.audienceCell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboardState {
+  display: grid;
+  min-height: 190px;
+  place-content: center;
+  justify-items: center;
+  margin-top: 40px;
+  padding: 24px;
+  border: 1px solid #dedbd7;
+  border-radius: 8px;
+  color: #556684;
+  text-align: center;
+}
+
+.dashboardState h2,
+.dashboardState p { margin: 4px; }
+.dashboardState a,
+.dashboardState button,
+.listFeedback button,
+.loadMore {
+  margin-top: 14px;
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 5px;
+  background: var(--color-ink-navy);
+  color: white;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+.listFeedback { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 18px; color: var(--color-ink-crimson); }
+.listFeedback button { margin-top: 0; }
+.loadMore { display: block; margin: 20px auto 0; }
 .stage {
   width: max-content;
   padding: 5px 12px;
@@ -416,7 +455,7 @@
     display: none;
   }
   .quickActionList {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
   }
   .quickActionList a {
     min-height: 64px;
@@ -426,9 +465,6 @@
     grid-template-columns: 28px 1fr;
     gap: 12px;
     white-space: nowrap;
-  }
-  .quickActionList a + a {
-    border-left: 1px solid #d8d7d5;
   }
   .quickActionList strong {
     margin: 0;
@@ -463,6 +499,7 @@
     color: var(--color-ink-navy);
     text-align: left;
     cursor: pointer;
+    text-decoration: none;
   }
   .mobileArticleRow strong {
     overflow: hidden;
@@ -481,6 +518,7 @@
     color: #435476;
     font-size: 0.82rem;
   }
+  .mobileArticleMeta { display: flex; align-items: center; justify-content: space-between; margin-top: 9px; color: #435476; }
   .mobileStage i {
     width: 7px;
     height: 7px;

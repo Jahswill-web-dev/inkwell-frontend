@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ClipboardText, Lightbulb } from "@phosphor-icons/react";
+import { ClipboardText } from "@phosphor-icons/react";
 import styles from "./dashboard.module.css";
 
 export function QuickActions() {
@@ -8,13 +8,6 @@ export function QuickActions() {
       <h2 id="quick-start-title">Quick start</h2>
       <div className={styles.quickActionList}>
         <Link href="/articles/new">
-          <Lightbulb size={27} aria-hidden />
-          <span>
-            <strong>Start from an idea</strong>
-            <small>Turn a spark into something written.</small>
-          </span>
-        </Link>
-        <Link href="/articles/new?mode=notes">
           <ClipboardText size={27} aria-hidden />
           <span>
             <strong>Paste your notes</strong>

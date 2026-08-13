@@ -3,325 +3,246 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, type KeyboardEvent } from "react";
-import { ArrowLeft, ClipboardText, Lightbulb } from "@phosphor-icons/react";
+import { useMemo, useState } from "react";
+import { ArrowLeft } from "@phosphor-icons/react";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
+import {
+  articleGoalLabels,
+  articleGoals,
+  articleInputSchema,
+  changedArticleFields,
+  toArticleFormValues,
+  toArticleInput,
+  type Article,
+  type ArticleFormValues,
+} from "@/lib/articles/article";
+import {
+  ArticleRequestError,
+  createArticle,
+  deleteArticle,
+  updateArticle,
+} from "@/lib/articles/client";
 import { DEFAULT_AUTH_IDENTITY, type AuthIdentity } from "@/lib/auth/identity";
 import styles from "./new-article-form.module.css";
 
-export type NewArticleMode = "idea" | "notes";
-
-export type NewArticleFormState = {
-  idea: string;
-  notes: string;
-  workingTitle: string;
-  targetAudience: string;
-  articleGoal: string;
-};
+type FieldName = keyof ArticleFormValues;
+type FormErrors = Partial<Record<FieldName, string>>;
 
 type NewArticleFormProps = {
   identity?: AuthIdentity;
-  initialMode?: NewArticleMode;
+  article?: Article;
 };
 
-const modes: readonly NewArticleMode[] = ["idea", "notes"];
-
-const modeContent = {
-  idea: {
-    label: "Start with an idea",
-    shortLabel: "Idea",
-    heading: "What would you like to write about?",
-    description:
-      "Capture your rough idea, and we’ll help shape it into a clear, compelling article.",
-    placeholder:
-      "Describe the idea you want to explore. It can be a question, observation, argument, or early thought…",
-    helper: "Write freely—this doesn’t have to be perfect.",
-  },
-  notes: {
-    label: "Paste your notes",
-    shortLabel: "Notes",
-    heading: "Turn your notes into a clear article.",
-    description:
-      "Paste anything you have—we’ll help find the story and shape it into a useful brief.",
-    placeholder:
-      "Paste rough notes, bullet points, quotes, research, or fragments here…\n\n• Key thought or observation\n• Supporting example or quote\n• Questions you still want to explore",
-    helper: "Formatting doesn’t need to be clean. We’ll organize it later.",
-  },
-} as const;
-
-const initialState: NewArticleFormState = {
-  idea: "",
+const emptyForm: ArticleFormValues = {
   notes: "",
   workingTitle: "",
   targetAudience: "",
   articleGoal: "",
 };
 
+const apiToFormField: Record<string, FieldName> = {
+  notes: "notes",
+  working_title: "workingTitle",
+  target_audience: "targetAudience",
+  article_goal: "articleGoal",
+};
+
+function validateForm(values: ArticleFormValues): FormErrors {
+  const result = articleInputSchema.safeParse(toArticleInput(values));
+  if (result.success) return {};
+  return result.error.issues.reduce<FormErrors>((errors, issue) => {
+    const field = apiToFormField[String(issue.path[0])];
+    if (field && !errors[field]) errors[field] = issue.message;
+    return errors;
+  }, {});
+}
+
+function apiMessage(error: unknown) {
+  if (error instanceof ArticleRequestError) {
+    if (error.status === 401) return "Your session expired. Please sign in again.";
+    if (error.status === 404) return "This article could not be found.";
+    if (error.status === 422) return "Review the highlighted fields and try again.";
+    return error.message;
+  }
+  return "Articles are temporarily unavailable. Please try again.";
+}
+
 export function NewArticleForm({
   identity = DEFAULT_AUTH_IDENTITY,
-  initialMode = "idea",
+  article,
 }: NewArticleFormProps) {
   const router = useRouter();
-  const [mode, setMode] = useState<NewArticleMode>(initialMode);
-  const [form, setForm] = useState<NewArticleFormState>(initialState);
-  const [error, setError] = useState("");
+  const isEditing = Boolean(article);
+  const initialValues = useMemo(
+    () => (article ? toArticleFormValues(article) : emptyForm),
+    [article],
+  );
+  const [form, setForm] = useState<ArticleFormValues>(initialValues);
+  const [errors, setErrors] = useState<FormErrors>({});
   const [status, setStatus] = useState("");
-  const ideaTabRef = useRef<HTMLButtonElement>(null);
-  const notesTabRef = useRef<HTMLButtonElement>(null);
-  const sourceRef = useRef<HTMLTextAreaElement>(null);
-  const content = modeContent[mode];
-  const sourceValue = form[mode];
-  const wordCount = sourceValue.trim()
-    ? sourceValue.trim().split(/\s+/).length
-    : 0;
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
-  const updateField = <K extends keyof NewArticleFormState>(
-    field: K,
-    value: NewArticleFormState[K],
-  ) => {
+  const updateField = <K extends FieldName>(field: K, value: ArticleFormValues[K]) => {
     setForm((current) => ({ ...current, [field]: value }));
-    if (field === mode && error) setError("");
-  };
-
-  const selectMode = (nextMode: NewArticleMode) => {
-    setMode(nextMode);
-    setError("");
+    if (errors[field]) setErrors((current) => ({ ...current, [field]: undefined }));
     setStatus("");
   };
 
-  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
-      return;
+  const validInput = () => {
+    const nextErrors = validateForm(form);
+    setErrors(nextErrors);
+    const firstError = Object.keys(nextErrors)[0] as FieldName | undefined;
+    if (firstError) {
+      document.getElementById(`article-${firstError}`)?.focus();
+      return null;
     }
-
-    event.preventDefault();
-    const currentIndex = modes.indexOf(mode);
-    const nextIndex =
-      event.key === "Home"
-        ? 0
-        : event.key === "End"
-          ? modes.length - 1
-          : event.key === "ArrowRight"
-            ? (currentIndex + 1) % modes.length
-            : (currentIndex - 1 + modes.length) % modes.length;
-    const nextMode = modes[nextIndex];
-    selectMode(nextMode);
-    (nextMode === "idea" ? ideaTabRef : notesTabRef).current?.focus();
+    return articleInputSchema.parse(toArticleInput(form));
   };
 
-  const saveDraft = () => {
-    setError("");
-    setStatus("Draft saved.");
+  const save = async (continueToBrief: boolean) => {
+    const input = validInput();
+    if (!input) return;
+    setIsSubmitting(true);
+    setStatus("");
+    try {
+      if (article) {
+        const patch = changedArticleFields(article, form);
+        if (Object.keys(patch).length === 0) {
+          setStatus("No changes to save.");
+          return;
+        }
+        const updated = await updateArticle(article.id, patch);
+        setForm(toArticleFormValues(updated));
+        setStatus("Article saved.");
+        router.refresh();
+        return;
+      }
+
+      const created = await createArticle(input);
+      if (continueToBrief) {
+        window.sessionStorage.setItem(
+          "inkwell:new-article",
+          JSON.stringify({
+            articleId: created.id,
+            mode: "notes",
+            notes: created.notes,
+            workingTitle: created.working_title,
+            targetAudience: created.target_audience,
+            articleGoal: created.article_goal,
+          }),
+        );
+        router.push(`/articles/new/brief?articleId=${created.id}`);
+      } else {
+        router.push(`/articles/${created.id}`);
+      }
+    } catch (error) {
+      if (error instanceof ArticleRequestError && error.status === 401) {
+        router.push(
+          `/login?next=${encodeURIComponent(article ? `/articles/${article.id}` : "/articles/new")}`,
+        );
+        return;
+      }
+      setStatus(apiMessage(error));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const buildBrief = () => {
-    if (sourceValue.trim().length < 20) {
-      setStatus("");
-      setError(
-        mode === "idea"
-          ? "Add at least 20 characters so we can understand your idea."
-          : "Paste at least 20 characters so we have enough notes to work with.",
-      );
-      sourceRef.current?.focus();
-      return;
+  const remove = async () => {
+    if (!article) return;
+    setIsSubmitting(true);
+    setStatus("");
+    try {
+      await deleteArticle(article.id);
+      router.push("/dashboard");
+      router.refresh();
+    } catch (error) {
+      setStatus(apiMessage(error));
+      setIsConfirmingDelete(false);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setError("");
-    window.sessionStorage.setItem(
-      "inkwell:new-article",
-      JSON.stringify({ mode, ...form }),
-    );
-    router.push("/articles/new/brief");
   };
 
   return (
     <main className={styles.page}>
-      <DashboardSidebar
-        activeHref="/dashboard?section=articles"
-        identity={identity}
-      />
-
+      <DashboardSidebar activeHref="/dashboard?section=articles" identity={identity} />
       <div className={styles.workspace}>
         <header className={styles.desktopHeader}>
           <div className={styles.headerInner}>
             <Link href="/dashboard?section=articles">Articles</Link>
             <span aria-hidden>/</span>
-            <span>New article</span>
+            <span>{isEditing ? "Edit article" : "New article"}</span>
           </div>
         </header>
-
         <header className={styles.mobileHeader}>
-          <Link href="/dashboard" aria-label="Back to dashboard">
-            <ArrowLeft size={28} aria-hidden />
-          </Link>
+          <Link href="/dashboard" aria-label="Back to dashboard"><ArrowLeft size={28} aria-hidden /></Link>
           <div className={styles.mobileTitle}>
-            <Image
-              src="/images/inkwell-icon.png"
-              alt=""
-              width={43}
-              height={60}
-              priority
-            />
-            <strong>New article</strong>
+            <Image src="/images/inkwell-icon.png" alt="" width={43} height={60} priority />
+            <strong>{isEditing ? "Edit article" : "New article"}</strong>
           </div>
-          <button type="button" onClick={saveDraft}>
-            Save
-          </button>
+          <button type="button" disabled={isSubmitting} onClick={() => void save(false)}>Save</button>
         </header>
 
         <div className={styles.content}>
-          <section className={styles.intro} aria-labelledby="new-article-title">
-            <p className={styles.eyebrow}>Start a new article</p>
-            <h1 id="new-article-title">{content.heading}</h1>
-            <p>{content.description}</p>
+          <section className={styles.intro} aria-labelledby="article-form-title">
+            <p className={styles.eyebrow}>{isEditing ? "Article intake" : "Start a new article"}</p>
+            <h1 id="article-form-title">{isEditing ? "Refine your article intake." : "Turn your notes into a clear article."}</h1>
+            <p>{isEditing ? "Update the notes and planning choices for this article." : "Add your notes and planning choices. We’ll help shape them into a useful brief."}</p>
           </section>
 
-          <div
-            className={styles.tabs}
-            role="tablist"
-            aria-label="Starting method"
-          >
-            {modes.map((item) => {
-              const isActive = item === mode;
-              const Icon = item === "idea" ? Lightbulb : ClipboardText;
-
-              return (
-                <button
-                  aria-controls="new-article-panel"
-                  aria-selected={isActive}
-                  className={isActive ? styles.activeTab : ""}
-                  id={`${item}-tab`}
-                  key={item}
-                  onClick={() => selectMode(item)}
-                  onKeyDown={handleTabKeyDown}
-                  ref={item === "idea" ? ideaTabRef : notesTabRef}
-                  role="tab"
-                  tabIndex={isActive ? 0 : -1}
-                  type="button"
-                >
-                  <Icon size={23} aria-hidden />
-                  <span className={styles.desktopTabLabel}>
-                    {modeContent[item].label}
-                  </span>
-                  <span className={styles.mobileTabLabel}>
-                    {modeContent[item].shortLabel}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          <form
-            className={styles.form}
-            id="new-article-panel"
-            role="tabpanel"
-            aria-labelledby={`${mode}-tab`}
-            onSubmit={(event) => {
-              event.preventDefault();
-              buildBrief();
-            }}
-          >
+          <form className={styles.form} noValidate onSubmit={(event) => { event.preventDefault(); void save(!isEditing); }}>
             <div className={styles.sourceField}>
-              <label className={styles.visuallyHidden} htmlFor="article-source">
-                {mode === "idea" ? "Your article idea" : "Your notes"}
-              </label>
+              <label className={styles.visuallyHidden} htmlFor="article-notes">Your notes</label>
               <textarea
-                aria-describedby={`source-helper${error ? " source-error" : ""}`}
-                aria-invalid={Boolean(error)}
-                id="article-source"
-                maxLength={5000}
-                onChange={(event) => updateField(mode, event.target.value)}
-                placeholder={content.placeholder}
-                ref={sourceRef}
-                value={sourceValue}
+                id="article-notes"
+                maxLength={20_000}
+                aria-invalid={Boolean(errors.notes)}
+                aria-describedby={`notes-helper${errors.notes ? " notes-error" : ""}`}
+                onChange={(event) => updateField("notes", event.target.value)}
+                placeholder="Paste rough notes, bullet points, quotes, research, or fragments here…"
+                value={form.notes}
               />
-              <div className={styles.sourceMeta} id="source-helper">
-                <span>{content.helper}</span>
-                {mode === "notes" ? <span>{wordCount} words</span> : null}
-              </div>
-              {error ? (
-                <p className={styles.error} id="source-error">
-                  {error}
-                </p>
-              ) : null}
+              <div className={styles.sourceMeta} id="notes-helper"><span>Notes are required.</span><span>{form.notes.length.toLocaleString()} / 20,000</span></div>
+              {errors.notes ? <p className={styles.error} id="notes-error">{errors.notes}</p> : null}
             </div>
 
             <div className={styles.detailsGrid}>
-              <label className={styles.field}>
-                <span>
-                  Working title <small>(optional)</small>
-                </span>
-                <input
-                  maxLength={120}
-                  onChange={(event) =>
-                    updateField("workingTitle", event.target.value)
-                  }
-                  placeholder="e.g., Why Good Ideas Are Hard to Write Down"
-                  value={form.workingTitle}
-                />
-                <small>You can change this later.</small>
+              <label className={styles.field} htmlFor="article-workingTitle">
+                <span>Working title *</span>
+                <input id="article-workingTitle" maxLength={200} aria-invalid={Boolean(errors.workingTitle)} onChange={(event) => updateField("workingTitle", event.target.value)} value={form.workingTitle} />
+                {errors.workingTitle ? <small className={styles.error}>{errors.workingTitle}</small> : <small>Up to 200 characters.</small>}
               </label>
-
-              <label className={styles.field}>
-                <span>Target audience</span>
-                <input
-                  maxLength={160}
-                  onChange={(event) =>
-                    updateField("targetAudience", event.target.value)
-                  }
-                  placeholder="Who are you writing for?"
-                  value={form.targetAudience}
-                />
-                <small>Who is this article for?</small>
+              <label className={styles.field} htmlFor="article-targetAudience">
+                <span>Target audience *</span>
+                <input id="article-targetAudience" maxLength={500} aria-invalid={Boolean(errors.targetAudience)} onChange={(event) => updateField("targetAudience", event.target.value)} value={form.targetAudience} />
+                {errors.targetAudience ? <small className={styles.error}>{errors.targetAudience}</small> : <small>Who is this article for?</small>}
               </label>
-
-              <label className={`${styles.field} ${styles.goalField}`}>
-                <span>Article goal</span>
-                <select
-                  onChange={(event) =>
-                    updateField("articleGoal", event.target.value)
-                  }
-                  value={form.articleGoal}
-                >
-                  <option value="" disabled>
-                    Select what readers should take away
-                  </option>
-                  <option value="inform">Inform and inspire</option>
-                  <option value="educate">
-                    Educate with practical guidance
-                  </option>
-                  <option value="persuade">
-                    Persuade or change a perspective
-                  </option>
-                  <option value="inspire">
-                    Inspire readers to take action
-                  </option>
-                  <option value="entertain">
-                    Entertain with a compelling story
-                  </option>
+              <label className={`${styles.field} ${styles.goalField}`} htmlFor="article-articleGoal">
+                <span>Article goal *</span>
+                <select id="article-articleGoal" aria-invalid={Boolean(errors.articleGoal)} onChange={(event) => updateField("articleGoal", event.target.value as ArticleFormValues["articleGoal"])} value={form.articleGoal}>
+                  <option value="" disabled>Select what readers should take away</option>
+                  {articleGoals.map((goal) => <option value={goal} key={goal}>{articleGoalLabels[goal]}</option>)}
                 </select>
-                <small>What should readers take away from this article?</small>
+                {errors.articleGoal ? <small className={styles.error}>{errors.articleGoal}</small> : <small>What should readers take away?</small>}
               </label>
             </div>
 
-            <p className={styles.status} role="status" aria-live="polite">
-              {status}
-            </p>
+            <p className={status.includes("saved") || status.includes("No changes") ? styles.status : styles.requestError} role="status" aria-live="polite">{status}</p>
+
+            {article ? (
+              <div className={styles.deletePanel}>
+                {isConfirmingDelete ? <div className={styles.deleteConfirm} role="group" aria-label="Confirm article deletion"><span>Delete permanently?</span><button type="button" onClick={() => setIsConfirmingDelete(false)} disabled={isSubmitting}>Cancel</button><button className={styles.dangerAction} type="button" onClick={() => void remove()} disabled={isSubmitting}>Confirm delete</button></div>
+                : <button className={styles.dangerAction} type="button" onClick={() => setIsConfirmingDelete(true)} disabled={isSubmitting}>Delete article</button>}
+              </div>
+            ) : null}
 
             <div className={styles.desktopActions}>
-              <button type="button" onClick={saveDraft}>
-                Save as draft
-              </button>
-              <button className={styles.primaryAction} type="submit">
-                Build my article brief
-              </button>
+              <button type="button" onClick={() => void save(false)} disabled={isSubmitting}>{isSubmitting ? "Saving…" : "Save as draft"}</button>
+              {!article ? <button className={styles.primaryAction} type="submit" disabled={isSubmitting}>{isSubmitting ? "Saving…" : "Build my article brief"}</button> : null}
             </div>
-
-            <div className={styles.mobileActions}>
-              <button className={styles.primaryAction} type="submit">
-                Build my article brief
-              </button>
-            </div>
+            <div className={styles.mobileActions}><button className={styles.primaryAction} type="submit" disabled={isSubmitting}>{isSubmitting ? "Saving…" : isEditing ? "Save changes" : "Build my article brief"}</button></div>
           </form>
         </div>
       </div>

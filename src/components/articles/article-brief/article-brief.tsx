@@ -4,218 +4,256 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  ArrowClockwise,
   ArrowLeft,
   ArrowRight,
-  CaretDown,
   Sparkle,
+  Warning,
 } from "@phosphor-icons/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { z } from "zod";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
+import { articleGoalLabels, type Article } from "@/lib/articles/article";
+import type { ArticleBrief as GeneratedBrief } from "@/lib/articles/brief";
+import {
+  ArticleRequestError,
+  generateArticleBrief,
+  getArticle,
+  getArticleBrief,
+  updateArticleBrief,
+} from "@/lib/articles/client";
 import { DEFAULT_AUTH_IDENTITY, type AuthIdentity } from "@/lib/auth/identity";
 import { ArticleProgress } from "../article-progress/article-progress";
+import {
+  changedBriefFields,
+  createBriefEditState,
+  type BriefEditState,
+} from "./brief-edit";
 import styles from "./article-brief.module.css";
 
-export type ArticleLength = "short" | "standard" | "long" | "custom";
+type ViewState =
+  "loading" | "generating" | "ready" | "missing-id" | "not-found" | "error";
+type BriefError = { code: string; message: string };
+const articleIdSchema = z.string().uuid();
 
-export type ArticleBriefState = {
-  workingTitle: string;
-  goal: string;
-  mainTopic: string;
-  targetAudience: string;
-  readerProblem: string;
-  examples: string;
-  mainArgument: string;
-  avoid: string;
-  desiredOutcome: string;
-  preferredLength: ArticleLength;
-};
+function displayError(error: unknown): BriefError {
+  if (error instanceof ArticleRequestError) {
+    return { code: error.code, message: error.message };
+  }
+  return {
+    code: "brief_generation_failed",
+    message: "We couldn’t generate this brief. Please try again.",
+  };
+}
 
-type BriefTextField = Exclude<keyof ArticleBriefState, "preferredLength">;
-
-const defaultBrief: ArticleBriefState = {
-  workingTitle: "Why Great Ideas Are Hard to Write Down",
-  goal: "Show why good ideas become difficult to express",
-  mainTopic:
-    "The nature of great ideas and why they’re difficult to capture in writing.",
-  targetAudience:
-    "Knowledge workers, students, and creative professionals who write essays, reports, or articles.",
-  readerProblem:
-    "They have valuable ideas but struggle to translate them into clear, structured writing.",
-  examples:
-    "Personal writing block moments, before-and-after rewrites, useful analogies, and a short real-world example.",
-  mainArgument:
-    "Great ideas resist precision; writing forces clarity, and that friction is essential to better thinking.",
-  avoid:
-    "Vague advice, motivation without method, overly academic theory, and generic writing tips.",
-  desiredOutcome:
-    "Readers will understand why writing is hard—and use that insight to write with more patience and purpose.",
-  preferredLength: "standard",
-};
-
-const goalLabels: Record<string, string> = {
-  inform: "Inform and inspire",
-  educate: "Educate with practical guidance",
-  persuade: "Persuade or change a perspective",
-  inspire: "Inspire readers to take action",
-  entertain: "Entertain with a compelling story",
-};
-
-const requiredFields: readonly BriefTextField[] = [
-  "mainTopic",
-  "targetAudience",
-  "readerProblem",
-  "mainArgument",
-  "desiredOutcome",
-];
-
-const fieldIds: Record<BriefTextField, string> = {
-  workingTitle: "brief-working-title",
-  goal: "brief-goal",
-  mainTopic: "main-topic",
-  targetAudience: "target-audience",
-  readerProblem: "reader-problem",
-  examples: "examples",
-  mainArgument: "main-argument",
-  avoid: "avoid",
-  desiredOutcome: "desired-outcome",
-};
-
-type BriefFieldProps = {
-  field: BriefTextField;
-  label: string;
-  maxLength: number;
-  value: string;
-  required?: boolean;
-  error?: string;
-  onChange: (field: BriefTextField, value: string) => void;
-};
-
-function BriefField({
-  field,
-  label,
-  maxLength,
-  value,
-  required = false,
-  error,
-  onChange,
-}: BriefFieldProps) {
-  const id = fieldIds[field];
-  const countId = `${id}-count`;
-  const errorId = `${id}-error`;
-
+function DetailCard({
+  title,
+  children,
+  wide = false,
+}: {
+  title: string;
+  children: ReactNode;
+  wide?: boolean;
+}) {
   return (
-    <label className={styles.field} htmlFor={id}>
-      <span>
-        {label} {required ? <b aria-hidden>*</b> : null}
-      </span>
+    <section className={`${styles.card} ${wide ? styles.wide : ""}`}>
+      <h2>{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+function EditField({
+  label,
+  value,
+  onChange,
+  rows = 4,
+  hint,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  rows?: number;
+  hint?: string;
+}) {
+  return (
+    <label className={styles.editField}>
+      <span>{label}</span>
       <textarea
-        aria-describedby={`${countId}${error ? ` ${errorId}` : ""}`}
-        aria-invalid={Boolean(error)}
-        id={id}
-        maxLength={maxLength}
-        onChange={(event) => onChange(field, event.target.value)}
+        rows={rows}
         value={value}
+        onChange={(event) => onChange(event.target.value)}
       />
-      <small id={countId}>
-        {value.length} / {maxLength}
-      </small>
-      {error ? (
-        <small className={styles.error} id={errorId}>
-          {error}
-        </small>
-      ) : null}
+      {hint ? <small>{hint}</small> : null}
     </label>
   );
 }
 
 export function ArticleBrief({
+  articleId,
   identity = DEFAULT_AUTH_IDENTITY,
 }: {
+  articleId?: string;
   identity?: AuthIdentity;
 }) {
-  const router = useRouter();
-  const [brief, setBrief] = useState<ArticleBriefState>(defaultBrief);
-  const [errors, setErrors] = useState<Partial<Record<BriefTextField, string>>>(
-    {},
+  const { push } = useRouter();
+  const validArticleId = articleIdSchema.safeParse(articleId);
+  const [article, setArticle] = useState<Article | null>(null);
+  const [brief, setBrief] = useState<GeneratedBrief | null>(null);
+  const [viewState, setViewState] = useState<ViewState>(
+    validArticleId.success ? "loading" : "missing-id",
   );
-  const [status, setStatus] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [openOptional, setOpenOptional] = useState({
-    examples: false,
-    avoid: false,
-  });
+  const [error, setError] = useState<BriefError | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isGeneratingOutline, setIsGeneratingOutline] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editDraft, setEditDraft] = useState<BriefEditState | null>(null);
+
+  const briefPath = validArticleId.success
+    ? `/articles/new/brief?articleId=${encodeURIComponent(validArticleId.data)}`
+    : "/articles/new/brief";
+  const loginPath = `/login?next=${encodeURIComponent(briefPath)}`;
+
   useEffect(() => {
-    const saved = window.sessionStorage.getItem("inkwell:new-article");
-    if (!saved) return;
+    if (!validArticleId.success) return;
+    const savedArticleId = validArticleId.data;
+    let active = true;
 
+    const fail = (caught: unknown) => {
+      if (!active) return;
+      const nextError = displayError(caught);
+      if (caught instanceof ArticleRequestError && caught.status === 401) {
+        push(loginPath);
+      } else if (nextError.code === "article_not_found") {
+        setViewState("not-found");
+      } else {
+        setError(nextError);
+        setViewState("error");
+      }
+    };
+
+    const load = async () => {
+      setViewState("loading");
+      setError(null);
+      try {
+        const savedArticle = await getArticle(savedArticleId);
+        if (!active) return;
+        setArticle(savedArticle);
+        try {
+          const savedBrief = await getArticleBrief(savedArticleId);
+          if (!active) return;
+          setBrief(savedBrief);
+          setViewState("ready");
+        } catch (caught) {
+          if (
+            caught instanceof ArticleRequestError &&
+            caught.status === 404 &&
+            caught.code === "brief_not_found"
+          ) {
+            setViewState("generating");
+            const generated = await generateArticleBrief(savedArticleId);
+            if (!active) return;
+            setBrief(generated);
+            setViewState("ready");
+          } else {
+            fail(caught);
+          }
+        }
+      } catch (caught) {
+        fail(caught);
+      }
+    };
+
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [loginPath, push, retryKey, validArticleId.data, validArticleId.success]);
+
+  const regenerate = async () => {
+    if (!articleId || isRegenerating || isEditing) return;
+    setIsRegenerating(true);
+    setError(null);
     try {
-      const seed = JSON.parse(saved) as Record<string, unknown>;
-      const source =
-        seed.mode === "notes"
-          ? String(seed.notes ?? "")
-          : String(seed.idea ?? "");
-      const timer = window.setTimeout(() => {
-        setBrief((current) => ({
-          ...current,
-          workingTitle:
-            String(seed.workingTitle ?? "").trim() || current.workingTitle,
-          goal: goalLabels[String(seed.articleGoal ?? "")] || current.goal,
-          mainTopic: source.trim() || current.mainTopic,
-          targetAudience: Array.isArray(seed.targetAudience)
-            ? seed.targetAudience.filter((item) => typeof item === "string").join(", ") ||
-              current.targetAudience
-            : String(seed.targetAudience ?? "").trim() || current.targetAudience,
-        }));
-      }, 0);
-
-      return () => window.clearTimeout(timer);
-    } catch {
-      window.sessionStorage.removeItem("inkwell:new-article");
-    }
-  }, []);
-
-  const updateField = (field: BriefTextField, value: string) => {
-    setBrief((current) => ({ ...current, [field]: value }));
-    if (errors[field]) {
-      setErrors((current) => ({ ...current, [field]: undefined }));
+      const generated = await generateArticleBrief(articleId);
+      setBrief(generated);
+      setViewState("ready");
+    } catch (caught) {
+      if (caught instanceof ArticleRequestError && caught.status === 401) {
+        push(loginPath);
+      } else {
+        setError(displayError(caught));
+        if (!brief) setViewState("error");
+      }
+    } finally {
+      setIsRegenerating(false);
     }
   };
 
-  const saveDraft = () => {
-    window.sessionStorage.setItem(
-      "inkwell:article-brief",
-      JSON.stringify(brief),
+  const beginEditing = () => {
+    if (!brief) return;
+    setError(null);
+    setEditDraft(createBriefEditState(brief));
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setEditDraft(null);
+    setError(null);
+    setIsEditing(false);
+  };
+
+  const saveBrief = async () => {
+    if (!articleId || !brief || !editDraft || isSaving) return;
+    let patch;
+    try {
+      patch = changedBriefFields(brief, editDraft);
+    } catch {
+      setError({
+        code: "validation_error",
+        message: "Complete the required brief fields before saving.",
+      });
+      return;
+    }
+    if (!patch) {
+      cancelEditing();
+      return;
+    }
+    setIsSaving(true);
+    setError(null);
+    try {
+      const updated = await updateArticleBrief(articleId, patch);
+      setBrief(updated);
+      setEditDraft(null);
+      setIsEditing(false);
+    } catch (caught) {
+      if (caught instanceof ArticleRequestError && caught.status === 401) {
+        push(loginPath);
+      } else {
+        setError(displayError(caught));
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const updateDraft = (field: keyof BriefEditState, value: string) => {
+    setEditDraft((current) =>
+      current ? { ...current, [field]: value } : current,
     );
-    setStatus("Article brief saved.");
+    setError(null);
   };
 
   const generateOutline = () => {
-    const nextErrors: Partial<Record<BriefTextField, string>> = {};
-    requiredFields.forEach((field) => {
-      if (brief[field].trim().length < 10) {
-        nextErrors[field] = "Add at least 10 characters.";
-      }
-    });
-    setErrors(nextErrors);
-    setStatus("");
-
-    const firstInvalid = requiredFields.find((field) => nextErrors[field]);
-    if (firstInvalid) {
-      document.getElementById(fieldIds[firstInvalid])?.focus();
-      return;
-    }
-
-    setIsGenerating(true);
-    window.sessionStorage.setItem(
-      "inkwell:article-brief",
-      JSON.stringify(brief),
-    );
-    window.setTimeout(() => {
-      setIsGenerating(false);
-      setStatus("Outline generated.");
-      router.push("/articles/new/outline");
-    }, 600);
+    if (!article || isGeneratingOutline || isEditing) return;
+    setIsGeneratingOutline(true);
+    push(`/articles/new/outline?articleId=${article.id}`);
   };
+
+  const backHref = article ? `/articles/${article.id}` : "/articles/new";
+  const isBlocked = error?.code === "brief_generation_blocked";
 
   return (
     <main className={styles.page}>
@@ -225,7 +263,7 @@ export function ArticleBrief({
       />
       <div className={styles.workspace}>
         <header className={styles.mobileHeader}>
-          <Link href="/articles/new" aria-label="Back to new article">
+          <Link href={backHref} aria-label="Back to article intake">
             <ArrowLeft size={28} aria-hidden />
           </Link>
           <div className={styles.mobileTitle}>
@@ -238,225 +276,361 @@ export function ArticleBrief({
             />
             <strong>Brief</strong>
           </div>
-          <button type="button" onClick={saveDraft}>
-            Save
+          <button
+            type="button"
+            disabled={!brief || isSaving}
+            onClick={() => (isEditing ? void saveBrief() : beginEditing())}
+          >
+            {isSaving ? "Saving…" : isEditing ? "Save" : "Edit"}
           </button>
         </header>
 
-        <ArticleProgress currentStep="brief" />
+        <ArticleProgress currentStep="brief" articleId={articleId} />
 
         <div className={styles.content}>
-          <section className={styles.summary} aria-label="Article summary">
-            <div>
-              <span>Working title</span>
-              <strong>{brief.workingTitle}</strong>
-            </div>
-            <div className={styles.goalSummary}>
-              <span>Goal</span>
-              <strong>{brief.goal}</strong>
-            </div>
-          </section>
-
-          <header className={styles.intro}>
-            <h1>Shape your article brief</h1>
-            <p>
-              Inkwell prefilled this brief based on your rough idea. Refine the
-              details to help us craft the right outline.
-            </p>
-          </header>
-
-          <form
-            className={styles.form}
-            noValidate
-            onSubmit={(event) => {
-              event.preventDefault();
-              generateOutline();
-            }}
-          >
-            <div className={styles.mainTopic}>
-              <BriefField
-                field="mainTopic"
-                label="Main topic"
-                maxLength={200}
-                value={brief.mainTopic}
-                required
-                error={errors.mainTopic}
-                onChange={updateField}
-              />
-            </div>
-            <div className={styles.audience}>
-              <BriefField
-                field="targetAudience"
-                label="Target audience"
-                maxLength={200}
-                value={brief.targetAudience}
-                required
-                error={errors.targetAudience}
-                onChange={updateField}
-              />
-            </div>
-            <div className={styles.problem}>
-              <BriefField
-                field="readerProblem"
-                label="Reader problem"
-                maxLength={200}
-                value={brief.readerProblem}
-                required
-                error={errors.readerProblem}
-                onChange={updateField}
-              />
-            </div>
-            <div
-              className={`${styles.optionalDetails} ${styles.examples} ${openOptional.examples ? styles.expanded : ""}`}
-            >
-              <button
-                aria-controls="examples-content"
-                aria-expanded={openOptional.examples}
-                className={styles.optionalToggle}
-                onClick={() =>
-                  setOpenOptional((current) => ({
-                    ...current,
-                    examples: !current.examples,
-                  }))
-                }
-                type="button"
-              >
-                Examples to include <small>(optional)</small>
-                <CaretDown size={18} aria-hidden />
-              </button>
-              <div className={styles.optionalContent} id="examples-content">
-                <BriefField
-                  field="examples"
-                  label="Examples or experiences to include"
-                  maxLength={300}
-                  value={brief.examples}
-                  onChange={updateField}
-                />
-              </div>
-            </div>
-            <div className={styles.argument}>
-              <BriefField
-                field="mainArgument"
-                label="Main argument or insight"
-                maxLength={300}
-                value={brief.mainArgument}
-                required
-                error={errors.mainArgument}
-                onChange={updateField}
-              />
-            </div>
-            <div
-              className={`${styles.optionalDetails} ${styles.avoid} ${openOptional.avoid ? styles.expanded : ""}`}
-            >
-              <button
-                aria-controls="avoid-content"
-                aria-expanded={openOptional.avoid}
-                className={styles.optionalToggle}
-                onClick={() =>
-                  setOpenOptional((current) => ({
-                    ...current,
-                    avoid: !current.avoid,
-                  }))
-                }
-                type="button"
-              >
-                What to avoid <small>(optional)</small>
-                <CaretDown size={18} aria-hidden />
-              </button>
-              <div className={styles.optionalContent} id="avoid-content">
-                <BriefField
-                  field="avoid"
-                  label="What should this article avoid?"
-                  maxLength={300}
-                  value={brief.avoid}
-                  onChange={updateField}
-                />
-              </div>
-            </div>
-            <div className={styles.outcome}>
-              <BriefField
-                field="desiredOutcome"
-                label="Desired reader outcome"
-                maxLength={300}
-                value={brief.desiredOutcome}
-                required
-                error={errors.desiredOutcome}
-                onChange={updateField}
-              />
-            </div>
-            <fieldset className={styles.length}>
-              <legend>Preferred length</legend>
-              <div className={styles.lengthOptions}>
-                {(
-                  [
-                    ["short", "Short", "~800 words"],
-                    ["standard", "Standard", "~1,500 words"],
-                    ["long", "Long", "~2,500 words"],
-                    ["custom", "Custom", "Set your own"],
-                  ] as const
-                ).map(([value, label, detail]) => (
-                  <label
-                    className={
-                      brief.preferredLength === value
-                        ? styles.selectedLength
-                        : ""
-                    }
-                    key={value}
-                  >
-                    <input
-                      checked={brief.preferredLength === value}
-                      name="preferred-length"
-                      onChange={() =>
-                        setBrief((current) => ({
-                          ...current,
-                          preferredLength: value,
-                        }))
-                      }
-                      type="radio"
-                      value={value}
-                    />
-                    <span>{label}</span>
-                    <small>{detail}</small>
-                  </label>
-                ))}
-              </div>
+          {viewState === "missing-id" ? (
+            <div className={styles.state} role="alert">
+              <h1>
+                {articleId ? "Invalid article link" : "No article selected"}
+              </h1>
               <p>
-                A standard-length article is ideal for in-depth insights with
-                actionable takeaways.
+                {articleId
+                  ? "This brief link does not contain a valid article ID."
+                  : "Start a new article before generating its brief."}
               </p>
-            </fieldset>
-
-            <p className={styles.status} role="status" aria-live="polite">
-              {status}
-            </p>
-
-            <div className={styles.mobileGenerate}>
-              <button type="submit" disabled={isGenerating}>
-                <Sparkle size={25} aria-hidden />
-                {isGenerating ? "Generating outline…" : "Generate outline"}
-              </button>
+              <Link href="/articles/new">Start a new article</Link>
             </div>
-          </form>
+          ) : null}
+
+          {viewState === "loading" || viewState === "generating" ? (
+            <div className={styles.state} role="status" aria-live="polite">
+              <Sparkle className={styles.pulse} size={38} aria-hidden />
+              <h1>
+                {viewState === "loading"
+                  ? "Preparing your article brief…"
+                  : "Generating your article brief…"}
+              </h1>
+              <p>
+                {viewState === "loading"
+                  ? "We’re checking for a saved brief."
+                  : "This can take several seconds while Inkwell shapes your source material."}
+              </p>
+            </div>
+          ) : null}
+
+          {viewState === "not-found" ? (
+            <div className={styles.state} role="alert">
+              <h1>Article not found</h1>
+              <p>
+                This article is unavailable or does not belong to your account.
+              </p>
+              <Link href="/dashboard?section=articles">Return to articles</Link>
+            </div>
+          ) : null}
+
+          {viewState === "error" ? (
+            <div className={styles.state} role="alert">
+              <Warning size={38} aria-hidden />
+              <h1>We couldn’t generate your brief</h1>
+              <p>{error?.message}</p>
+              <div className={styles.stateActions}>
+                {isBlocked && article ? (
+                  <Link href={`/articles/${article.id}`}>
+                    Revise article intake
+                  </Link>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() =>
+                    article ? void regenerate() : setRetryKey((key) => key + 1)
+                  }
+                  disabled={isRegenerating}
+                >
+                  {isRegenerating ? "Retrying…" : "Try again"}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {viewState === "ready" && article && brief ? (
+            <>
+              <section className={styles.summary} aria-label="Article summary">
+                <div>
+                  <span>Working title</span>
+                  <strong>{article.working_title}</strong>
+                </div>
+                <div className={styles.goalSummary}>
+                  <span>Goal</span>
+                  <strong>{articleGoalLabels[article.article_goal]}</strong>
+                </div>
+                <div className={styles.audienceSummary}>
+                  <span>Audience</span>
+                  <strong>{article.target_audience.join(", ")}</strong>
+                </div>
+              </section>
+
+              <header className={styles.intro}>
+                <div>
+                  <h1>Your article brief</h1>
+                  <p>
+                    Generated from your saved notes and planning choices. Review
+                    the direction before moving to the outline.
+                  </p>
+                </div>
+                <div className={styles.introActions}>
+                  {isEditing ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={cancelEditing}
+                        disabled={isSaving}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void saveBrief()}
+                        disabled={isSaving}
+                      >
+                        {isSaving ? "Saving…" : "Save changes"}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button type="button" onClick={beginEditing}>
+                        Edit brief
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void regenerate()}
+                        disabled={isRegenerating}
+                      >
+                        <ArrowClockwise size={19} aria-hidden />
+                        {isRegenerating ? "Regenerating…" : "Regenerate brief"}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </header>
+
+              {brief.is_stale ? (
+                <div className={styles.stale} role="status">
+                  <Warning size={21} aria-hidden />
+                  <p>
+                    Your article intake changed after this brief was generated.
+                    Regenerate it to use the latest inputs.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void regenerate()}
+                    disabled={isRegenerating || isEditing}
+                  >
+                    Regenerate
+                  </button>
+                </div>
+              ) : null}
+
+              {error ? (
+                <div className={styles.inlineError} role="alert">
+                  <span>{error.message}</span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      isEditing ? void saveBrief() : void regenerate()
+                    }
+                  >
+                    Try again
+                  </button>
+                </div>
+              ) : null}
+
+              {isEditing && editDraft ? (
+                <div className={styles.editGrid}>
+                  <EditField
+                    label="Summary"
+                    value={editDraft.summary}
+                    onChange={(value) => updateDraft("summary", value)}
+                  />
+                  <EditField
+                    label="Core angle"
+                    value={editDraft.coreAngle}
+                    onChange={(value) => updateDraft("coreAngle", value)}
+                  />
+                  <EditField
+                    label="Audience insights"
+                    value={editDraft.audienceInsights}
+                    onChange={(value) => updateDraft("audienceInsights", value)}
+                    hint="One insight per line"
+                  />
+                  <EditField
+                    label="Tone and style"
+                    value={editDraft.toneAndStyle}
+                    onChange={(value) => updateDraft("toneAndStyle", value)}
+                  />
+                  <EditField
+                    label="Key takeaways"
+                    value={editDraft.keyTakeaways}
+                    onChange={(value) => updateDraft("keyTakeaways", value)}
+                    hint="One takeaway per line"
+                  />
+                  <EditField
+                    label="Evidence gaps"
+                    value={editDraft.evidenceGaps}
+                    onChange={(value) => updateDraft("evidenceGaps", value)}
+                    hint="One gap per line"
+                  />
+                  <EditField
+                    label="Call to action"
+                    value={editDraft.callToAction}
+                    onChange={(value) => updateDraft("callToAction", value)}
+                  />
+                  <div className={styles.editSeo}>
+                    <h2>SEO direction</h2>
+                    <EditField
+                      label="Suggested titles"
+                      value={editDraft.suggestedTitles}
+                      onChange={(value) =>
+                        updateDraft("suggestedTitles", value)
+                      }
+                      hint="One title per line"
+                    />
+                    <EditField
+                      label="Primary keyword"
+                      value={editDraft.primaryKeyword}
+                      onChange={(value) => updateDraft("primaryKeyword", value)}
+                      rows={2}
+                    />
+                    <EditField
+                      label="Secondary keywords"
+                      value={editDraft.secondaryKeywords}
+                      onChange={(value) =>
+                        updateDraft("secondaryKeywords", value)
+                      }
+                      hint="One keyword per line"
+                    />
+                    <EditField
+                      label="Meta description"
+                      value={editDraft.metaDescription}
+                      onChange={(value) =>
+                        updateDraft("metaDescription", value)
+                      }
+                    />
+                  </div>
+                  <button
+                    className={styles.mobileCancelEdit}
+                    type="button"
+                    onClick={cancelEditing}
+                    disabled={isSaving}
+                  >
+                    Cancel changes
+                  </button>
+                </div>
+              ) : (
+                <div className={styles.cards}>
+                  <DetailCard title="Summary" wide>
+                    <p>{brief.summary}</p>
+                  </DetailCard>
+                  <DetailCard title="Core angle">
+                    <p>{brief.core_angle}</p>
+                  </DetailCard>
+                  <DetailCard title="Tone and style">
+                    <p>{brief.tone_and_style}</p>
+                  </DetailCard>
+                  <DetailCard title="Audience insights">
+                    <ul>
+                      {brief.audience_insights.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </DetailCard>
+                  <DetailCard title="Key takeaways">
+                    <ul>
+                      {brief.key_takeaways.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </DetailCard>
+                  <DetailCard title="Evidence gaps">
+                    {brief.evidence_gaps.length ? (
+                      <ul>
+                        {brief.evidence_gaps.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p>No significant evidence gaps identified.</p>
+                    )}
+                  </DetailCard>
+                  <DetailCard title="Call to action">
+                    <p>{brief.call_to_action}</p>
+                  </DetailCard>
+                  <DetailCard title="SEO direction" wide>
+                    <div className={styles.seoGrid}>
+                      <div>
+                        <h3>Suggested titles</h3>
+                        <ul>
+                          {brief.seo.suggested_titles.map((title) => (
+                            <li key={title}>{title}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div>
+                        <h3>Keywords</h3>
+                        <p>
+                          <strong>Primary:</strong> {brief.seo.primary_keyword}
+                        </p>
+                        <p>{brief.seo.secondary_keywords.join(", ")}</p>
+                      </div>
+                      <div className={styles.metaDescription}>
+                        <h3>Meta description</h3>
+                        <p>{brief.seo.meta_description}</p>
+                      </div>
+                    </div>
+                  </DetailCard>
+                </div>
+              )}
+
+              <button
+                className={styles.mobileRegenerate}
+                type="button"
+                onClick={() => void regenerate()}
+                disabled={isEditing || isRegenerating}
+              >
+                <ArrowClockwise size={19} aria-hidden />
+                {isRegenerating ? "Regenerating…" : "Regenerate brief"}
+              </button>
+
+              <div className={styles.mobileGenerate}>
+                <button
+                  type="button"
+                  disabled={isGeneratingOutline || isEditing}
+                  onClick={generateOutline}
+                >
+                  <Sparkle size={25} aria-hidden />
+                  {isGeneratingOutline
+                    ? "Generating outline…"
+                    : "Generate outline"}
+                </button>
+              </div>
+            </>
+          ) : null}
         </div>
 
-        <footer className={styles.desktopFooter}>
-          <Link href="/articles/new">
-            <ArrowLeft size={18} aria-hidden /> Back
-          </Link>
-          <div>
-            <button type="button" onClick={saveDraft}>
-              Save as draft
-            </button>
+        {viewState === "ready" && article && brief ? (
+          <footer className={styles.desktopFooter}>
+            <Link href={`/articles/${article.id}`}>
+              <ArrowLeft size={18} aria-hidden /> Back to intake
+            </Link>
             <button
               type="button"
               onClick={generateOutline}
-              disabled={isGenerating}
+              disabled={isGeneratingOutline || isEditing}
             >
-              {isGenerating ? "Generating outline…" : "Generate outline"}
+              {isGeneratingOutline ? "Generating outline…" : "Generate outline"}
               <ArrowRight size={19} aria-hidden />
             </button>
-          </div>
-        </footer>
+          </footer>
+        ) : null}
       </div>
     </main>
   );

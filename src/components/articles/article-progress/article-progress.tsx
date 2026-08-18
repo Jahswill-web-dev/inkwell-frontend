@@ -43,9 +43,11 @@ const steps: readonly ProgressStep[] = [
 export function ArticleProgress({
   currentStep,
   compact = false,
+  articleId,
 }: {
   currentStep: ArticleWorkflowStep;
   compact?: boolean;
+  articleId?: string;
 }) {
   const currentIndex = steps.findIndex((step) => step.id === currentStep);
 
@@ -78,7 +80,14 @@ export function ArticleProgress({
               key={step.desktopLabel}
             >
               {isComplete && step.href ? (
-                <Link aria-label={step.desktopLabel} href={step.href}>
+                <Link
+                  aria-label={step.desktopLabel}
+                  href={
+                    articleId && (step.id === "brief" || step.id === "outline")
+                      ? `${step.href}?articleId=${encodeURIComponent(articleId)}`
+                      : step.href
+                  }
+                >
                   {content}
                 </Link>
               ) : (

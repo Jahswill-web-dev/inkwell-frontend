@@ -9,6 +9,18 @@ import {
   type ArticleList,
   type ArticlePatch,
 } from "./article";
+import {
+  articleBriefPatchSchema,
+  articleBriefSchema,
+  type ArticleBrief,
+  type ArticleBriefPatch,
+} from "./brief";
+import {
+  articleOutlinePatchSchema,
+  articleOutlineSchema,
+  type ArticleOutline,
+  type ArticleOutlinePatch,
+} from "./outline";
 
 export class ArticleRequestError extends Error {
   constructor(
@@ -35,7 +47,10 @@ async function articleRequest<T>(
     },
   });
 
-  const payload = response.status === 204 ? undefined : await response.json().catch(() => undefined);
+  const payload =
+    response.status === 204
+      ? undefined
+      : await response.json().catch(() => undefined);
   if (!response.ok) {
     const error = articleApiErrorSchema.safeParse(payload);
     throw new ArticleRequestError(
@@ -81,6 +96,68 @@ export function createArticle(input: ArticleInput): Promise<Article> {
     "/api/articles",
     { method: "POST", body: JSON.stringify(body) },
     (value) => articleSchema.parse(value),
+  );
+}
+
+export function getArticleBrief(articleId: string): Promise<ArticleBrief> {
+  return articleRequest(`/api/articles/${articleId}/brief`, {}, (value) =>
+    articleBriefSchema.parse(value),
+  );
+}
+
+export function generateArticleBrief(articleId: string): Promise<ArticleBrief> {
+  return articleRequest(
+    `/api/articles/${articleId}/brief`,
+    { method: "POST" },
+    (value) => articleBriefSchema.parse(value),
+  );
+}
+
+export function updateArticleBrief(
+  articleId: string,
+  input: ArticleBriefPatch,
+): Promise<ArticleBrief> {
+  const body = articleBriefPatchSchema.parse(input);
+  return articleRequest(
+    `/api/articles/${articleId}/brief`,
+    { method: "PATCH", body: JSON.stringify(body) },
+    (value) => articleBriefSchema.parse(value),
+  );
+}
+
+export function getArticleOutline(articleId: string): Promise<ArticleOutline> {
+  return articleRequest(`/api/articles/${articleId}/outline`, {}, (value) =>
+    articleOutlineSchema.parse(value),
+  );
+}
+
+export function generateArticleOutline(
+  articleId: string,
+): Promise<ArticleOutline> {
+  return articleRequest(
+    `/api/articles/${articleId}/outline`,
+    { method: "POST" },
+    (value) => articleOutlineSchema.parse(value),
+  );
+}
+
+export function updateArticleOutline(
+  articleId: string,
+  input: ArticleOutlinePatch,
+): Promise<ArticleOutline> {
+  const body = articleOutlinePatchSchema.parse(input);
+  return articleRequest(
+    `/api/articles/${articleId}/outline`,
+    { method: "PATCH", body: JSON.stringify(body) },
+    (value) => articleOutlineSchema.parse(value),
+  );
+}
+
+export function deleteArticleOutline(articleId: string): Promise<void> {
+  return articleRequest(
+    `/api/articles/${articleId}/outline`,
+    { method: "DELETE" },
+    () => undefined,
   );
 }
 

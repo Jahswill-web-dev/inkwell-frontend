@@ -32,7 +32,12 @@ export function articleUpstreamError(error: unknown): NextResponse {
     const status = error.response?.status;
     const parsed = articleApiErrorSchema.safeParse(error.response?.data);
     if (
-      (status === 401 || status === 404 || status === 422) &&
+      (status === 401 ||
+        status === 404 ||
+        status === 422 ||
+        status === 502 ||
+        status === 503 ||
+        status === 504) &&
       parsed.success
     ) {
       const response = NextResponse.json(parsed.data, { status });

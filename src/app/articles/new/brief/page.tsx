@@ -8,7 +8,15 @@ export const metadata: Metadata = {
   description: "Shape the details Inkwell will use to build your outline.",
 };
 
-export default async function ArticleBriefPage() {
-  const user = await requireUser("/articles/new/brief");
-  return <ArticleBrief identity={toAuthIdentity(user)} />;
+export default async function ArticleBriefPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ articleId?: string }>;
+}) {
+  const { articleId } = await searchParams;
+  const next = articleId
+    ? `/articles/new/brief?articleId=${encodeURIComponent(articleId)}`
+    : "/articles/new/brief";
+  const user = await requireUser(next);
+  return <ArticleBrief articleId={articleId} identity={toAuthIdentity(user)} />;
 }

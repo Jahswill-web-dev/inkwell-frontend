@@ -8,7 +8,17 @@ export const metadata: Metadata = {
   description: "Shape and organize your article before drafting.",
 };
 
-export default async function OutlineBuilderPage() {
-  const user = await requireUser("/articles/new/outline");
-  return <OutlineBuilder identity={toAuthIdentity(user)} />;
+export default async function OutlineBuilderPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ articleId?: string }>;
+}) {
+  const { articleId } = await searchParams;
+  const next = articleId
+    ? `/articles/new/outline?articleId=${encodeURIComponent(articleId)}`
+    : "/articles/new/outline";
+  const user = await requireUser(next);
+  return (
+    <OutlineBuilder articleId={articleId} identity={toAuthIdentity(user)} />
+  );
 }

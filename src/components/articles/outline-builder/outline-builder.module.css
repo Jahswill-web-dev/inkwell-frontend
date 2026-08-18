@@ -37,6 +37,168 @@
   margin-inline: auto;
 }
 
+.state {
+  display: grid;
+  min-height: 520px;
+  place-content: center;
+  justify-items: center;
+  padding: 30px;
+  text-align: center;
+}
+
+.state h1 {
+  margin: 14px 0 0;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 2.5rem;
+  font-weight: 500;
+}
+
+.state p {
+  max-width: 580px;
+  margin: 12px 0 20px;
+  color: #53617b;
+}
+
+.state a,
+.state button {
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid var(--color-ink-navy);
+  border-radius: 4px;
+  background: var(--color-ink-navy);
+  color: #fff;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.stale,
+.inlineError,
+.dirtyNotice {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 16px 0;
+  padding: 12px 15px;
+  border: 1px solid #ddbb73;
+  border-radius: 5px;
+  background: #fff7e6;
+}
+
+.stale span,
+.inlineError span,
+.dirtyNotice span {
+  flex: 1;
+}
+
+.stale button,
+.dirtyNotice button {
+  padding: 7px 12px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.inlineError {
+  border-color: #e2aaa7;
+  background: #fff2f1;
+  color: #8b2721;
+}
+
+.dirtyNotice {
+  border-color: #b9c4da;
+  background: #f2f5fa;
+}
+
+.keyPoints {
+  display: grid;
+  margin-top: 28px;
+  gap: 9px;
+}
+
+.keyPoints h3 {
+  margin: 0 0 3px;
+  font-size: 0.76rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.keyPoints > div {
+  display: flex;
+  gap: 8px;
+}
+
+.keyPoints input {
+  min-width: 0;
+  flex: 1;
+  padding: 9px 11px;
+  border: 1px solid #d9d6d1;
+  border-radius: 4px;
+  background: #fffefa;
+  color: inherit;
+  font: inherit;
+}
+
+.keyPoints button,
+.addSection {
+  display: inline-flex;
+  width: max-content;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid #c8cdd7;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.keyPoints > div button {
+  width: 38px;
+  padding: 0;
+}
+
+.keyPoints button:disabled,
+.addSection:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.addSection {
+  margin-top: 18px;
+}
+
+.outlineDanger {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+  color: #8b2721;
+}
+
+.outlineDanger button {
+  min-height: 38px;
+  padding: 0 13px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.outlineDanger button:last-child:not(:only-child) {
+  background: #8b2721;
+  color: #fff;
+}
+
 .intro h1 {
   margin: 0;
   font-family: var(--font-newsreader), Georgia, serif;
@@ -534,7 +696,6 @@
   .healthPanel,
   .desktopFooter,
   .desktopRegenerate,
-  .desktopMenuButton,
   .wordCount {
     display: none;
   }

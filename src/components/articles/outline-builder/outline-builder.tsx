@@ -11,187 +11,92 @@ import {
   DotsSixVertical,
   DotsThree,
   ListBullets,
-  TextT,
+  Plus,
+  Sparkle,
+  Warning,
   X,
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { z } from "zod";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
+import type { Article } from "@/lib/articles/article";
+import {
+  ArticleRequestError,
+  deleteArticleOutline,
+  generateArticleOutline,
+  getArticle,
+  getArticleOutline,
+  updateArticleOutline,
+} from "@/lib/articles/client";
+import type {
+  ArticleOutline,
+  ArticleOutlineSection,
+} from "@/lib/articles/outline";
 import { DEFAULT_AUTH_IDENTITY, type AuthIdentity } from "@/lib/auth/identity";
 import { ArticleProgress } from "../article-progress/article-progress";
 import styles from "./outline-builder.module.css";
 
-export type OutlineSection = {
-  id: string;
-  title: string;
-  purpose: string;
-  questions: string[];
-  notes: string;
-  estimatedWords: number;
-};
+type EditableSection = ArticleOutlineSection & { clientId: string };
+type ViewState =
+  "loading" | "generating" | "ready" | "missing-id" | "not-found" | "error";
+type OutlineError = { code: string; message: string };
+const articleIdSchema = z.string().uuid();
 
-export type ArticleOutlineState = {
-  workingTitle: string;
-  targetAudience: string;
-  sections: OutlineSection[];
-};
-
-const defaultSections: readonly OutlineSection[] = [
-  {
-    id: "introduction",
-    title: "Introduction",
-    purpose:
-      "Hook the reader, introduce the challenge of capturing great ideas, and set expectations for what’s ahead.",
-    questions: [
-      "Why are great ideas so hard to write down?",
-      "What will the reader gain from reading this?",
-    ],
-    notes: "",
-    estimatedWords: 120,
-  },
-  {
-    id: "messy-nature",
-    title: "The messy nature of great ideas",
-    purpose:
-      "Show why worthwhile ideas often begin as incomplete, contradictory thoughts rather than polished arguments.",
-    questions: [
-      "Why do promising ideas feel unclear at first?",
-      "What makes early thinking difficult to explain?",
-    ],
-    notes: "",
-    estimatedWords: 280,
-  },
-  {
-    id: "writing-creates-structure",
-    title: "Writing creates structure",
-    purpose:
-      "Explain how writing turns loose connections into a sequence that other people can follow.",
-    questions: [
-      "How does writing expose gaps in an idea?",
-      "Which structures help a reader follow the thinking?",
-    ],
-    notes: "",
-    estimatedWords: 280,
-  },
-  {
-    id: "clarity-through-iteration",
-    title: "Clarity comes through iteration",
-    purpose:
-      "Reframe revision as the process that sharpens both the language and the underlying idea.",
-    questions: [
-      "Why is the first version rarely the clearest?",
-      "How can each revision improve the thinking?",
-    ],
-    notes: "",
-    estimatedWords: 260,
-  },
-  {
-    id: "conclusion",
-    title: "Conclusion",
-    purpose:
-      "Reinforce the central insight and leave readers with a practical next step for capturing difficult ideas.",
-    questions: [
-      "What should the reader remember?",
-      "What can they do the next time an idea resists words?",
-    ],
-    notes: "",
-    estimatedWords: 120,
-  },
-];
-
-const defaultOutline: ArticleOutlineState = {
-  workingTitle: "Why Great Ideas Are Hard to Write Down",
-  targetAudience: "Knowledge workers, creators, founders",
-  sections: defaultSections.map((section) => ({ ...section })),
-};
-
-const alternativeContent: Record<
-  string,
-  Pick<OutlineSection, "purpose" | "questions">
-> = {
-  introduction: {
-    purpose:
-      "Open with a relatable moment of creative friction and establish why turning thought into language matters.",
-    questions: [
-      "Why do great ideas often resist words?",
-      "What makes writing them down so difficult?",
-    ],
-  },
-  "messy-nature": {
-    purpose:
-      "Explore the fragments, associations, and uncertainty that make an emerging idea feel more complex than it first appears.",
-    questions: [
-      "What does an unfinished idea actually look like?",
-      "Why can complexity be a sign of potential?",
-    ],
-  },
-  "writing-creates-structure": {
-    purpose:
-      "Demonstrate how sentences force choices about order, evidence, and meaning that thinking alone can postpone.",
-    questions: [
-      "Which decisions does writing force us to make?",
-      "How does structure improve understanding?",
-    ],
-  },
-  "clarity-through-iteration": {
-    purpose:
-      "Show how drafting and revision progressively reveal the strongest version of an idea.",
-    questions: [
-      "What changes between a rough draft and a clear one?",
-      "How should a writer approach revision?",
-    ],
-  },
-  conclusion: {
-    purpose:
-      "Close by turning the friction of writing into an encouraging reason to keep shaping the idea.",
-    questions: [
-      "Which insight ties the article together?",
-      "What small writing habit should readers try next?",
-    ],
-  },
-};
-
-function isOutlineSection(value: unknown): value is OutlineSection {
-  if (!value || typeof value !== "object") return false;
-  const section = value as Record<string, unknown>;
-  return (
-    typeof section.id === "string" &&
-    typeof section.title === "string" &&
-    typeof section.purpose === "string" &&
-    Array.isArray(section.questions) &&
-    section.questions.every((question) => typeof question === "string") &&
-    typeof section.notes === "string" &&
-    typeof section.estimatedWords === "number"
-  );
+function clientId(section: ArticleOutlineSection, index: number) {
+  const slug = section.heading
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return `${slug || "section"}-${index}`;
 }
 
-function parseSavedOutline(value: string): ArticleOutlineState | null {
-  try {
-    const outline = JSON.parse(value) as Record<string, unknown>;
-    if (
-      typeof outline.workingTitle !== "string" ||
-      typeof outline.targetAudience !== "string" ||
-      !Array.isArray(outline.sections) ||
-      !outline.sections.every(isOutlineSection)
-    ) {
-      return null;
-    }
-    return outline as ArticleOutlineState;
-  } catch {
-    return null;
-  }
+function editableSections(outline: ArticleOutline): EditableSection[] {
+  return outline.sections.map((section, index) => ({
+    ...section,
+    clientId: clientId(section, index),
+  }));
 }
 
-type OutlineHealthProps = {
-  checks: readonly { label: string; description: string; passed: boolean }[];
-  isRegenerating: boolean;
-  onRegenerate: () => void;
-};
+function apiSections(sections: EditableSection[]): ArticleOutlineSection[] {
+  return sections.map(({ heading, purpose, key_points }) => ({
+    heading,
+    purpose,
+    key_points,
+  }));
+}
 
-function OutlineHealth({
-  checks,
-  isRegenerating,
-  onRegenerate,
-}: OutlineHealthProps) {
+function outlineError(error: unknown): OutlineError {
+  if (error instanceof ArticleRequestError)
+    return { code: error.code, message: error.message };
+  return {
+    code: "outline_generation_failed",
+    message: "We couldn’t load this outline. Please try again.",
+  };
+}
+
+function OutlineHealth({ sections }: { sections: EditableSection[] }) {
+  const checks = useMemo(() => {
+    const last = sections.at(-1);
+    return [
+      {
+        label: "Clear progression",
+        description:
+          "The outline has enough sections to develop a complete argument.",
+        passed: sections.length >= 3,
+      },
+      {
+        label: "Strong conclusion",
+        description: "The final section reinforces a conclusion or takeaway.",
+        passed: Boolean(
+          last &&
+          /conclusion|takeaway|close|next step/i.test(
+            `${last.heading} ${last.purpose}`,
+          ),
+        ),
+      },
+    ];
+  }, [sections]);
+
   return (
     <div className={styles.healthContent}>
       <h2>Outline health</h2>
@@ -211,219 +116,334 @@ function OutlineHealth({
           </div>
         ))}
       </div>
-      <button
-        className={styles.regenerateApproach}
-        disabled={isRegenerating}
-        onClick={onRegenerate}
-        type="button"
-      >
-        <ArrowClockwise size={21} aria-hidden />
-        {isRegenerating
-          ? "Generating another approach…"
-          : "Generate another approach"}
-      </button>
     </div>
   );
 }
 
 export function OutlineBuilder({
+  articleId,
   identity = DEFAULT_AUTH_IDENTITY,
 }: {
+  articleId?: string;
   identity?: AuthIdentity;
 }) {
-  const router = useRouter();
-  const [outline, setOutline] = useState<ArticleOutlineState>(defaultOutline);
-  const [openSectionId, setOpenSectionId] = useState("introduction");
+  const { push } = useRouter();
+  const validArticleId = articleIdSchema.safeParse(articleId);
+  const [article, setArticle] = useState<Article | null>(null);
+  const [savedOutline, setSavedOutline] = useState<ArticleOutline | null>(null);
+  const [sections, setSections] = useState<EditableSection[]>([]);
+  const [viewState, setViewState] = useState<ViewState>(
+    validArticleId.success ? "loading" : "missing-id",
+  );
+  const [error, setError] = useState<OutlineError | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
+  const [openSectionId, setOpenSectionId] = useState("");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
-  const [isRegeneratingOutline, setIsRegeneratingOutline] = useState(false);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [status, setStatus] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [showHealth, setShowHealth] = useState(false);
   const closeHealthRef = useRef<HTMLButtonElement>(null);
-  const healthTriggerRef = useRef<HTMLButtonElement>(null);
+
+  const outlinePath = validArticleId.success
+    ? `/articles/new/outline?articleId=${encodeURIComponent(validArticleId.data)}`
+    : "/articles/new/outline";
+  const loginPath = `/login?next=${encodeURIComponent(outlinePath)}`;
+  const dirty =
+    Boolean(savedOutline) &&
+    JSON.stringify(apiSections(sections)) !==
+      JSON.stringify(savedOutline?.sections);
+
+  const applyOutline = (outline: ArticleOutline) => {
+    const next = editableSections(outline);
+    setSavedOutline(outline);
+    setSections(next);
+    setOpenSectionId(next[0]?.clientId ?? "");
+    setViewState("ready");
+    setError(null);
+  };
 
   useEffect(() => {
-    const savedOutline = window.sessionStorage.getItem(
-      "inkwell:article-outline",
-    );
-    const savedBrief = window.sessionStorage.getItem("inkwell:article-brief");
-    const parsedOutline = savedOutline ? parseSavedOutline(savedOutline) : null;
-
-    let nextOutline = parsedOutline;
-    if (!nextOutline && savedBrief) {
-      try {
-        const brief = JSON.parse(savedBrief) as Record<string, unknown>;
-        nextOutline = {
-          ...defaultOutline,
-          workingTitle:
-            String(brief.workingTitle ?? "").trim() ||
-            defaultOutline.workingTitle,
-          targetAudience:
-            String(brief.targetAudience ?? "").trim() ||
-            defaultOutline.targetAudience,
-          sections: defaultSections.map((section) => ({ ...section })),
-        };
-      } catch {
-        window.sessionStorage.removeItem("inkwell:article-brief");
+    if (!validArticleId.success) return;
+    const savedArticleId = validArticleId.data;
+    let active = true;
+    const fail = (caught: unknown) => {
+      if (!active) return;
+      const nextError = outlineError(caught);
+      if (caught instanceof ArticleRequestError && caught.status === 401)
+        push(loginPath);
+      else if (nextError.code === "article_not_found")
+        setViewState("not-found");
+      else {
+        setError(nextError);
+        setViewState("error");
       }
-    }
-
-    if (nextOutline) {
-      const timer = window.setTimeout(() => setOutline(nextOutline), 0);
-      return () => window.clearTimeout(timer);
-    }
-  }, []);
+    };
+    const load = async () => {
+      setViewState("loading");
+      setError(null);
+      try {
+        const loadedArticle = await getArticle(savedArticleId);
+        if (!active) return;
+        setArticle(loadedArticle);
+        try {
+          const outline = await getArticleOutline(savedArticleId);
+          if (active) applyOutline(outline);
+        } catch (caught) {
+          if (
+            caught instanceof ArticleRequestError &&
+            caught.status === 404 &&
+            caught.code === "outline_not_found"
+          ) {
+            setViewState("generating");
+            const outline = await generateArticleOutline(savedArticleId);
+            if (active) applyOutline(outline);
+          } else fail(caught);
+        }
+      } catch (caught) {
+        fail(caught);
+      }
+    };
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [loginPath, push, retryKey, validArticleId.data, validArticleId.success]);
 
   useEffect(() => {
     if (!showHealth) return;
     closeHealthRef.current?.focus();
-    const closeOnEscape = (event: KeyboardEvent) => {
+    const close = (event: KeyboardEvent) => {
       if (event.key === "Escape") setShowHealth(false);
     };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
   }, [showHealth]);
 
-  const totalWords = outline.sections.reduce(
-    (total, section) => total + section.estimatedWords,
-    0,
-  );
-
-  const healthChecks = useMemo(() => {
-    const firstTitle = outline.sections[0]?.title ?? "";
-    const lastSection = outline.sections.at(-1);
-    const hasProgression =
-      outline.sections.length >= 3 && /intro/i.test(firstTitle);
-    const hasBalance =
-      totalWords > 0 &&
-      outline.sections.every((section) => {
-        const share = section.estimatedWords / totalWords;
-        return share >= 0.08 && share <= 0.35;
-      });
-    const hasConclusion = Boolean(
-      lastSection &&
-      /conclusion|takeaway|close/i.test(
-        `${lastSection.title} ${lastSection.purpose}`,
+  const updateSection = (id: string, patch: Partial<EditableSection>) => {
+    setSections((current) =>
+      current.map((section) =>
+        section.clientId === id ? { ...section, ...patch } : section,
       ),
     );
-    return [
-      {
-        label: "Clear progression",
-        description: "Your sections flow logically from problem to solution.",
-        passed: hasProgression,
-      },
-      {
-        label: "Balanced sections",
-        description: "Your word counts are well-distributed across sections.",
-        passed: hasBalance,
-      },
-      {
-        label: "Strong conclusion",
-        description: "You’ve included a conclusion to reinforce key takeaways.",
-        passed: hasConclusion,
-      },
-    ] as const;
-  }, [outline.sections, totalWords]);
-
-  const saveOutline = (message = "Outline saved.") => {
-    window.sessionStorage.setItem(
-      "inkwell:article-outline",
-      JSON.stringify(outline),
-    );
-    setStatus(message);
-  };
-
-  const startDrafting = () => {
-    saveOutline("Outline saved. Opening your draft.");
-    router.push("/articles/new/draft");
-  };
-
-  const updateNotes = (id: string, notes: string) => {
-    setOutline((current) => ({
-      ...current,
-      sections: current.sections.map((section) =>
-        section.id === id ? { ...section, notes } : section,
-      ),
-    }));
     setStatus("");
   };
 
-  const moveSection = (id: string, direction: -1 | 1) => {
-    setOutline((current) => {
-      const index = current.sections.findIndex((section) => section.id === id);
-      const nextIndex = index + direction;
-      if (index < 0 || nextIndex < 0 || nextIndex >= current.sections.length) {
-        return current;
-      }
-      const sections = [...current.sections];
-      [sections[index], sections[nextIndex]] = [
-        sections[nextIndex],
-        sections[index],
-      ];
-      return { ...current, sections };
+  const updateKeyPoint = (id: string, index: number, value: string) => {
+    const section = sections.find((item) => item.clientId === id);
+    if (!section) return;
+    const points = [...section.key_points];
+    points[index] = value;
+    updateSection(id, { key_points: points });
+  };
+
+  const addSection = () => {
+    if (sections.length >= 10) return;
+    const id = `new-section-${Date.now()}`;
+    setSections((current) => [
+      ...current,
+      {
+        clientId: id,
+        heading: "New section",
+        purpose: "Describe what this section should accomplish",
+        key_points: ["Add a key point"],
+      },
+    ]);
+    setOpenSectionId(id);
+  };
+
+  const duplicateSection = (id: string) => {
+    if (sections.length >= 10) return;
+    setSections((current) => {
+      const index = current.findIndex((section) => section.clientId === id);
+      if (index < 0) return current;
+      const copy = {
+        ...current[index],
+        clientId: `section-copy-${Date.now()}`,
+        heading: `${current[index].heading} (copy)`,
+        key_points: [...current[index].key_points],
+      };
+      const next = [...current];
+      next.splice(index + 1, 0, copy);
+      return next;
     });
     setOpenMenuId(null);
-    setStatus("Section order updated.");
+  };
+
+  const removeSection = (id: string) => {
+    if (sections.length <= 3) return;
+    setSections((current) =>
+      current.filter((section) => section.clientId !== id),
+    );
+    setOpenMenuId(null);
+  };
+
+  const moveSection = (id: string, direction: -1 | 1) => {
+    setSections((current) => {
+      const index = current.findIndex((section) => section.clientId === id);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= current.length)
+        return current;
+      const next = [...current];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      return next;
+    });
+    setOpenMenuId(null);
   };
 
   const dropSection = (targetId: string) => {
     if (!draggedId || draggedId === targetId) return;
-    setOutline((current) => {
-      const sections = [...current.sections];
-      const sourceIndex = sections.findIndex(
-        (section) => section.id === draggedId,
-      );
-      const targetIndex = sections.findIndex(
-        (section) => section.id === targetId,
-      );
-      if (sourceIndex < 0 || targetIndex < 0) return current;
-      const [moved] = sections.splice(sourceIndex, 1);
-      sections.splice(targetIndex, 0, moved);
-      return { ...current, sections };
+    setSections((current) => {
+      const next = [...current];
+      const from = next.findIndex((section) => section.clientId === draggedId);
+      const to = next.findIndex((section) => section.clientId === targetId);
+      if (from < 0 || to < 0) return current;
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
     });
     setDraggedId(null);
-    setStatus("Section order updated.");
   };
 
-  const regenerateSection = (id: string) => {
-    setRegeneratingId(id);
-    setOpenMenuId(null);
-    setStatus("");
-    window.setTimeout(() => {
-      setOutline((current) => ({
-        ...current,
-        sections: current.sections.map((section) =>
-          section.id === id && alternativeContent[id]
-            ? { ...section, ...alternativeContent[id] }
-            : section,
-        ),
-      }));
-      setRegeneratingId(null);
-      setStatus("Section regenerated.");
-    }, 450);
+  const saveOutline = async (): Promise<ArticleOutline | null> => {
+    if (!articleId || !savedOutline || isSaving) return null;
+    if (!dirty) {
+      setStatus("No changes to save.");
+      return savedOutline;
+    }
+    setIsSaving(true);
+    setError(null);
+    try {
+      const updated = await updateArticleOutline(articleId, {
+        sections: apiSections(sections),
+      });
+      applyOutline(updated);
+      setStatus("Outline saved.");
+      return updated;
+    } catch (caught) {
+      if (caught instanceof ArticleRequestError && caught.status === 401)
+        push(loginPath);
+      else setError(outlineError(caught));
+      return null;
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const regenerateOutline = () => {
-    setIsRegeneratingOutline(true);
-    setStatus("");
-    window.setTimeout(() => {
-      setOutline((current) => ({
-        ...current,
-        sections: current.sections.map((section) => ({
-          ...section,
-          ...(alternativeContent[section.id] ?? {}),
+  const regenerate = async () => {
+    if (!articleId || dirty || isRegenerating) return;
+    setIsRegenerating(true);
+    setError(null);
+    try {
+      applyOutline(await generateArticleOutline(articleId));
+    } catch (caught) {
+      if (caught instanceof ArticleRequestError && caught.status === 401)
+        push(loginPath);
+      else setError(outlineError(caught));
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  const removeOutline = async () => {
+    if (!articleId || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await deleteArticleOutline(articleId);
+      window.sessionStorage.removeItem("inkwell:article-outline");
+      push(`/articles/new/brief?articleId=${articleId}`);
+    } catch (caught) {
+      setError(outlineError(caught));
+      setConfirmDelete(false);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const startDrafting = async () => {
+    if (!article || !savedOutline) return;
+    const persisted = dirty ? await saveOutline() : savedOutline;
+    if (!persisted) return;
+    window.sessionStorage.setItem(
+      "inkwell:article-outline",
+      JSON.stringify({
+        workingTitle: article.working_title,
+        targetAudience: article.target_audience.join(", "),
+        sections: persisted.sections.map((section, index) => ({
+          id: clientId(section, index),
+          title: section.heading,
         })),
-      }));
-      setIsRegeneratingOutline(false);
-      setStatus("A new outline approach is ready.");
-    }, 600);
+      }),
+    );
+    push(`/articles/new/draft?articleId=${article.id}`);
   };
 
-  const closeHealth = () => {
-    setShowHealth(false);
-    window.setTimeout(() => healthTriggerRef.current?.focus(), 0);
-  };
+  const briefHref = articleId
+    ? `/articles/new/brief?articleId=${articleId}`
+    : "/articles/new/brief";
+
+  if (viewState !== "ready" || !article || !savedOutline) {
+    return (
+      <main className={styles.page}>
+        <DashboardSidebar
+          activeHref="/dashboard?section=articles"
+          identity={identity}
+          showSettings={false}
+        />
+        <div className={styles.workspace}>
+          <ArticleProgress currentStep="outline" articleId={articleId} />
+          <div
+            className={styles.state}
+            role={
+              viewState === "loading" || viewState === "generating"
+                ? "status"
+                : "alert"
+            }
+          >
+            {viewState === "loading" || viewState === "generating" ? (
+              <Sparkle size={38} aria-hidden />
+            ) : (
+              <Warning size={38} aria-hidden />
+            )}
+            <h1>
+              {viewState === "loading"
+                ? "Preparing your outline…"
+                : viewState === "generating"
+                  ? "Generating your outline…"
+                  : viewState === "missing-id"
+                    ? articleId
+                      ? "Invalid article link"
+                      : "No article selected"
+                    : viewState === "not-found"
+                      ? "Article not found"
+                      : "We couldn’t load your outline"}
+            </h1>
+            <p>
+              {error?.message ??
+                (viewState === "generating"
+                  ? "This can take several seconds."
+                  : "Choose an article and try again.")}
+            </p>
+            {error?.code === "brief_not_found" ? (
+              <Link href={briefHref}>Generate a brief first</Link>
+            ) : viewState === "error" ? (
+              <button
+                type="button"
+                onClick={() => setRetryKey((key) => key + 1)}
+              >
+                Try again
+              </button>
+            ) : viewState === "missing-id" ? (
+              <Link href="/articles/new">Start a new article</Link>
+            ) : null}
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className={styles.page}>
@@ -432,10 +452,9 @@ export function OutlineBuilder({
         identity={identity}
         showSettings={false}
       />
-
       <div className={styles.workspace}>
         <header className={styles.mobileHeader}>
-          <Link href="/articles/new/brief" aria-label="Back to article brief">
+          <Link href={briefHref} aria-label="Back to article brief">
             <ArrowLeft size={31} aria-hidden />
           </Link>
           <div className={styles.mobileTitle}>
@@ -448,12 +467,16 @@ export function OutlineBuilder({
             />
             <strong>Outline</strong>
           </div>
-          <button type="button" onClick={() => saveOutline()}>
-            Save
+          <button
+            type="button"
+            onClick={() => void saveOutline()}
+            disabled={!dirty || isSaving}
+          >
+            {isSaving ? "Saving…" : "Save"}
           </button>
         </header>
 
-        <ArticleProgress currentStep="outline" />
+        <ArticleProgress currentStep="outline" articleId={articleId} />
 
         <div className={styles.layout}>
           <section className={styles.mainContent}>
@@ -462,15 +485,15 @@ export function OutlineBuilder({
               <div className={styles.desktopMetadata}>
                 <div>
                   <span>Working title</span>
-                  <strong>{outline.workingTitle}</strong>
+                  <strong>{article.working_title}</strong>
                 </div>
                 <div>
                   <span>Audience</span>
-                  <strong>{outline.targetAudience}</strong>
+                  <strong>{article.target_audience.join(", ")}</strong>
                 </div>
                 <div>
-                  <span>Est. length</span>
-                  <strong>{totalWords.toLocaleString()} words</strong>
+                  <span>Sections</span>
+                  <strong>{sections.length}</strong>
                 </div>
               </div>
               <div className={styles.mobileMetadata}>
@@ -478,108 +501,132 @@ export function OutlineBuilder({
                   <i aria-hidden>
                     <ListBullets size={20} />
                   </i>
-                  {outline.sections.length} sections
+                  {sections.length} sections
                 </span>
                 <span aria-hidden className={styles.divider} />
-                <span>
-                  <i aria-hidden>
-                    <TextT size={20} />
-                  </i>
-                  ~{totalWords.toLocaleString()} words
-                </span>
-                <span aria-hidden className={styles.divider} />
-                <button
-                  ref={healthTriggerRef}
-                  type="button"
-                  onClick={() => setShowHealth(true)}
-                >
+                <button type="button" onClick={() => setShowHealth(true)}>
                   Outline health
                 </button>
               </div>
             </header>
 
+            {savedOutline.is_stale ? (
+              <div className={styles.stale}>
+                <Warning size={20} aria-hidden />
+                <span>This outline is based on an older brief.</span>
+                <button
+                  type="button"
+                  disabled={dirty || isRegenerating}
+                  onClick={() => void regenerate()}
+                >
+                  Regenerate
+                </button>
+              </div>
+            ) : null}
+            {error ? (
+              <div className={styles.inlineError} role="alert">
+                <span>{error.message}</span>
+              </div>
+            ) : null}
+            {dirty ? (
+              <div className={styles.dirtyNotice}>
+                <span>You have unsaved outline changes.</span>
+                <button
+                  type="button"
+                  onClick={() => applyOutline(savedOutline)}
+                >
+                  Discard changes
+                </button>
+              </div>
+            ) : null}
+
             <div className={styles.sections} aria-label="Outline sections">
-              {outline.sections.map((section, index) => {
-                const isOpen = section.id === openSectionId;
-                const isRegenerating = section.id === regeneratingId;
+              {sections.map((section, index) => {
+                const open = section.clientId === openSectionId;
                 return (
                   <article
-                    className={`${styles.sectionCard} ${isOpen ? styles.openSection : ""} ${draggedId === section.id ? styles.dragging : ""}`}
+                    className={`${styles.sectionCard} ${open ? styles.openSection : ""} ${draggedId === section.clientId ? styles.dragging : ""}`}
                     draggable
-                    key={section.id}
-                    onDragStart={() => setDraggedId(section.id)}
+                    key={section.clientId}
+                    onDragStart={() => setDraggedId(section.clientId)}
                     onDragEnd={() => setDraggedId(null)}
                     onDragOver={(event: DragEvent<HTMLElement>) =>
                       event.preventDefault()
                     }
-                    onDrop={() => dropSection(section.id)}
+                    onDrop={() => dropSection(section.clientId)}
                   >
                     <div className={styles.sectionHeader}>
                       <span className={styles.dragHandle} aria-hidden>
                         <DotsSixVertical size={25} weight="bold" />
                       </span>
                       <span className={styles.sectionNumber}>{index + 1}</span>
-                      <h2>{section.title}</h2>
+                      <h2>{section.heading}</h2>
                       <div className={styles.sectionActions}>
-                        <button
-                          aria-label={`Regenerate ${section.title}`}
-                          className={styles.desktopRegenerate}
-                          disabled={isRegenerating}
-                          onClick={() => regenerateSection(section.id)}
-                          type="button"
-                        >
-                          <ArrowClockwise
-                            className={isRegenerating ? styles.spinning : ""}
-                            size={22}
-                            aria-hidden
-                          />
-                        </button>
                         <div className={styles.menuWrap}>
                           <button
-                            aria-expanded={openMenuId === section.id}
+                            aria-expanded={openMenuId === section.clientId}
                             aria-haspopup="menu"
-                            aria-label={`More actions for ${section.title}`}
+                            aria-label={`More actions for ${section.heading}`}
                             className={styles.desktopMenuButton}
                             onClick={() =>
                               setOpenMenuId((current) =>
-                                current === section.id ? null : section.id,
+                                current === section.clientId
+                                  ? null
+                                  : section.clientId,
                               )
                             }
                             type="button"
                           >
                             <DotsThree size={25} weight="bold" aria-hidden />
                           </button>
-                          {openMenuId === section.id ? (
+                          {openMenuId === section.clientId ? (
                             <div className={styles.actionMenu} role="menu">
                               <button
                                 disabled={index === 0}
-                                onClick={() => moveSection(section.id, -1)}
+                                onClick={() =>
+                                  moveSection(section.clientId, -1)
+                                }
                                 role="menuitem"
                                 type="button"
                               >
                                 Move up
                               </button>
                               <button
-                                disabled={index === outline.sections.length - 1}
-                                onClick={() => moveSection(section.id, 1)}
+                                disabled={index === sections.length - 1}
+                                onClick={() => moveSection(section.clientId, 1)}
                                 role="menuitem"
                                 type="button"
                               >
                                 Move down
                               </button>
+                              <button
+                                disabled={sections.length >= 10}
+                                onClick={() =>
+                                  duplicateSection(section.clientId)
+                                }
+                                role="menuitem"
+                                type="button"
+                              >
+                                Duplicate
+                              </button>
+                              <button
+                                disabled={sections.length <= 3}
+                                onClick={() => removeSection(section.clientId)}
+                                role="menuitem"
+                                type="button"
+                              >
+                                Delete section
+                              </button>
                             </div>
                           ) : null}
                         </div>
-                        <span className={styles.wordCount}>
-                          ~{section.estimatedWords} words
-                        </span>
                         <button
-                          aria-controls={`section-content-${section.id}`}
-                          aria-expanded={isOpen}
-                          aria-label={`${isOpen ? "Collapse" : "Expand"} ${section.title}`}
+                          aria-controls={`section-content-${section.clientId}`}
+                          aria-expanded={open}
+                          aria-label={`${open ? "Collapse" : "Expand"} ${section.heading}`}
                           className={styles.expandButton}
                           onClick={() =>
-                            setOpenSectionId(isOpen ? "" : section.id)
+                            setOpenSectionId(open ? "" : section.clientId)
                           }
                           type="button"
                         >
@@ -587,81 +634,80 @@ export function OutlineBuilder({
                         </button>
                       </div>
                     </div>
-
-                    {isOpen ? (
+                    {open ? (
                       <div
                         className={styles.sectionContent}
-                        id={`section-content-${section.id}`}
+                        id={`section-content-${section.clientId}`}
                       >
-                        <div className={styles.sectionDetails}>
-                          <div>
-                            <h3>
-                              <span className={styles.desktopPurposeLabel}>
-                                Section purpose
-                              </span>
-                              <span className={styles.mobilePurposeLabel}>
-                                Purpose
-                              </span>
-                            </h3>
-                            <p>{section.purpose}</p>
-                          </div>
-                          <div>
-                            <h3>Questions to answer</h3>
-                            <ul>
-                              {section.questions.map((question) => (
-                                <li key={question}>{question}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        </div>
-
                         <label className={styles.notes}>
-                          <span>
-                            Notes <small>(optional)</small>
-                          </span>
+                          <span>Heading</span>
                           <textarea
-                            maxLength={500}
+                            rows={2}
+                            value={section.heading}
                             onChange={(event) =>
-                              updateNotes(section.id, event.target.value)
+                              updateSection(section.clientId, {
+                                heading: event.target.value,
+                              })
                             }
-                            placeholder="Add any key points, examples, or context to include in this section…"
-                            value={section.notes}
                           />
                         </label>
-
-                        <div className={styles.mobileSectionMeta}>
-                          <span>
-                            <i aria-hidden>
-                              <TextT size={18} />
-                            </i>
-                            Estimated words: ~{section.estimatedWords}
-                          </span>
-                        </div>
-                        <div className={styles.mobileSectionActions}>
-                          <button
-                            disabled={isRegenerating}
-                            onClick={() => regenerateSection(section.id)}
-                            type="button"
-                          >
-                            <ArrowClockwise
-                              className={isRegenerating ? styles.spinning : ""}
-                              size={22}
-                              aria-hidden
-                            />
-                            {isRegenerating ? "Regenerating…" : "Regenerate"}
-                          </button>
-                          <button
-                            aria-expanded={openMenuId === section.id}
-                            aria-haspopup="menu"
-                            onClick={() =>
-                              setOpenMenuId((current) =>
-                                current === section.id ? null : section.id,
-                              )
+                        <label className={styles.notes}>
+                          <span>Purpose</span>
+                          <textarea
+                            rows={3}
+                            value={section.purpose}
+                            onChange={(event) =>
+                              updateSection(section.clientId, {
+                                purpose: event.target.value,
+                              })
                             }
+                          />
+                        </label>
+                        <div className={styles.keyPoints}>
+                          <h3>Key points</h3>
+                          {section.key_points.map((point, pointIndex) => (
+                            <div key={`${section.clientId}-${pointIndex}`}>
+                              <input
+                                aria-label={`Key point ${pointIndex + 1} for ${section.heading}`}
+                                value={point}
+                                onChange={(event) =>
+                                  updateKeyPoint(
+                                    section.clientId,
+                                    pointIndex,
+                                    event.target.value,
+                                  )
+                                }
+                              />
+                              <button
+                                type="button"
+                                aria-label={`Remove key point ${pointIndex + 1}`}
+                                disabled={section.key_points.length <= 1}
+                                onClick={() =>
+                                  updateSection(section.clientId, {
+                                    key_points: section.key_points.filter(
+                                      (_, itemIndex) =>
+                                        itemIndex !== pointIndex,
+                                    ),
+                                  })
+                                }
+                              >
+                                <X size={17} aria-hidden />
+                              </button>
+                            </div>
+                          ))}
+                          <button
                             type="button"
+                            disabled={section.key_points.length >= 5}
+                            onClick={() =>
+                              updateSection(section.clientId, {
+                                key_points: [
+                                  ...section.key_points,
+                                  "New key point",
+                                ],
+                              })
+                            }
                           >
-                            More actions
-                            <DotsThree size={23} weight="bold" aria-hidden />
+                            <Plus size={17} aria-hidden /> Add key point
                           </button>
                         </div>
                       </div>
@@ -671,43 +717,97 @@ export function OutlineBuilder({
               })}
             </div>
 
+            <button
+              className={styles.addSection}
+              type="button"
+              disabled={sections.length >= 10}
+              onClick={addSection}
+            >
+              <Plus size={19} aria-hidden /> Add section
+            </button>
+            <div className={styles.outlineDanger}>
+              {confirmDelete ? (
+                <>
+                  <span>Delete this outline permanently?</span>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelete(false)}
+                    disabled={isDeleting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void removeOutline()}
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? "Deleting…" : "Confirm delete"}
+                  </button>
+                </>
+              ) : (
+                <button type="button" onClick={() => setConfirmDelete(true)}>
+                  Delete outline
+                </button>
+              )}
+            </div>
             <p className={styles.status} role="status" aria-live="polite">
               {status}
             </p>
-
             <div className={styles.mobileDraftAction}>
-              <button onClick={startDrafting} type="button">
-                Start drafting
+              <button
+                onClick={() => void startDrafting()}
+                disabled={isSaving}
+                type="button"
+              >
+                {isSaving ? "Saving…" : "Start drafting"}
               </button>
             </div>
           </section>
 
           <aside className={styles.healthPanel} aria-label="Outline health">
-            <OutlineHealth
-              checks={healthChecks}
-              isRegenerating={isRegeneratingOutline}
-              onRegenerate={regenerateOutline}
-            />
+            <OutlineHealth sections={sections} />
+            <button
+              className={styles.regenerateApproach}
+              disabled={dirty || isRegenerating}
+              onClick={() => void regenerate()}
+              type="button"
+            >
+              <ArrowClockwise size={21} aria-hidden />
+              {isRegenerating
+                ? "Generating another approach…"
+                : "Generate another approach"}
+            </button>
           </aside>
         </div>
 
         <footer className={styles.desktopFooter}>
-          <Link href="/articles/new/brief">
+          <Link href={briefHref}>
             <ArrowLeft size={19} aria-hidden /> Back to brief
           </Link>
           <div>
-            <button type="button" onClick={() => saveOutline()}>
-              Save
+            <button
+              type="button"
+              onClick={() => void saveOutline()}
+              disabled={!dirty || isSaving}
+            >
+              {isSaving ? "Saving…" : "Save"}
             </button>
-            <button type="button" onClick={startDrafting}>
-              Start drafting
+            <button
+              type="button"
+              onClick={() => void startDrafting()}
+              disabled={isSaving}
+            >
+              {isSaving ? "Saving…" : "Start drafting"}
             </button>
           </div>
         </footer>
       </div>
 
       {showHealth ? (
-        <div className={styles.healthOverlay} onMouseDown={closeHealth}>
+        <div
+          className={styles.healthOverlay}
+          onMouseDown={() => setShowHealth(false)}
+        >
           <section
             aria-label="Outline health details"
             aria-modal="true"
@@ -718,17 +818,13 @@ export function OutlineBuilder({
             <button
               aria-label="Close outline health"
               className={styles.closeHealth}
-              onClick={closeHealth}
+              onClick={() => setShowHealth(false)}
               ref={closeHealthRef}
               type="button"
             >
               <X size={24} aria-hidden />
             </button>
-            <OutlineHealth
-              checks={healthChecks}
-              isRegenerating={isRegeneratingOutline}
-              onRegenerate={regenerateOutline}
-            />
+            <OutlineHealth sections={sections} />
           </section>
         </div>
       ) : null}

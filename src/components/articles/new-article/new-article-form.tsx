@@ -59,9 +59,11 @@ function validateForm(values: ArticleFormValues): FormErrors {
 
 function apiMessage(error: unknown) {
   if (error instanceof ArticleRequestError) {
-    if (error.status === 401) return "Your session expired. Please sign in again.";
+    if (error.status === 401)
+      return "Your session expired. Please sign in again.";
     if (error.status === 404) return "This article could not be found.";
-    if (error.status === 422) return "Review the highlighted fields and try again.";
+    if (error.status === 422)
+      return "Review the highlighted fields and try again.";
     return error.message;
   }
   return "Articles are temporarily unavailable. Please try again.";
@@ -84,9 +86,13 @@ export function NewArticleForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
-  const updateField = <K extends FieldName>(field: K, value: ArticleFormValues[K]) => {
+  const updateField = <K extends FieldName>(
+    field: K,
+    value: ArticleFormValues[K],
+  ) => {
     setForm((current) => ({ ...current, [field]: value }));
-    if (errors[field]) setErrors((current) => ({ ...current, [field]: undefined }));
+    if (errors[field])
+      setErrors((current) => ({ ...current, [field]: undefined }));
     setStatus("");
   };
 
@@ -102,7 +108,8 @@ export function NewArticleForm({
       ...audiences.filter(
         (audience) =>
           !form.targetAudience.some(
-            (existing) => existing.toLocaleLowerCase() === audience.toLocaleLowerCase(),
+            (existing) =>
+              existing.toLocaleLowerCase() === audience.toLocaleLowerCase(),
           ),
       ),
     ]);
@@ -162,17 +169,6 @@ export function NewArticleForm({
 
       const created = await createArticle(input);
       if (continueToBrief) {
-        window.sessionStorage.setItem(
-          "inkwell:new-article",
-          JSON.stringify({
-            articleId: created.id,
-            mode: "notes",
-            notes: created.notes,
-            workingTitle: created.working_title,
-            targetAudience: created.target_audience,
-            articleGoal: created.article_goal,
-          }),
-        );
         router.push(`/articles/new/brief?articleId=${created.id}`);
       } else {
         router.push(`/articles/${created.id}`);
@@ -208,7 +204,10 @@ export function NewArticleForm({
 
   return (
     <main className={styles.page}>
-      <DashboardSidebar activeHref="/dashboard?section=articles" identity={identity} />
+      <DashboardSidebar
+        activeHref="/dashboard?section=articles"
+        identity={identity}
+      />
       <div className={styles.workspace}>
         <header className={styles.desktopHeader}>
           <div className={styles.headerInner}>
@@ -218,24 +217,60 @@ export function NewArticleForm({
           </div>
         </header>
         <header className={styles.mobileHeader}>
-          <Link href="/dashboard" aria-label="Back to dashboard"><ArrowLeft size={28} aria-hidden /></Link>
+          <Link href="/dashboard" aria-label="Back to dashboard">
+            <ArrowLeft size={28} aria-hidden />
+          </Link>
           <div className={styles.mobileTitle}>
-            <Image src="/images/inkwell-icon.png" alt="" width={43} height={60} priority />
+            <Image
+              src="/images/inkwell-icon.png"
+              alt=""
+              width={43}
+              height={60}
+              priority
+            />
             <strong>{isEditing ? "Edit article" : "New article"}</strong>
           </div>
-          <button type="button" disabled={isSubmitting} onClick={() => void save(false)}>Save</button>
+          <button
+            type="button"
+            disabled={isSubmitting}
+            onClick={() => void save(false)}
+          >
+            Save
+          </button>
         </header>
 
         <div className={styles.content}>
-          <section className={styles.intro} aria-labelledby="article-form-title">
-            <p className={styles.eyebrow}>{isEditing ? "Article intake" : "Start a new article"}</p>
-            <h1 id="article-form-title">{isEditing ? "Refine your article intake." : "Turn your notes into a clear article."}</h1>
-            <p>{isEditing ? "Update the notes and planning choices for this article." : "Add your notes and planning choices. We’ll help shape them into a useful brief."}</p>
+          <section
+            className={styles.intro}
+            aria-labelledby="article-form-title"
+          >
+            <p className={styles.eyebrow}>
+              {isEditing ? "Article intake" : "Start a new article"}
+            </p>
+            <h1 id="article-form-title">
+              {isEditing
+                ? "Refine your article intake."
+                : "Turn your notes into a clear article."}
+            </h1>
+            <p>
+              {isEditing
+                ? "Update the notes and planning choices for this article."
+                : "Add your notes and planning choices. We’ll help shape them into a useful brief."}
+            </p>
           </section>
 
-          <form className={styles.form} noValidate onSubmit={(event) => { event.preventDefault(); void save(!isEditing); }}>
+          <form
+            className={styles.form}
+            noValidate
+            onSubmit={(event) => {
+              event.preventDefault();
+              void save(!isEditing);
+            }}
+          >
             <div className={styles.sourceField}>
-              <label className={styles.visuallyHidden} htmlFor="article-notes">Your notes</label>
+              <label className={styles.visuallyHidden} htmlFor="article-notes">
+                Your notes
+              </label>
               <textarea
                 id="article-notes"
                 maxLength={20_000}
@@ -245,22 +280,45 @@ export function NewArticleForm({
                 placeholder="Paste rough notes, bullet points, quotes, research, or fragments here…"
                 value={form.notes}
               />
-              <div className={styles.sourceMeta} id="notes-helper"><span>Notes are required.</span><span>{form.notes.length.toLocaleString()} / 20,000</span></div>
-              {errors.notes ? <p className={styles.error} id="notes-error">{errors.notes}</p> : null}
+              <div className={styles.sourceMeta} id="notes-helper">
+                <span>Notes are required.</span>
+                <span>{form.notes.length.toLocaleString()} / 20,000</span>
+              </div>
+              {errors.notes ? (
+                <p className={styles.error} id="notes-error">
+                  {errors.notes}
+                </p>
+              ) : null}
             </div>
 
             <div className={styles.detailsGrid}>
               <label className={styles.field} htmlFor="article-workingTitle">
                 <span>Working title *</span>
-                <input id="article-workingTitle" maxLength={200} aria-invalid={Boolean(errors.workingTitle)} onChange={(event) => updateField("workingTitle", event.target.value)} value={form.workingTitle} />
-                {errors.workingTitle ? <small className={styles.error}>{errors.workingTitle}</small> : <small>Up to 200 characters.</small>}
+                <input
+                  id="article-workingTitle"
+                  maxLength={200}
+                  aria-invalid={Boolean(errors.workingTitle)}
+                  onChange={(event) =>
+                    updateField("workingTitle", event.target.value)
+                  }
+                  value={form.workingTitle}
+                />
+                {errors.workingTitle ? (
+                  <small className={styles.error}>{errors.workingTitle}</small>
+                ) : (
+                  <small>Up to 200 characters.</small>
+                )}
               </label>
               <div className={styles.field}>
-                <label htmlFor="article-targetAudience">Target audience *</label>
+                <label htmlFor="article-targetAudience">
+                  Target audience *
+                </label>
                 <div
                   className={styles.tagInput}
                   data-invalid={Boolean(errors.targetAudience)}
-                  onClick={() => document.getElementById("article-targetAudience")?.focus()}
+                  onClick={() =>
+                    document.getElementById("article-targetAudience")?.focus()
+                  }
                 >
                   {form.targetAudience.map((audience) => (
                     <span className={styles.tag} key={audience}>
@@ -303,32 +361,130 @@ export function NewArticleForm({
                     value={audienceInput}
                   />
                 </div>
-                {errors.targetAudience ? <small className={styles.error} id="target-audience-helper">{errors.targetAudience}</small> : <small id="target-audience-helper">Type a word, then press space to add it.</small>}
+                {errors.targetAudience ? (
+                  <small className={styles.error} id="target-audience-helper">
+                    {errors.targetAudience}
+                  </small>
+                ) : (
+                  <small id="target-audience-helper">
+                    Type a word, then press space to add it.
+                  </small>
+                )}
               </div>
-              <label className={`${styles.field} ${styles.goalField}`} htmlFor="article-articleGoal">
+              <label
+                className={`${styles.field} ${styles.goalField}`}
+                htmlFor="article-articleGoal"
+              >
                 <span>Article goal *</span>
-                <select id="article-articleGoal" aria-invalid={Boolean(errors.articleGoal)} onChange={(event) => updateField("articleGoal", event.target.value as ArticleFormValues["articleGoal"])} value={form.articleGoal}>
-                  <option value="" disabled>Select what readers should take away</option>
-                  {articleGoals.map((goal) => <option value={goal} key={goal}>{articleGoalLabels[goal]}</option>)}
+                <select
+                  id="article-articleGoal"
+                  aria-invalid={Boolean(errors.articleGoal)}
+                  onChange={(event) =>
+                    updateField(
+                      "articleGoal",
+                      event.target.value as ArticleFormValues["articleGoal"],
+                    )
+                  }
+                  value={form.articleGoal}
+                >
+                  <option value="" disabled>
+                    Select what readers should take away
+                  </option>
+                  {articleGoals.map((goal) => (
+                    <option value={goal} key={goal}>
+                      {articleGoalLabels[goal]}
+                    </option>
+                  ))}
                 </select>
-                {errors.articleGoal ? <small className={styles.error}>{errors.articleGoal}</small> : <small>What should readers take away?</small>}
+                {errors.articleGoal ? (
+                  <small className={styles.error}>{errors.articleGoal}</small>
+                ) : (
+                  <small>What should readers take away?</small>
+                )}
               </label>
             </div>
 
-            <p className={status.includes("saved") || status.includes("No changes") ? styles.status : styles.requestError} role="status" aria-live="polite">{status}</p>
+            <p
+              className={
+                status.includes("saved") || status.includes("No changes")
+                  ? styles.status
+                  : styles.requestError
+              }
+              role="status"
+              aria-live="polite"
+            >
+              {status}
+            </p>
 
             {article ? (
               <div className={styles.deletePanel}>
-                {isConfirmingDelete ? <div className={styles.deleteConfirm} role="group" aria-label="Confirm article deletion"><span>Delete permanently?</span><button type="button" onClick={() => setIsConfirmingDelete(false)} disabled={isSubmitting}>Cancel</button><button className={styles.dangerAction} type="button" onClick={() => void remove()} disabled={isSubmitting}>Confirm delete</button></div>
-                : <button className={styles.dangerAction} type="button" onClick={() => setIsConfirmingDelete(true)} disabled={isSubmitting}>Delete article</button>}
+                {isConfirmingDelete ? (
+                  <div
+                    className={styles.deleteConfirm}
+                    role="group"
+                    aria-label="Confirm article deletion"
+                  >
+                    <span>Delete permanently?</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsConfirmingDelete(false)}
+                      disabled={isSubmitting}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className={styles.dangerAction}
+                      type="button"
+                      onClick={() => void remove()}
+                      disabled={isSubmitting}
+                    >
+                      Confirm delete
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    className={styles.dangerAction}
+                    type="button"
+                    onClick={() => setIsConfirmingDelete(true)}
+                    disabled={isSubmitting}
+                  >
+                    Delete article
+                  </button>
+                )}
               </div>
             ) : null}
 
             <div className={styles.desktopActions}>
-              <button type="button" onClick={() => void save(false)} disabled={isSubmitting}>{isSubmitting ? "Saving…" : "Save as draft"}</button>
-              {!article ? <button className={styles.primaryAction} type="submit" disabled={isSubmitting}>{isSubmitting ? "Saving…" : "Build my article brief"}</button> : null}
+              <button
+                type="button"
+                onClick={() => void save(false)}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Saving…" : "Save as draft"}
+              </button>
+              {!article ? (
+                <button
+                  className={styles.primaryAction}
+                  type="submit"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "Saving…" : "Build my article brief"}
+                </button>
+              ) : null}
             </div>
-            <div className={styles.mobileActions}><button className={styles.primaryAction} type="submit" disabled={isSubmitting}>{isSubmitting ? "Saving…" : isEditing ? "Save changes" : "Build my article brief"}</button></div>
+            <div className={styles.mobileActions}>
+              <button
+                className={styles.primaryAction}
+                type="submit"
+                disabled={isSubmitting}
+              >
+                {isSubmitting
+                  ? "Saving…"
+                  : isEditing
+                    ? "Save changes"
+                    : "Build my article brief"}
+              </button>
+            </div>
           </form>
         </div>
       </div>

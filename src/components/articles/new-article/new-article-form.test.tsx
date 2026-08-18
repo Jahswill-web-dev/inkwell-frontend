@@ -3,14 +3,23 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NewArticleForm } from "./new-article-form";
 
-const { pushMock, refreshMock, createMock, updateMock, deleteMock } = vi.hoisted(() => ({
-  pushMock: vi.fn(), refreshMock: vi.fn(), createMock: vi.fn(), updateMock: vi.fn(), deleteMock: vi.fn(),
-}));
+const { pushMock, refreshMock, createMock, updateMock, deleteMock } =
+  vi.hoisted(() => ({
+    pushMock: vi.fn(),
+    refreshMock: vi.fn(),
+    createMock: vi.fn(),
+    updateMock: vi.fn(),
+    deleteMock: vi.fn(),
+  }));
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: pushMock, refresh: refreshMock }) }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: pushMock, refresh: refreshMock }),
+}));
 vi.mock("@/lib/articles/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/articles/client")>()),
-  createArticle: createMock, updateArticle: updateMock, deleteArticle: deleteMock,
+  createArticle: createMock,
+  updateArticle: updateMock,
+  deleteArticle: deleteMock,
 }));
 
 const article = {
@@ -25,10 +34,22 @@ const article = {
 };
 
 async function fillRequiredForm() {
-  await userEvent.type(screen.getByRole("textbox", { name: "Your notes" }), "Useful research notes");
-  await userEvent.type(screen.getByRole("textbox", { name: /Working title/ }), "A useful title");
-  await userEvent.type(screen.getByRole("textbox", { name: /Target audience/ }), "Independent writers");
-  await userEvent.selectOptions(screen.getByRole("combobox", { name: /Article goal/ }), "educate_with_practical_guidance");
+  await userEvent.type(
+    screen.getByRole("textbox", { name: "Your notes" }),
+    "Useful research notes",
+  );
+  await userEvent.type(
+    screen.getByRole("textbox", { name: /Working title/ }),
+    "A useful title",
+  );
+  await userEvent.type(
+    screen.getByRole("textbox", { name: /Target audience/ }),
+    "Independent writers",
+  );
+  await userEvent.selectOptions(
+    screen.getByRole("combobox", { name: /Article goal/ }),
+    "educate_with_practical_guidance",
+  );
 }
 
 beforeEach(() => {
@@ -37,18 +58,25 @@ beforeEach(() => {
   updateMock.mockResolvedValue({ ...article, working_title: "Revised title" });
   deleteMock.mockResolvedValue(undefined);
 });
-afterEach(() => { cleanup(); window.sessionStorage.clear(); });
+afterEach(() => {
+  cleanup();
+  window.sessionStorage.clear();
+});
 
 describe("NewArticleForm", () => {
   it("uses a notes-only form with exact API goal values", () => {
     render(<NewArticleForm />);
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Inform and inspire" })).toHaveValue("inform_and_inspire");
+    expect(
+      screen.getByRole("option", { name: "Inform and inspire" }),
+    ).toHaveValue("inform_and_inspire");
   });
 
   it("requires all four intake fields", async () => {
     render(<NewArticleForm />);
-    await userEvent.click(screen.getAllByRole("button", { name: "Build my article brief" })[0]);
+    await userEvent.click(
+      screen.getAllByRole("button", { name: "Build my article brief" })[0],
+    );
     expect(await screen.findByText("Notes is required.")).toBeVisible();
     expect(createMock).not.toHaveBeenCalled();
   });
@@ -57,26 +85,49 @@ describe("NewArticleForm", () => {
     render(<NewArticleForm />);
     const input = screen.getByRole("textbox", { name: /Target audience/ });
     await userEvent.type(input, "writers founders ");
-    expect(screen.getByRole("button", { name: "Remove writers" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Remove founders" })).toBeVisible();
-    await userEvent.click(screen.getByRole("button", { name: "Remove writers" }));
-    expect(screen.queryByRole("button", { name: "Remove writers" })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Remove writers" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Remove founders" }),
+    ).toBeVisible();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Remove writers" }),
+    );
+    expect(
+      screen.queryByRole("button", { name: "Remove writers" }),
+    ).not.toBeInTheDocument();
   });
 
   it("creates and opens a saved intake", async () => {
     render(<NewArticleForm />);
     await fillRequiredForm();
-    await userEvent.click(screen.getByRole("button", { name: "Save as draft" }));
-    await waitFor(() => expect(createMock).toHaveBeenCalledWith({ notes: "Useful research notes", working_title: "A useful title", target_audience: ["Independent", "writers"], article_goal: "educate_with_practical_guidance" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Save as draft" }),
+    );
+    await waitFor(() =>
+      expect(createMock).toHaveBeenCalledWith({
+        notes: "Useful research notes",
+        working_title: "A useful title",
+        target_audience: ["Independent", "writers"],
+        article_goal: "educate_with_practical_guidance",
+      }),
+    );
     expect(pushMock).toHaveBeenCalledWith(`/articles/${article.id}`);
   });
 
-  it("creates, seeds the brief, and continues", async () => {
+  it("creates an article and opens its brief URL", async () => {
     render(<NewArticleForm />);
     await fillRequiredForm();
-    await userEvent.click(screen.getAllByRole("button", { name: "Build my article brief" })[0]);
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith(`/articles/new/brief?articleId=${article.id}`));
-    expect(JSON.parse(sessionStorage.getItem("inkwell:new-article") ?? "{}")).toMatchObject({ articleId: article.id, notes: article.notes });
+    await userEvent.click(
+      screen.getAllByRole("button", { name: "Build my article brief" })[0],
+    );
+    await waitFor(() =>
+      expect(pushMock).toHaveBeenCalledWith(
+        `/articles/new/brief?articleId=${article.id}`,
+      ),
+    );
+    expect(sessionStorage.getItem("inkwell:new-article")).toBeNull();
   });
 
   it("patches only changed fields and confirms deletion", async () => {
@@ -84,11 +135,21 @@ describe("NewArticleForm", () => {
     const title = screen.getByRole("textbox", { name: /Working title/ });
     await userEvent.clear(title);
     await userEvent.type(title, "Revised title");
-    await userEvent.click(screen.getByRole("button", { name: "Save as draft" }));
-    await waitFor(() => expect(updateMock).toHaveBeenCalledWith(article.id, { working_title: "Revised title" }));
-    await userEvent.click(screen.getByRole("button", { name: "Delete article" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Save as draft" }),
+    );
+    await waitFor(() =>
+      expect(updateMock).toHaveBeenCalledWith(article.id, {
+        working_title: "Revised title",
+      }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Delete article" }),
+    );
     expect(deleteMock).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Confirm delete" }),
+    );
     await waitFor(() => expect(deleteMock).toHaveBeenCalledWith(article.id));
     expect(pushMock).toHaveBeenCalledWith("/dashboard");
   });

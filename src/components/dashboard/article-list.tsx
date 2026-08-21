@@ -19,6 +19,10 @@ function updatedLabel(value: string) {
   }).format(new Date(value));
 }
 
+function articleBriefHref(articleId: string) {
+  return `/articles/new/brief?articleId=${encodeURIComponent(articleId)}`;
+}
+
 export function ArticleList({
   articles,
   total,
@@ -35,7 +39,7 @@ export function ArticleList({
           <span>Title</span><span>Goal</span><span>Target audience</span><span>Last edited</span><span />
         </div>
         {articles.map((article) => (
-          <Link className={styles.desktopArticleRow} href={`/articles/${article.id}`} key={article.id}>
+          <Link className={styles.desktopArticleRow} href={articleBriefHref(article.id)} key={article.id}>
             <strong>{article.working_title}</strong>
             <span>{articleGoalLabels[article.article_goal]}</span>
             <span className={styles.audienceCell}>{article.target_audience.join(", ")}</span>
@@ -46,7 +50,7 @@ export function ArticleList({
       </div>
       <div className={styles.mobileList}>
         {articles.map((article) => (
-          <Link className={styles.mobileArticleRow} href={`/articles/${article.id}`} key={article.id}>
+          <Link className={styles.mobileArticleRow} href={articleBriefHref(article.id)} key={article.id}>
             <strong>{article.working_title}</strong>
             <span className={styles.mobileStage}>{articleGoalLabels[article.article_goal]}</span>
             <span className={styles.mobileArticleMeta}><small>{updatedLabel(article.updated_at)}</small><CaretRight size={24} aria-hidden /></span>

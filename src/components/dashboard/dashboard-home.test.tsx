@@ -27,6 +27,21 @@ describe("DashboardHome", () => {
     expect(listMock).toHaveBeenCalledWith(0, 20);
   });
 
+  it("opens each article at its brief from desktop and mobile lists", async () => {
+    render(<DashboardHome />);
+
+    for (const article of articles) {
+      const titles = await screen.findAllByText(article.working_title);
+      expect(titles).toHaveLength(2);
+      for (const title of titles) {
+        expect(title.closest("a")).toHaveAttribute(
+          "href",
+          `/articles/new/brief?articleId=${encodeURIComponent(article.id)}`,
+        );
+      }
+    }
+  });
+
   it("filters loaded articles by title", async () => {
     render(<DashboardHome />);
     await screen.findAllByText("The Case for Slower Thinking");

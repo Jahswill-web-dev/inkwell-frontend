@@ -12,6 +12,7 @@ import {
 } from "@/lib/articles/server";
 
 const articleIdSchema = z.string().uuid();
+const OUTLINE_GENERATION_TIMEOUT_MS = 120_000;
 type RouteContext = { params: Promise<{ articleId: string }> };
 
 async function requestContext(context: RouteContext) {
@@ -54,7 +55,9 @@ async function outlineRequest(
       method === "get"
         ? await client.get(path)
         : method === "post"
-          ? await client.post(path)
+          ? await client.post(path, undefined, {
+              timeout: OUTLINE_GENERATION_TIMEOUT_MS,
+            })
           : await client.patch(path, body);
     const result = articleOutlineSchema.safeParse(response.data);
     if (!result.success) throw new Error("Invalid article outline response");

@@ -79,6 +79,11 @@ describe("/api/articles/[articleId]/outline", () => {
       (await DELETE(new Request("http://local", { method: "DELETE" }), context))
         .status,
     ).toBe(204);
+    expect(postMock).toHaveBeenCalledWith(
+      `/api/v1/articles/${articleId}/outline`,
+      undefined,
+      { timeout: 120_000 },
+    );
     expect(patchMock).toHaveBeenCalledWith(
       `/api/v1/articles/${articleId}/outline`,
       { sections },

@@ -12,12 +12,13 @@
 
 .workspace {
   min-height: 100svh;
-  margin-left: 215px;
+  margin-left: var(--dashboard-sidebar-width, 215px);
+  transition: margin-left 200ms ease;
 }
 
 .topbar {
   position: fixed;
-  inset: 0 0 auto 215px;
+  inset: 0 0 auto var(--dashboard-sidebar-width, 215px);
   z-index: 10;
   display: grid;
   height: 91px;
@@ -26,6 +27,7 @@
   border-bottom: 1px solid var(--color-ink-line);
   background: rgba(255, 253, 250, 0.98);
   padding: 0 31px;
+  transition: left 200ms ease;
 }
 
 .topbar > nav {

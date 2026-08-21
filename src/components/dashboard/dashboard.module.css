@@ -10,7 +10,8 @@
 }
 .workspace {
   min-height: 100svh;
-  margin-left: 215px;
+  margin-left: var(--dashboard-sidebar-width, 215px);
+  transition: margin-left 200ms ease;
 }
 .dashboardHeader {
   display: flex;
@@ -292,7 +293,9 @@
 }
 
 .dashboardState h2,
-.dashboardState p { margin: 4px; }
+.dashboardState p {
+  margin: 4px;
+}
 .dashboardState a,
 .dashboardState button,
 .listFeedback button,
@@ -307,9 +310,21 @@
   text-decoration: none;
   cursor: pointer;
 }
-.listFeedback { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 18px; color: var(--color-ink-crimson); }
-.listFeedback button { margin-top: 0; }
-.loadMore { display: block; margin: 20px auto 0; }
+.listFeedback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 18px;
+  color: var(--color-ink-crimson);
+}
+.listFeedback button {
+  margin-top: 0;
+}
+.loadMore {
+  display: block;
+  margin: 20px auto 0;
+}
 .stage {
   width: max-content;
   padding: 5px 12px;
@@ -518,7 +533,13 @@
     color: #435476;
     font-size: 0.82rem;
   }
-  .mobileArticleMeta { display: flex; align-items: center; justify-content: space-between; margin-top: 9px; color: #435476; }
+  .mobileArticleMeta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 9px;
+    color: #435476;
+  }
   .mobileStage i {
     width: 7px;
     height: 7px;

@@ -12,8 +12,9 @@
 
 .workspace {
   min-height: 100svh;
-  margin-left: 215px;
+  margin-left: var(--dashboard-sidebar-width, 215px);
   padding-bottom: 110px;
+  transition: margin-left 200ms ease;
 }
 
 .topbar {
@@ -71,7 +72,7 @@
   position: fixed;
   right: 0;
   bottom: 0;
-  left: 215px;
+  left: var(--dashboard-sidebar-width, 215px);
   z-index: 10;
   display: flex;
   min-height: 110px;
@@ -79,7 +80,14 @@
   justify-content: space-between;
   border-top: 1px solid var(--color-ink-line);
   background: rgba(255, 253, 250, 0.98);
-  padding: 0 max(25px, calc((100vw - 215px - 1116px) / 2 + 16px));
+  padding: 0
+    max(
+      25px,
+      calc((100vw - var(--dashboard-sidebar-width, 215px) - 1116px) / 2 + 16px)
+    );
+  transition:
+    left 200ms ease,
+    padding 200ms ease;
 }
 
 .actions > div {

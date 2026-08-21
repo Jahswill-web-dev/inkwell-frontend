@@ -12,6 +12,7 @@ import {
 } from "@/lib/articles/server";
 
 const articleIdSchema = z.string().uuid();
+const BRIEF_GENERATION_TIMEOUT_MS = 120_000;
 type RouteContext = { params: Promise<{ articleId: string }> };
 
 async function requestContext(context: RouteContext) {
@@ -50,7 +51,9 @@ async function briefRequest(
       method === "get"
         ? await client.get(path)
         : method === "post"
-          ? await client.post(path)
+          ? await client.post(path, undefined, {
+              timeout: BRIEF_GENERATION_TIMEOUT_MS,
+            })
           : await client.patch(path, body);
     const result = articleBriefSchema.safeParse(response.data);
     if (!result.success) throw new Error("Invalid article brief response");

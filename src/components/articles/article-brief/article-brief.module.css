@@ -5,8 +5,9 @@
 }
 .workspace {
   min-height: 100svh;
-  margin-left: 215px;
+  margin-left: var(--dashboard-sidebar-width, 215px);
   padding-bottom: 92px;
+  transition: margin-left 200ms ease;
 }
 .mobileHeader {
   display: none;
@@ -306,15 +307,22 @@
   z-index: 3;
   right: 0;
   bottom: 0;
-  left: 215px;
+  left: var(--dashboard-sidebar-width, 215px);
   display: flex;
   height: 92px;
   box-sizing: border-box;
   align-items: center;
   justify-content: space-between;
-  padding: 0 max(42px, calc((100vw - 215px - 1138px) / 2));
+  padding: 0
+    max(
+      42px,
+      calc((100vw - var(--dashboard-sidebar-width, 215px) - 1138px) / 2)
+    );
   border-top: 1px solid var(--color-ink-line);
   background: rgb(255 253 250 / 98%);
+  transition:
+    left 200ms ease,
+    padding 200ms ease;
 }
 .desktopFooter > a,
 .desktopFooter > button {

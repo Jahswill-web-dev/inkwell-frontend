@@ -6,7 +6,8 @@
 
 .workspace {
   min-height: 100svh;
-  margin-left: 215px;
+  margin-left: var(--dashboard-sidebar-width, 215px);
+  transition: margin-left 200ms ease;
 }
 
 .desktopHeader {

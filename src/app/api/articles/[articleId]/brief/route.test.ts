@@ -72,6 +72,8 @@ describe("/api/articles/[articleId]/brief", () => {
     expect(getMock).toHaveBeenCalledWith(`/api/v1/articles/${articleId}/brief`);
     expect(postMock).toHaveBeenCalledWith(
       `/api/v1/articles/${articleId}/brief`,
+      undefined,
+      { timeout: 120_000 },
     );
   });
 

@@ -15,12 +15,13 @@
 
 .desktopWorkspace {
   min-height: 100svh;
-  margin-left: 215px;
+  margin-left: var(--dashboard-sidebar-width, 215px);
+  transition: margin-left 200ms ease;
 }
 
 .desktopTopbar {
   position: fixed;
-  inset: 0 0 auto 215px;
+  inset: 0 0 auto var(--dashboard-sidebar-width, 215px);
   z-index: 5;
   display: grid;
   height: 91px;
@@ -32,6 +33,7 @@
   border-bottom: 1px solid var(--color-ink-line);
   background: rgba(255, 253, 250, 0.97);
   padding: 0 30px;
+  transition: left 200ms ease;
 }
 
 .saveMeta,
@@ -90,12 +92,13 @@
 
 .outlineRail {
   position: fixed;
-  inset: 91px auto 0 215px;
+  inset: 91px auto 0 var(--dashboard-sidebar-width, 215px);
   z-index: 3;
   width: 236px;
   overflow-y: auto;
   border-right: 1px solid var(--color-ink-line);
   background: var(--color-ink-paper);
+  transition: left 200ms ease;
 }
 
 .outlineContent {
@@ -338,7 +341,7 @@
   position: fixed;
   z-index: 4;
   bottom: 46px;
-  left: calc(215px + 236px + 24px);
+  left: calc(var(--dashboard-sidebar-width, 215px) + 236px + 24px);
   display: flex;
   width: 568px;
   height: 64px;
@@ -348,6 +351,7 @@
   border-radius: 7px;
   background: rgba(255, 253, 250, 0.98);
   box-shadow: 0 5px 22px rgba(7, 25, 79, 0.05);
+  transition: left 200ms ease;
 }
 
 .toolbar button,
@@ -715,8 +719,10 @@
   }
 
   .toolbar {
-    left: calc(215px + 205px + 24px);
-    width: calc(100vw - 215px - 205px - 290px - 48px);
+    left: calc(var(--dashboard-sidebar-width, 215px) + 205px + 24px);
+    width: calc(
+      100vw - var(--dashboard-sidebar-width, 215px) - 205px - 290px - 48px
+    );
   }
 }
 

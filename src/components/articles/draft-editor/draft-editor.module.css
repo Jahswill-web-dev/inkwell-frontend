@@ -14,6 +14,8 @@
 }
 
 .desktopWorkspace {
+  --draft-outline-rail-width: 52px;
+
   min-height: 100svh;
   margin-left: var(--dashboard-sidebar-width, 215px);
   transition: margin-left 200ms ease;
@@ -86,7 +88,10 @@
 .desktopLayout {
   display: grid;
   min-height: 100svh;
-  grid-template-columns: 236px minmax(500px, 1fr) 338px;
+  grid-template-columns: var(--draft-outline-rail-width) minmax(
+      500px,
+      1fr
+    ) 338px;
   padding-top: 91px;
 }
 
@@ -94,11 +99,100 @@
   position: fixed;
   inset: 91px auto 0 var(--dashboard-sidebar-width, 215px);
   z-index: 3;
-  width: 236px;
+  width: var(--draft-outline-rail-width);
   overflow-y: auto;
   border-right: 1px solid var(--color-ink-line);
   background: var(--color-ink-paper);
   transition: left 200ms ease;
+}
+
+.outlineExpandButton {
+  display: grid;
+  width: 100%;
+  min-height: 68px;
+  grid-template-columns: 1fr;
+  place-items: center;
+  gap: 3px;
+  border: 0;
+  border-bottom: 1px solid var(--color-ink-line);
+  background: transparent;
+  color: var(--color-ink-navy);
+  cursor: pointer;
+}
+
+.outlineExpandButton:hover {
+  background: #fff8f7;
+  color: var(--color-ink-crimson);
+}
+
+.compactOutlineList {
+  display: grid;
+  gap: 15px;
+  justify-items: center;
+  margin: 22px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.compactOutlineList button {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid #d4d8e1;
+  border-radius: 50%;
+  background: transparent;
+  color: #52617d;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.compactOutlineList button:hover {
+  border-color: #e7a7b7;
+  color: var(--color-ink-crimson);
+}
+
+.compactOutlineList button.activeOutlineMarker {
+  border-color: var(--color-ink-crimson);
+  background: var(--color-ink-crimson);
+  color: white;
+}
+
+.outlineDrawer {
+  position: fixed;
+  inset: 91px auto 0
+    calc(
+      var(--dashboard-sidebar-width, 215px) + var(--draft-outline-rail-width)
+    );
+  z-index: 5;
+  width: 260px;
+  overflow-y: auto;
+  border-right: 1px solid var(--color-ink-line);
+  background: var(--color-ink-paper);
+  box-shadow: 14px 0 30px rgb(7 25 79 / 10%);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-18px);
+  visibility: hidden;
+  transition:
+    left 200ms ease,
+    opacity 200ms ease,
+    transform 200ms ease,
+    visibility 0s 200ms;
+}
+
+.outlineDrawerOpen {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+  visibility: visible;
+  transition:
+    left 200ms ease,
+    opacity 200ms ease,
+    transform 200ms ease,
+    visibility 0s;
 }
 
 .outlineContent {
@@ -124,7 +218,13 @@
   letter-spacing: 0.02em;
 }
 
-.outlineHeading > button {
+.outlineHeadingActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.outlineHeadingActions button {
   display: grid;
   width: 27px;
   height: 27px;
@@ -228,6 +328,13 @@
 .articleBody,
 .previewArticle {
   width: min(100%, 568px);
+}
+
+.articleBody {
+  margin: 0 auto;
+}
+
+.previewArticle {
   margin: 0;
 }
 
@@ -341,7 +448,17 @@
   position: fixed;
   z-index: 4;
   bottom: 46px;
-  left: calc(var(--dashboard-sidebar-width, 215px) + 236px + 24px);
+  left: calc(
+    var(--dashboard-sidebar-width, 215px) + var(--draft-outline-rail-width) +
+      max(
+        32px,
+        (
+            100vw - var(--dashboard-sidebar-width, 215px) -
+              var(--draft-outline-rail-width) - 338px - 568px
+          ) /
+          2
+      )
+  );
   display: flex;
   width: 568px;
   height: 64px;
@@ -707,11 +824,10 @@
     min-width: 130px;
   }
   .desktopLayout {
-    grid-template-columns: 205px minmax(430px, 1fr) 290px;
-  }
-
-  .outlineRail {
-    width: 205px;
+    grid-template-columns: var(--draft-outline-rail-width) minmax(
+        430px,
+        1fr
+      ) 290px;
   }
 
   .assistantPanel {
@@ -719,9 +835,13 @@
   }
 
   .toolbar {
-    left: calc(var(--dashboard-sidebar-width, 215px) + 205px + 24px);
+    left: calc(
+      var(--dashboard-sidebar-width, 215px) + var(--draft-outline-rail-width) +
+        24px
+    );
     width: calc(
-      100vw - var(--dashboard-sidebar-width, 215px) - 205px - 290px - 48px
+      100vw - var(--dashboard-sidebar-width, 215px) -
+        var(--draft-outline-rail-width) - 290px - 48px
     );
   }
 }

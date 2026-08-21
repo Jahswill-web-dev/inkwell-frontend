@@ -1,4 +1,10 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DraftEditor } from "./draft-editor";
@@ -10,7 +16,13 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock }),
 }));
 
-beforeEach(() => pushMock.mockClear());
+beforeEach(() => {
+  pushMock.mockClear();
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+    configurable: true,
+    value: vi.fn(),
+  });
+});
 
 afterEach(() => {
   cleanup();
@@ -31,6 +43,89 @@ describe("DraftEditor", () => {
       screen.getAllByRole("textbox", { name: /draft content/ }),
     ).toHaveLength(5);
     expect(screen.getAllByRole("button", { name: "Preview" })[0]).toBeVisible();
+  });
+
+  it("uses a compact outline rail and an accessible overlay drawer", async () => {
+    render(<DraftEditor />);
+    await screen.findByRole("complementary", { name: "Writing assistant" });
+
+    const expandButton = screen.getByRole("button", {
+      name: "Expand draft outline",
+    });
+    const introductionMarker = screen.getByRole("button", {
+      name: "Go to Introduction",
+    });
+    expect(expandButton).toHaveAttribute("aria-expanded", "false");
+    expect(introductionMarker).toHaveAttribute("aria-current", "location");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Go to Conclusion" }),
+    );
+    expect(
+      screen.getByRole("button", { name: "Go to Conclusion" }),
+    ).toHaveAttribute("aria-current", "location");
+
+    await userEvent.click(expandButton);
+    const drawer = screen.getByRole("complementary", {
+      name: "Outline details",
+    });
+    const closeButton = screen.getByRole("button", {
+      name: "Collapse draft outline",
+    });
+    expect(drawer).toBeVisible();
+    expect(drawer).toHaveAttribute("aria-hidden", "false");
+    await waitFor(() => expect(closeButton).toHaveFocus());
+
+    await userEvent.click(
+      within(drawer).getByRole("button", {
+        name: "1. The messy nature of great ideas",
+      }),
+    );
+    expect(drawer).toHaveAttribute("aria-hidden", "false");
+
+    await userEvent.keyboard("{Escape}");
+    expect(drawer).toHaveAttribute("aria-hidden", "true");
+    expect(drawer).toHaveAttribute("inert");
+    await waitFor(() => expect(expandButton).toHaveFocus());
+  });
+
+  it("keeps outline add and reorder controls in the expanded drawer", async () => {
+    render(<DraftEditor />);
+    await screen.findByRole("complementary", { name: "Writing assistant" });
+    await userEvent.click(
+      screen.getByRole("button", { name: "Expand draft outline" }),
+    );
+
+    const drawer = screen.getByRole("complementary", {
+      name: "Outline details",
+    });
+    await userEvent.click(
+      within(drawer).getByRole("button", {
+        name: "Move The messy nature of great ideas up",
+      }),
+    );
+    expect(within(drawer).getAllByRole("listitem")[0]).toHaveTextContent(
+      "The messy nature of great ideas",
+    );
+
+    await userEvent.click(
+      within(drawer).getByRole("button", { name: "Add section" }),
+    );
+    const dialog = screen.getByRole("dialog", { name: "Add a section" });
+    await userEvent.type(
+      within(dialog).getByRole("textbox", { name: "Section title" }),
+      "Practical next steps",
+    );
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Add section" }),
+    );
+
+    expect(
+      within(drawer).getByRole("button", {
+        name: "5. Practical next steps",
+      }),
+    ).toBeVisible();
+    expect(drawer).toHaveAttribute("aria-hidden", "false");
   });
 
   it("creates and retries deterministic assistant suggestions", async () => {

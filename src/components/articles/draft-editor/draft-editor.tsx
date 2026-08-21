@@ -8,6 +8,8 @@ import {
   ArrowUDownLeft,
   ArrowUDownRight,
   CaretDown,
+  CaretLeft,
+  CaretRight,
   CaretUp,
   Check,
   DotsThree,
@@ -63,6 +65,7 @@ import styles from "./draft-editor.module.css";
 type SaveStatus = "saved" | "saving" | "offline" | "failed" | "retrying";
 type MobileTab = "outline" | "assistant" | "format" | "more";
 type AssistantAction = "clearer" | "example" | "transition" | "voice";
+const DRAFT_OUTLINE_DRAWER_ID = "draft-outline-drawer";
 
 type Suggestion = {
   action: AssistantAction;
@@ -174,8 +177,11 @@ export function DraftEditor({
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isOutlineExpanded, setIsOutlineExpanded] = useState(false);
   const editorsRef = useRef(new Map<string, LexicalEditor>());
   const activeEditorRef = useRef<LexicalEditor | null>(null);
+  const outlineExpandRef = useRef<HTMLButtonElement>(null);
+  const outlineCloseRef = useRef<HTMLButtonElement>(null);
   const dirtyRef = useRef(false);
   const skipNextAutosaveRef = useRef(true);
 
@@ -183,6 +189,27 @@ export function DraftEditor({
     draft.sections.find((section) => section.id === activeSectionId) ??
     draft.sections[0];
   const wordCount = useMemo(() => countDraftWords(draft), [draft]);
+
+  const openOutline = useCallback(() => {
+    setIsOutlineExpanded(true);
+    window.setTimeout(() => outlineCloseRef.current?.focus(), 0);
+  }, []);
+
+  const closeOutline = useCallback(() => {
+    setIsOutlineExpanded(false);
+    window.setTimeout(() => outlineExpandRef.current?.focus(), 0);
+  }, []);
+
+  useEffect(() => {
+    if (!isOutlineExpanded) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      closeOutline();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [closeOutline, isOutlineExpanded]);
 
   useEffect(() => {
     if (typeof window.matchMedia !== "function") return;
@@ -495,19 +522,33 @@ export function DraftEditor({
             ? "Retrying save…"
             : elapsedLabel(lastSavedAt);
 
-  const renderOutline = (mobile = false) => (
+  const renderOutline = (mobile = false, drawer = false) => (
     <div className={styles.outlineContent}>
       <div className={styles.outlineHeading}>
         <span>
           <ListBullets size={22} aria-hidden /> Outline
         </span>
-        <button
-          aria-label="Add section"
-          onClick={() => setAddSectionOpen(true)}
-          type="button"
-        >
-          <Plus size={21} aria-hidden />
-        </button>
+        <div className={styles.outlineHeadingActions}>
+          {drawer ? (
+            <button
+              aria-controls={DRAFT_OUTLINE_DRAWER_ID}
+              aria-expanded={isOutlineExpanded}
+              aria-label="Collapse draft outline"
+              onClick={closeOutline}
+              ref={outlineCloseRef}
+              type="button"
+            >
+              <CaretLeft size={18} aria-hidden />
+            </button>
+          ) : null}
+          <button
+            aria-label="Add section"
+            onClick={() => setAddSectionOpen(true)}
+            type="button"
+          >
+            <Plus size={21} aria-hidden />
+          </button>
+        </div>
       </div>
       <ol className={styles.outlineList}>
         {draft.sections.map((section, index) => (
@@ -553,6 +594,42 @@ export function DraftEditor({
         </button>
       ) : null}
     </div>
+  );
+
+  const renderCompactOutline = () => (
+    <>
+      <button
+        aria-controls={DRAFT_OUTLINE_DRAWER_ID}
+        aria-expanded={isOutlineExpanded}
+        aria-label="Expand draft outline"
+        className={styles.outlineExpandButton}
+        onClick={openOutline}
+        ref={outlineExpandRef}
+        type="button"
+      >
+        <ListBullets size={21} aria-hidden />
+        <CaretRight size={15} aria-hidden />
+      </button>
+      <ol className={styles.compactOutlineList}>
+        {draft.sections.map((section, index) => {
+          const isActive = section.id === activeSectionId;
+          return (
+            <li key={section.id}>
+              <button
+                aria-current={isActive ? "location" : undefined}
+                aria-label={`Go to ${section.title}`}
+                className={isActive ? styles.activeOutlineMarker : ""}
+                onClick={() => focusSection(section.id)}
+                title={section.title}
+                type="button"
+              >
+                {index + 1}
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </>
   );
 
   const renderAssistant = (surface: "desktop" | "mobile") => (
@@ -768,7 +845,16 @@ export function DraftEditor({
             </header>
             <div className={styles.desktopLayout}>
               <aside className={styles.outlineRail} aria-label="Draft outline">
-                {renderOutline()}
+                {renderCompactOutline()}
+              </aside>
+              <aside
+                aria-hidden={!isOutlineExpanded}
+                aria-label="Outline details"
+                className={`${styles.outlineDrawer} ${isOutlineExpanded ? styles.outlineDrawerOpen : ""}`}
+                id={DRAFT_OUTLINE_DRAWER_ID}
+                inert={!isOutlineExpanded}
+              >
+                {renderOutline(false, true)}
               </aside>
               <article className={styles.articleCanvas}>
                 <div className={styles.articleBody}>

@@ -1,7 +1,4 @@
-import {
-  createDefaultDraft,
-  type DraftArticleState,
-} from "../draft-editor/draft-editor-data";
+import type { DraftArticleState } from "../draft-editor/draft-editor-data";
 
 export const REVIEW_STORAGE_KEY = "inkwell:article-review";
 export const REVIEW_SCHEMA_VERSION = 1;
@@ -215,8 +212,4 @@ export function ensureIssueAnchors(
     }
   });
   return { ...review, issues };
-}
-
-export function loadReviewDraft(value: string | null) {
-  return value ? value : JSON.stringify(createDefaultDraft());
 }

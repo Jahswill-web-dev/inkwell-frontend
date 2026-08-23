@@ -8,7 +8,15 @@ export const metadata: Metadata = {
   description: "Write and refine your article with contextual guidance.",
 };
 
-export default async function DraftEditorPage() {
-  const user = await requireUser("/articles/new/draft");
-  return <DraftEditor identity={toAuthIdentity(user)} />;
+export default async function DraftEditorPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ articleId?: string }>;
+}) {
+  const { articleId } = await searchParams;
+  const next = articleId
+    ? `/articles/new/draft?articleId=${encodeURIComponent(articleId)}`
+    : "/articles/new/draft";
+  const user = await requireUser(next);
+  return <DraftEditor articleId={articleId} identity={toAuthIdentity(user)} />;
 }

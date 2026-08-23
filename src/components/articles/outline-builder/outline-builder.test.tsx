@@ -45,16 +45,19 @@ const outline = {
   article_id: articleId,
   sections: [
     {
+      id: "10000000-0000-4000-8000-000000000000",
       heading: "Introduction",
       purpose: "Introduce the publishing problem",
       key_points: ["Set the context"],
     },
     {
+      id: "10000000-0000-4000-8000-000000000001",
       heading: "Build the workflow",
       purpose: "Explain a sustainable workflow",
       key_points: ["Define ownership"],
     },
     {
+      id: "10000000-0000-4000-8000-000000000002",
       heading: "Conclusion",
       purpose: "Close with a practical next step",
       key_points: ["Create a checklist"],
@@ -149,7 +152,7 @@ describe("OutlineBuilder", () => {
     ).toBeEnabled();
   });
 
-  it("saves before drafting and writes the legacy projection", async () => {
+  it("saves before drafting without writing a browser projection", async () => {
     render(<OutlineBuilder articleId={articleId} />);
     await screen.findByText("Build the workflow");
     await userEvent.type(
@@ -165,11 +168,7 @@ describe("OutlineBuilder", () => {
       ),
     );
     expect(updateMock).toHaveBeenCalled();
-    const saved = JSON.parse(
-      sessionStorage.getItem("inkwell:article-outline") ?? "{}",
-    );
-    expect(saved.workingTitle).toBe(article.working_title);
-    expect(saved.sections[0].title).toContain("revised");
+    expect(sessionStorage.getItem("inkwell:article-outline")).toBeNull();
   });
 
   it("deletes with confirmation and returns to the brief", async () => {

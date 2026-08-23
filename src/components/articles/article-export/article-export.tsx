@@ -1,16 +1,22 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
+import { z } from "zod";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { DEFAULT_AUTH_IDENTITY, type AuthIdentity } from "@/lib/auth/identity";
+import {
+  ArticleRequestError,
+  getArticle,
+  getArticleDraft,
+} from "@/lib/articles/client";
 import { ArticleProgress } from "../article-progress/article-progress";
 import {
   createDefaultDraft,
-  DRAFT_STORAGE_KEY,
-  parseDraft,
+  toDraftArticleState,
   type DraftArticleState,
 } from "../draft-editor/draft-editor-data";
 import {
@@ -30,6 +36,13 @@ import { ExportFormats } from "./export-formats";
 import { ExportInclusionOptions } from "./export-inclusions";
 import { ExportSummary } from "./export-summary";
 import styles from "./article-export.module.css";
+
+const articleIdSchema = z.string().uuid();
+type LoadFailure = {
+  kind: "missing-id" | "not-found" | "missing-draft" | "error";
+  message: string;
+  retryable: boolean;
+};
 
 function persistSettings(settings: ExportSettings) {
   window.sessionStorage.setItem(
@@ -73,11 +86,19 @@ async function copyExport(
 }
 
 export function ArticleExport({
+  articleId,
   identity = DEFAULT_AUTH_IDENTITY,
 }: {
+  articleId?: string;
   identity?: AuthIdentity;
 }) {
-  const router = useRouter();
+  const { push } = useRouter();
+  const validArticleId = articleIdSchema.safeParse(articleId);
+  const savedArticleId = validArticleId.success ? validArticleId.data : null;
+  const exportPath = savedArticleId
+    ? `/articles/new/export?articleId=${encodeURIComponent(savedArticleId)}`
+    : "/articles/new/export";
+  const loginPath = `/login?next=${encodeURIComponent(exportPath)}`;
   const [draft, setDraft] = useState<DraftArticleState>(() =>
     createDefaultDraft(),
   );
@@ -88,22 +109,70 @@ export function ArticleExport({
   const [inclusionsExpanded, setInclusionsExpanded] = useState(true);
   const [status, setStatus] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [loadFailure, setLoadFailure] = useState<LoadFailure | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
-    const savedDraft =
-      parseDraft(window.sessionStorage.getItem(DRAFT_STORAGE_KEY)) ??
-      createDefaultDraft();
-    const savedSettings =
-      parseExportSettings(
-        window.sessionStorage.getItem(EXPORT_SETTINGS_STORAGE_KEY),
-      ) ?? DEFAULT_EXPORT_SETTINGS;
-    const timer = window.setTimeout(() => {
-      setDraft(savedDraft);
-      setSettings(savedSettings);
-      setHydrated(true);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
+    let active = true;
+    const load = async () => {
+      setLoadFailure(null);
+      if (!savedArticleId) {
+        setLoadFailure({
+          kind: "missing-id",
+          message: "Choose an article before opening its export options.",
+          retryable: false,
+        });
+        setHydrated(true);
+        return;
+      }
+      try {
+        const [article, saved] = await Promise.all([
+          getArticle(savedArticleId),
+          getArticleDraft(savedArticleId),
+        ]);
+        if (!active) return;
+        setDraft(toDraftArticleState(article, saved));
+        setSettings(
+          parseExportSettings(
+            window.sessionStorage.getItem(EXPORT_SETTINGS_STORAGE_KEY),
+          ) ?? DEFAULT_EXPORT_SETTINGS,
+        );
+      } catch (caught) {
+        if (!active) return;
+        if (caught instanceof ArticleRequestError && caught.status === 401) {
+          push(loginPath);
+          return;
+        }
+        const code =
+          caught instanceof ArticleRequestError ? caught.code : "export_error";
+        setLoadFailure({
+          kind:
+            code === "article_not_found"
+              ? "not-found"
+              : code === "draft_not_found"
+                ? "missing-draft"
+                : "error",
+          message:
+            code === "article_not_found"
+              ? "This article could not be found."
+              : code === "draft_not_found"
+                ? "Start the article draft before opening Export."
+                : caught instanceof ArticleRequestError
+                  ? caught.message
+                  : "We couldn’t load this draft for export.",
+          retryable:
+            !(caught instanceof ArticleRequestError) ||
+            [502, 503, 504].includes(caught.status),
+        });
+      } finally {
+        if (active) setHydrated(true);
+      }
+    };
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [loginPath, push, retryKey, savedArticleId]);
 
   const estimatedSize = useMemo(
     () =>
@@ -159,6 +228,29 @@ export function ArticleExport({
     return <main className={styles.loading}>Preparing your export…</main>;
   }
 
+  if (loadFailure)
+    return (
+      <main className={styles.loading}>
+        <div className={styles.loadState}>
+          <span role="alert">{loadFailure.message}</span>
+          {loadFailure.kind === "missing-draft" && savedArticleId ? (
+            <Link href={`/articles/new/draft?articleId=${savedArticleId}`}>
+              Open draft
+            </Link>
+          ) : null}
+          {loadFailure.kind === "missing-id" ||
+          loadFailure.kind === "not-found" ? (
+            <Link href="/dashboard?section=articles">Back to articles</Link>
+          ) : null}
+          {loadFailure.retryable ? (
+            <button type="button" onClick={() => setRetryKey((key) => key + 1)}>
+              Try again
+            </button>
+          ) : null}
+        </div>
+      </main>
+    );
+
   return (
     <main className={styles.page}>
       <DashboardSidebar
@@ -171,7 +263,9 @@ export function ArticleExport({
           <button
             aria-label="Back to review"
             className={styles.mobileBack}
-            onClick={() => router.push("/articles/new/review")}
+            onClick={() =>
+              push(`/articles/new/review?articleId=${savedArticleId}`)
+            }
             type="button"
           >
             <ArrowLeft size={31} aria-hidden />
@@ -186,7 +280,7 @@ export function ArticleExport({
             />
             <strong>Export</strong>
           </div>
-          <ArticleProgress currentStep="export" compact />
+          <ArticleProgress currentStep="export" compact articleId={articleId} />
         </header>
 
         <div className={styles.content}>
@@ -219,7 +313,9 @@ export function ArticleExport({
         <footer className={styles.actions}>
           <button
             className={styles.backButton}
-            onClick={() => router.push("/articles/new/review")}
+            onClick={() =>
+              push(`/articles/new/review?articleId=${savedArticleId}`)
+            }
             type="button"
           >
             Back

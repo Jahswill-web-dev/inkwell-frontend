@@ -3,10 +3,15 @@ import { z } from "zod";
 const requiredText = z.string().trim().min(1, "This field is required.");
 
 export const articleOutlineSectionSchema = z.object({
+  id: z.string().uuid(),
   heading: requiredText,
   purpose: requiredText,
   key_points: z.array(requiredText).min(1).max(5),
 });
+
+export const articleOutlineSectionInputSchema = articleOutlineSectionSchema
+  .omit({ id: true })
+  .extend({ id: z.string().uuid().optional() });
 
 export const articleOutlineSchema = z.object({
   id: z.string().uuid(),
@@ -23,7 +28,7 @@ export const articleOutlineSchema = z.object({
 });
 
 export const articleOutlinePatchSchema = z.object({
-  sections: z.array(articleOutlineSectionSchema).min(3).max(10),
+  sections: z.array(articleOutlineSectionInputSchema).min(3).max(10),
 });
 
 export type ArticleOutline = z.infer<typeof articleOutlineSchema>;

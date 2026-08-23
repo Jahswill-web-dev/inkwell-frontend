@@ -1,10 +1,13 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
+  ArrowClockwise,
+  ArrowUpRight,
   ArrowUDownLeft,
   ArrowUDownRight,
   CaretDown,
@@ -12,15 +15,18 @@ import {
   CaretRight,
   CaretUp,
   Check,
+  CheckCircle,
   DotsThree,
   ImageSquare,
   LinkSimple,
   ListBullets,
   ListNumbers,
   NotePencil,
+  PencilSimple,
   Plus,
   Quotes,
   Sparkle,
+  Trash,
   TextAa,
   TextB,
   TextItalic,
@@ -29,12 +35,16 @@ import {
 import { $createHeadingNode, $createQuoteNode } from "@lexical/rich-text";
 import { $setBlocksType } from "@lexical/selection";
 import {
+  $createListItemNode,
+  $createListNode,
   INSERT_ORDERED_LIST_COMMAND,
   INSERT_UNORDERED_LIST_COMMAND,
 } from "@lexical/list";
 import { TOGGLE_LINK_COMMAND } from "@lexical/link";
 import {
   $createParagraphNode,
+  $createTextNode,
+  $getRoot,
   $getSelection,
   $isRangeSelection,
   CAN_REDO_COMMAND,
@@ -45,17 +55,34 @@ import {
   UNDO_COMMAND,
   type LexicalEditor,
 } from "lexical";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { z } from "zod";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { DEFAULT_AUTH_IDENTITY, type AuthIdentity } from "@/lib/auth/identity";
+import {
+  ArticleRequestError,
+  createArticleDraft,
+  generateTalkingPoints,
+  getArticle,
+  getArticleDraft,
+  updateArticleDraft,
+} from "@/lib/articles/client";
 import { ArticleProgress } from "../article-progress/article-progress";
 import { Checkbox } from "@/components/ui/checkbox/checkbox";
 import {
   countDraftWords,
   createDefaultDraft,
   createEditorState,
-  DRAFT_STORAGE_KEY,
-  parseDraft,
+  editorStateText,
+  toArticleDraftPatch,
+  toDraftArticleState,
   type DraftArticleState,
   type DraftSection,
 } from "./draft-editor-data";
@@ -63,9 +90,27 @@ import { DraftRichSection, insertEditorImage } from "./draft-rich-section";
 import styles from "./draft-editor.module.css";
 
 type SaveStatus = "saved" | "saving" | "offline" | "failed" | "retrying";
+type DraftLoadFailure = {
+  kind: "missing-id" | "not-found" | "missing-outline" | "error";
+  message: string;
+  retryable: boolean;
+};
 type MobileTab = "outline" | "assistant" | "format" | "more";
-type AssistantAction = "clearer" | "example" | "transition" | "voice";
+type AssistantAction = "clearer" | "expand" | "example" | "tone" | "transition";
+type AssistantStartMode = "plan" | "guided" | "draft";
+type GeneratedResult = {
+  sectionId: string;
+  points: string[];
+  instruction: string;
+};
+type GenerationError = {
+  message: string;
+  retryable: boolean;
+  instruction: string;
+};
 const DRAFT_OUTLINE_DRAWER_ID = "draft-outline-drawer";
+const DRAFT_ASSISTANT_ID = "draft-writing-assistant";
+const articleIdSchema = z.string().uuid();
 
 type Suggestion = {
   action: AssistantAction;
@@ -84,6 +129,11 @@ const actionCopy: Record<
     subtitle: "Clarify this sentence",
     icon: Sparkle,
   },
+  expand: {
+    title: "Expand idea",
+    subtitle: "Develop the point further",
+    icon: ArrowUpRight,
+  },
   example: {
     title: "Add example",
     subtitle: "Add a relevant example",
@@ -94,9 +144,9 @@ const actionCopy: Record<
     subtitle: "Smooth the flow",
     icon: NotePencil,
   },
-  voice: {
-    title: "Rewrite in my voice",
-    subtitle: "Match my writing style",
+  tone: {
+    title: "Change tone",
+    subtitle: "Adjust how this sounds",
     icon: NotePencil,
   },
 };
@@ -106,6 +156,10 @@ const suggestionVariants: Record<AssistantAction, readonly string[]> = {
     "Great ideas are hard to capture because they begin as possibilities, not precise statements.",
     "Ideas often resist words because they first appear as possibilities rather than finished thoughts.",
   ],
+  expand: [
+    "Writing gives an unfinished thought room to develop: once the idea is visible, its assumptions, consequences, and connections become easier to explore.",
+    "Putting the idea into words does more than preserve it. The page becomes a place to test the thought, follow its implications, and discover what it still needs.",
+  ],
   example: [
     "For example, a founder may sense the shape of a new product long before they can explain why it matters.",
     "Think of the idea that arrives during a walk: vivid enough to feel important, but still too loose to present to someone else.",
@@ -114,10 +168,25 @@ const suggestionVariants: Record<AssistantAction, readonly string[]> = {
     "That uncertainty is exactly why writing becomes the next essential step.",
     "Once the fragments are visible, structure can begin to turn them into an argument.",
   ],
-  voice: [
+  tone: [
     "The idea is there, but it is still moving—more possibility than precision, more spark than sentence.",
     "A good idea rarely arrives dressed for the page. It shows up unfinished and asks us to do the tailoring.",
   ],
+};
+
+const startModeCopy: Record<
+  AssistantStartMode,
+  { title: string; subtitle: string }
+> = {
+  plan: { title: "Help me plan", subtitle: "Create 3–5 talking points" },
+  guided: {
+    title: "Write with me",
+    subtitle: "Answer a few questions, then build the section together",
+  },
+  draft: {
+    title: "Draft this section",
+    subtitle: "Generate a complete first draft",
+  },
 };
 
 function createSuggestion(
@@ -147,28 +216,60 @@ function elapsedLabel(savedAt: string | null) {
 }
 
 export function DraftEditor({
+  articleId,
   identity = DEFAULT_AUTH_IDENTITY,
 }: {
+  articleId?: string;
   identity?: AuthIdentity;
 }) {
-  const router = useRouter();
+  const { push } = useRouter();
+  const validArticleId = articleIdSchema.safeParse(articleId);
+  const savedArticleId = validArticleId.success ? validArticleId.data : null;
+  const draftPath = savedArticleId
+    ? `/articles/new/draft?articleId=${encodeURIComponent(savedArticleId)}`
+    : "/articles/new/draft";
+  const loginPath = `/login?next=${encodeURIComponent(draftPath)}`;
   const [draft, setDraft] = useState<DraftArticleState>(() =>
     createDefaultDraft(),
   );
   const [hydrated, setHydrated] = useState(false);
   const [activeSectionId, setActiveSectionId] = useState("introduction");
-  const [selectedText, setSelectedText] = useState(
-    "Great ideas are elusive because they live in the realm of possibility, not precision.",
-  );
+  const [selectedText, setSelectedText] = useState("");
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState("");
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
+  const [assistantAction, setAssistantAction] =
+    useState<AssistantAction>("clearer");
+  const [assistantInstruction, setAssistantInstruction] = useState("");
+  const [assistantStartMode, setAssistantStartMode] =
+    useState<AssistantStartMode>("plan");
+  const [assistantDirection, setAssistantDirection] = useState("");
+  const [generatedResult, setGeneratedResult] =
+    useState<GeneratedResult | null>(null);
+  const [generationError, setGenerationError] =
+    useState<GenerationError | null>(null);
+  const [isGeneratingTalkingPoints, setIsGeneratingTalkingPoints] =
+    useState(false);
+  const [goalExpanded, setGoalExpanded] = useState(true);
+  const [isAssistantOpen, setIsAssistantOpen] = useState(true);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>("assistant");
   const [sheetCollapsed, setSheetCollapsed] = useState(false);
   const [addSectionOpen, setAddSectionOpen] = useState(false);
   const [newSectionTitle, setNewSectionTitle] = useState("");
+  const [newSectionGoal, setNewSectionGoal] = useState("");
+  const [loadFailure, setLoadFailure] = useState<DraftLoadFailure | null>(
+    validArticleId.success
+      ? null
+      : {
+          kind: "missing-id",
+          message: "Choose an article before opening the draft editor.",
+          retryable: false,
+        },
+  );
+  const [saveRetryable, setSaveRetryable] = useState(true);
+  const [retryKey, setRetryKey] = useState(0);
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [imageOpen, setImageOpen] = useState(false);
@@ -180,15 +281,25 @@ export function DraftEditor({
   const [isOutlineExpanded, setIsOutlineExpanded] = useState(false);
   const editorsRef = useRef(new Map<string, LexicalEditor>());
   const activeEditorRef = useRef<LexicalEditor | null>(null);
+  const activeSectionIdRef = useRef("introduction");
   const outlineExpandRef = useRef<HTMLButtonElement>(null);
   const outlineCloseRef = useRef<HTMLButtonElement>(null);
+  const assistantOpenRef = useRef<HTMLButtonElement>(null);
+  const assistantCloseRef = useRef<HTMLButtonElement>(null);
   const dirtyRef = useRef(false);
   const skipNextAutosaveRef = useRef(true);
+  const generationRequestRef = useRef(0);
 
   const activeSection =
     draft.sections.find((section) => section.id === activeSectionId) ??
     draft.sections[0];
+  const activeSectionNumber = activeSection
+    ? draft.sections.findIndex((section) => section.id === activeSection.id) + 1
+    : 0;
   const wordCount = useMemo(() => countDraftWords(draft), [draft]);
+  const activeSectionIsEmpty = activeSection
+    ? !editorStateText(activeSection.editorState).trim()
+    : true;
 
   const openOutline = useCallback(() => {
     setIsOutlineExpanded(true);
@@ -198,6 +309,32 @@ export function DraftEditor({
   const closeOutline = useCallback(() => {
     setIsOutlineExpanded(false);
     window.setTimeout(() => outlineExpandRef.current?.focus(), 0);
+  }, []);
+
+  const closeAssistant = useCallback(() => {
+    setIsAssistantOpen(false);
+    window.setTimeout(() => assistantOpenRef.current?.focus(), 0);
+  }, []);
+
+  const openAssistant = useCallback(() => {
+    setIsAssistantOpen(true);
+    window.setTimeout(() => assistantCloseRef.current?.focus(), 0);
+  }, []);
+
+  const activateSection = useCallback((sectionId: string) => {
+    if (activeSectionIdRef.current !== sectionId) {
+      activeSectionIdRef.current = sectionId;
+      setSelectedText("");
+      setSuggestion(null);
+      setGeneratedResult(null);
+      setGenerationError(null);
+      generationRequestRef.current += 1;
+      setIsGeneratingTalkingPoints(false);
+      setAssistantInstruction("");
+      setAssistantDirection("");
+      setGoalExpanded(true);
+    }
+    setActiveSectionId(sectionId);
   }, []);
 
   useEffect(() => {
@@ -212,6 +349,17 @@ export function DraftEditor({
   }, [closeOutline, isOutlineExpanded]);
 
   useEffect(() => {
+    if (!isAssistantOpen || isOutlineExpanded) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      closeAssistant();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [closeAssistant, isAssistantOpen, isOutlineExpanded]);
+
+  useEffect(() => {
     if (typeof window.matchMedia !== "function") return;
     const media = window.matchMedia("(max-width: 800px)");
     const update = () => setIsMobile(media.matches);
@@ -224,41 +372,114 @@ export function DraftEditor({
   }, []);
 
   useEffect(() => {
-    const saved = parseDraft(window.sessionStorage.getItem(DRAFT_STORAGE_KEY));
-    const next =
-      saved ??
-      createDefaultDraft(
-        window.sessionStorage.getItem("inkwell:article-outline"),
-      );
-    const timer = window.setTimeout(() => {
-      setDraft(next);
-      setActiveSectionId(next.sections[0]?.id ?? "introduction");
-      setLastSavedAt(next.savedAt);
-      setHydrated(true);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
+    let active = true;
+    const load = async () => {
+      setHydrated(false);
+      setLoadFailure(null);
+      if (!savedArticleId) {
+        setLoadFailure({
+          kind: "missing-id",
+          message: "Choose an article before opening the draft editor.",
+          retryable: false,
+        });
+        setHydrated(true);
+        return;
+      }
+      try {
+        const article = await getArticle(savedArticleId);
+        let persisted;
+        try {
+          persisted = await getArticleDraft(savedArticleId);
+        } catch (caught) {
+          if (
+            caught instanceof ArticleRequestError &&
+            caught.status === 404 &&
+            caught.code === "draft_not_found"
+          ) {
+            persisted = await createArticleDraft(savedArticleId);
+          } else {
+            throw caught;
+          }
+        }
+        if (!active) return;
+        const next = toDraftArticleState(article, persisted);
+        setDraft(next);
+        const firstSectionId = next.sections[0]?.id ?? "";
+        activeSectionIdRef.current = firstSectionId;
+        setActiveSectionId(firstSectionId);
+        setLastSavedAt(next.savedAt);
+        skipNextAutosaveRef.current = true;
+      } catch (caught) {
+        if (!active) return;
+        if (caught instanceof ArticleRequestError && caught.status === 401) {
+          push(loginPath);
+          return;
+        }
+        const code =
+          caught instanceof ArticleRequestError ? caught.code : "draft_error";
+        setLoadFailure({
+          kind:
+            code === "article_not_found"
+              ? "not-found"
+              : code === "outline_not_found"
+                ? "missing-outline"
+                : "error",
+          message:
+            code === "article_not_found"
+              ? "This article could not be found."
+              : code === "outline_not_found"
+                ? "Create an outline before starting this draft."
+                : caught instanceof ArticleRequestError
+                  ? caught.message
+                  : "We couldn’t load this draft. Please try again.",
+          retryable:
+            !(caught instanceof ArticleRequestError) ||
+            [502, 503, 504].includes(caught.status),
+        });
+      } finally {
+        if (active) setHydrated(true);
+      }
+    };
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [loginPath, push, retryKey, savedArticleId]);
 
   const saveDraft = useCallback(
-    (nextStatus: SaveStatus = "saved", message = "") => {
-      const savedAt = new Date().toISOString();
+    async (nextStatus: SaveStatus = "saved", message = "") => {
+      if (!savedArticleId) return false;
+      setSaveStatus(nextStatus === "retrying" ? "retrying" : "saving");
       try {
-        window.sessionStorage.setItem(
-          DRAFT_STORAGE_KEY,
-          JSON.stringify({ ...draft, savedAt }),
+        const saved = await updateArticleDraft(
+          savedArticleId,
+          toArticleDraftPatch(draft),
         );
         dirtyRef.current = false;
-        setLastSavedAt(savedAt);
-        setSaveStatus(nextStatus);
+        setSaveRetryable(true);
+        setLastSavedAt(saved.updated_at);
+        setSaveStatus("saved");
         if (message) setStatusMessage(message);
         return true;
-      } catch {
+      } catch (caught) {
+        if (caught instanceof ArticleRequestError && caught.status === 401) {
+          push(loginPath);
+          return false;
+        }
+        setSaveRetryable(
+          !(caught instanceof ArticleRequestError) ||
+            [502, 503, 504].includes(caught.status),
+        );
         setSaveStatus("failed");
-        setStatusMessage("Autosave failed. Your changes are still open.");
+        setStatusMessage(
+          caught instanceof ArticleRequestError && caught.status === 422
+            ? caught.message
+            : "Autosave failed. Your changes are still open.",
+        );
         return false;
       }
     },
-    [draft],
+    [draft, loginPath, push, savedArticleId],
   );
 
   useEffect(() => {
@@ -273,7 +494,7 @@ export function DraftEditor({
       return () => window.clearTimeout(offlineTimer);
     }
     const statusTimer = window.setTimeout(() => setSaveStatus("saving"), 0);
-    const timer = window.setTimeout(() => saveDraft(), 800);
+    const timer = window.setTimeout(() => void saveDraft(), 800);
     return () => {
       window.clearTimeout(statusTimer);
       window.clearTimeout(timer);
@@ -284,7 +505,7 @@ export function DraftEditor({
     const onOffline = () => setSaveStatus("offline");
     const onOnline = () => {
       setSaveStatus("retrying");
-      window.setTimeout(() => saveDraft(), 350);
+      window.setTimeout(() => void saveDraft("retrying"), 350);
     };
     const beforeUnload = (event: BeforeUnloadEvent) => {
       if (!dirtyRef.current) return;
@@ -334,13 +555,13 @@ export function DraftEditor({
         const visible = entries.find((entry) => entry.isIntersecting);
         const id = (visible?.target as HTMLElement | undefined)?.dataset
           .sectionId;
-        if (id) setActiveSectionId(id);
+        if (id) activateSection(id);
       },
       { rootMargin: "-18% 0px -68% 0px" },
     );
     sections.forEach((section) => observer.observe(section));
     return () => observer.disconnect();
-  }, [draft.sections.length]);
+  }, [activateSection, draft.sections.length]);
 
   const updateSectionEditor = useCallback(
     (sectionId: string, editorState: string) => {
@@ -364,16 +585,19 @@ export function DraftEditor({
     [activeSectionId],
   );
 
-  const focusSection = useCallback((sectionId: string) => {
-    setActiveSectionId(sectionId);
-    activeEditorRef.current = editorsRef.current.get(sectionId) ?? null;
-    document
-      .getElementById(`draft-section-${sectionId}`)
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, []);
+  const focusSection = useCallback(
+    (sectionId: string) => {
+      activateSection(sectionId);
+      activeEditorRef.current = editorsRef.current.get(sectionId) ?? null;
+      document
+        .getElementById(`draft-section-${sectionId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    },
+    [activateSection],
+  );
 
   const onEditorFocus = (sectionId: string) => {
-    setActiveSectionId(sectionId);
+    activateSection(sectionId);
     activeEditorRef.current = editorsRef.current.get(sectionId) ?? null;
   };
 
@@ -393,6 +617,15 @@ export function DraftEditor({
     }));
   };
 
+  const updateActiveSectionGoal = (goal: string) => {
+    setDraft((current) => ({
+      ...current,
+      sections: current.sections.map((section) =>
+        section.id === activeSectionId ? { ...section, goal } : section,
+      ),
+    }));
+  };
+
   const moveSection = (sectionId: string, direction: -1 | 1) => {
     setDraft((current) => {
       const sections = [...current.sections];
@@ -406,25 +639,27 @@ export function DraftEditor({
 
   const addSection = () => {
     const title = newSectionTitle.trim();
-    if (!title) return;
-    const id = `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${draft.sections.length + 1}`;
+    const goal = newSectionGoal.trim();
+    if (!title || !goal) return;
+    const id = crypto.randomUUID();
     const section: DraftSection = {
       id,
+      outlineSectionId: null,
       title,
-      goal: `Develop the article’s point about ${title.toLowerCase()}`,
+      goal,
       checklist: [
         {
-          id: `${id}-point`,
+          id: crypto.randomUUID(),
           label: "Make the central point clear",
           completed: false,
         },
         {
-          id: `${id}-example`,
+          id: crypto.randomUUID(),
           label: "Add a supporting example",
           completed: false,
         },
         {
-          id: `${id}-transition`,
+          id: crypto.randomUUID(),
           label: "Connect to the next section",
           completed: false,
         },
@@ -436,12 +671,18 @@ export function DraftEditor({
       sections: [...current.sections, section],
     }));
     setNewSectionTitle("");
+    setNewSectionGoal("");
     setAddSectionOpen(false);
     window.setTimeout(() => focusSection(id), 0);
   };
 
-  const startSuggestion = (action: AssistantAction) => {
-    setSuggestion(createSuggestion(action, selectedText));
+  const previewSuggestion = () => {
+    if (!selectedText.trim()) return;
+    const next = createSuggestion(assistantAction, selectedText);
+    setSuggestion({
+      ...next,
+      explanation: assistantInstruction.trim() || next.explanation,
+    });
   };
 
   const acceptSuggestion = () => {
@@ -471,6 +712,106 @@ export function DraftEditor({
         suggestion.attempt + 1,
       ),
     );
+  };
+
+  const requestTalkingPoints = async (instruction = assistantDirection) => {
+    if (!activeSection || !savedArticleId || isGeneratingTalkingPoints) return;
+    const requestedSectionId = activeSection.id;
+    const normalizedInstruction = instruction.trim();
+    const requestId = generationRequestRef.current + 1;
+    generationRequestRef.current = requestId;
+    setIsGeneratingTalkingPoints(true);
+    setGenerationError(null);
+
+    if (dirtyRef.current && !(await saveDraft())) {
+      if (generationRequestRef.current === requestId) {
+        setGenerationError({
+          message: "Save your latest changes before generating talking points.",
+          retryable: true,
+          instruction: normalizedInstruction,
+        });
+        setIsGeneratingTalkingPoints(false);
+      }
+      return;
+    }
+    if (generationRequestRef.current !== requestId) return;
+
+    try {
+      const result = await generateTalkingPoints(
+        savedArticleId,
+        requestedSectionId,
+        normalizedInstruction ? { instruction: normalizedInstruction } : {},
+      );
+      if (generationRequestRef.current !== requestId) return;
+      if (result.section_id !== requestedSectionId)
+        throw new ArticleRequestError(
+          502,
+          "invalid_article_response",
+          "The talking-point response did not match this section.",
+        );
+      setGeneratedResult({
+        sectionId: result.section_id,
+        points: result.points,
+        instruction: normalizedInstruction,
+      });
+      setGoalExpanded(false);
+    } catch (caught) {
+      if (generationRequestRef.current !== requestId) return;
+      if (caught instanceof ArticleRequestError && caught.status === 401) {
+        push(loginPath);
+        return;
+      }
+      setGenerationError({
+        message:
+          caught instanceof ArticleRequestError
+            ? caught.message
+            : "We couldn’t generate talking points. Please try again.",
+        retryable:
+          !(caught instanceof ArticleRequestError) ||
+          [502, 503, 504].includes(caught.status),
+        instruction: normalizedInstruction,
+      });
+    } finally {
+      if (generationRequestRef.current === requestId)
+        setIsGeneratingTalkingPoints(false);
+    }
+  };
+
+  const beginAssistantStart = () => void requestTalkingPoints();
+
+  const applyGeneratedResult = (replace: boolean) => {
+    if (!generatedResult || generatedResult.sectionId !== activeSectionId)
+      return;
+    const editor = editorsRef.current.get(activeSectionId);
+    if (!editor) return;
+    editor.update(() => {
+      const root = $getRoot();
+      if (replace) root.clear();
+      const list = $createListNode("bullet");
+      generatedResult.points.forEach((text) => {
+        const item = $createListItemNode();
+        item.append($createTextNode(text));
+        list.append(item);
+      });
+      root.append(list);
+    });
+    setGeneratedResult(null);
+    setGenerationError(null);
+    setStatusMessage(
+      replace
+        ? "The generated content replaced this section."
+        : "The generated content was inserted into this section.",
+    );
+  };
+
+  const retryGeneratedResult = () => {
+    if (!generatedResult) return;
+    void requestTalkingPoints(generatedResult.instruction);
+  };
+
+  const refineGeneratedResult = () => {
+    if (!generatedResult) return;
+    void requestTalkingPoints(assistantDirection);
   };
 
   const setBlock = (type: "heading" | "quote" | "paragraph") => {
@@ -504,10 +845,10 @@ export function DraftEditor({
     setImageAlt("");
   };
 
-  const reviewArticle = () => {
-    if (saveDraft("saved", "Draft saved and ready for review.")) {
+  const reviewArticle = async () => {
+    if (await saveDraft("saved", "Draft saved and ready for review.")) {
       setStatusMessage("Draft saved and ready for review.");
-      router.push("/articles/new/review");
+      push(`/articles/new/review?articleId=${articleId}`);
     }
   };
 
@@ -515,7 +856,7 @@ export function DraftEditor({
     saveStatus === "saving"
       ? "Saving…"
       : saveStatus === "offline"
-        ? "Offline — saved on this device"
+        ? "Offline — changes not yet saved"
         : saveStatus === "failed"
           ? "Autosave failed"
           : saveStatus === "retrying"
@@ -632,31 +973,269 @@ export function DraftEditor({
     </>
   );
 
-  const renderAssistant = (surface: "desktop" | "mobile") => (
+  const renderGoal = (surface: "desktop" | "mobile", editable = false) => (
+    <section className={styles.goalSection}>
+      <button
+        aria-expanded={goalExpanded}
+        className={styles.goalHeader}
+        onClick={() => setGoalExpanded((current) => !current)}
+        type="button"
+      >
+        <span>Section goal</span>
+        {goalExpanded ? (
+          <CaretUp size={18} aria-hidden />
+        ) : (
+          <CaretRight size={18} aria-hidden />
+        )}
+      </button>
+      {goalExpanded ? (
+        editable && !activeSection?.outlineSectionId ? (
+          <label className={styles.goalEditor}>
+            <span className={styles.srStatus}>Edit section goal</span>
+            <textarea
+              aria-label={`Edit ${activeSection?.title ?? "section"} goal`}
+              onChange={(event) => updateActiveSectionGoal(event.target.value)}
+              value={activeSection?.goal ?? ""}
+            />
+            <PencilSimple size={19} aria-hidden />
+          </label>
+        ) : (
+          <p className={styles.goalCopy}>{activeSection?.goal}</p>
+        )
+      ) : null}
+      {(!editable || Boolean(activeSection?.outlineSectionId)) &&
+      goalExpanded ? (
+        <div className={styles.checklist} aria-label="Goal progress">
+          <span className={styles.checklistTitle}>Goal progress</span>
+          {activeSection?.checklist.map((item) => (
+            <Checkbox
+              checked={item.completed}
+              id={`${surface}-${item.id}`}
+              key={item.id}
+              label={item.label}
+              onChange={(event) =>
+                toggleChecklist(item.id, event.target.checked)
+              }
+            />
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+
+  const renderAssistantSectionContext = () => {
+    if (!activeSection || activeSectionNumber < 1) return null;
+    return (
+      <div
+        aria-label={`Current section: Section ${activeSectionNumber}, ${activeSection.title}`}
+        className={styles.assistantSectionContext}
+        title={`Section ${activeSectionNumber}: ${activeSection.title}`}
+      >
+        <span>Section {activeSectionNumber}</span>
+        <span aria-hidden>·</span>
+        <strong>{activeSection.title}</strong>
+      </div>
+    );
+  };
+
+  const renderGenerationError = () =>
+    generationError ? (
+      <div className={styles.generationError} role="alert">
+        <span>{generationError.message}</span>
+        {generationError.retryable ? (
+          <button
+            disabled={isGeneratingTalkingPoints}
+            onClick={() =>
+              void requestTalkingPoints(generationError.instruction)
+            }
+            type="button"
+          >
+            Try again
+          </button>
+        ) : null}
+      </div>
+    ) : null;
+
+  const renderGeneratedAssistant = (surface: "desktop" | "mobile") => {
+    if (!generatedResult) return null;
+    const generatedWords = generatedResult.points
+      .join(" ")
+      .trim()
+      .split(/\s+/u).length;
+    return (
+      <div className={styles.assistantContent}>
+        {renderAssistantSectionContext()}
+        <div className={styles.readyStatus} role="status">
+          <CheckCircle size={23} weight="bold" aria-hidden />
+          <span>Talking points ready</span>
+        </div>
+        {renderGoal(surface)}
+        {renderGenerationError()}
+        <section className={styles.reviewDraft}>
+          <h3>Review these talking points</h3>
+          <p>Nothing changes until you insert or replace the section.</p>
+          <button
+            className={styles.primaryAssistantButton}
+            disabled={isGeneratingTalkingPoints}
+            onClick={() => applyGeneratedResult(false)}
+            type="button"
+          >
+            Insert talking points
+          </button>
+          <button
+            className={styles.secondaryAssistantButton}
+            disabled={isGeneratingTalkingPoints}
+            onClick={() => applyGeneratedResult(true)}
+            type="button"
+          >
+            Replace current section
+          </button>
+          <div className={styles.generatedUtilities}>
+            <button
+              disabled={isGeneratingTalkingPoints}
+              onClick={retryGeneratedResult}
+              type="button"
+            >
+              <ArrowClockwise size={20} aria-hidden />
+              {isGeneratingTalkingPoints ? "Generating…" : "Try another"}
+            </button>
+            <button
+              disabled={isGeneratingTalkingPoints}
+              onClick={() => {
+                setGeneratedResult(null);
+                setGenerationError(null);
+              }}
+              type="button"
+            >
+              <Trash size={20} aria-hidden /> Discard
+            </button>
+          </div>
+          <label className={styles.refineField}>
+            <span>Refine before inserting</span>
+            <textarea
+              maxLength={1000}
+              onChange={(event) => setAssistantDirection(event.target.value)}
+              placeholder="Make it more practical and add a software example"
+              value={assistantDirection}
+            />
+          </label>
+          <button
+            className={styles.secondaryAssistantButton}
+            disabled={isGeneratingTalkingPoints || !assistantDirection.trim()}
+            onClick={refineGeneratedResult}
+            type="button"
+          >
+            Regenerate with direction
+          </button>
+          <p className={styles.resultMeta}>
+            About {generatedWords} words · {generatedResult.points.length}{" "}
+            points
+          </p>
+        </section>
+      </div>
+    );
+  };
+
+  const renderStartAssistant = (surface: "desktop" | "mobile") => (
     <div className={styles.assistantContent}>
-      <div className={styles.goalHeader}>
-        <h3>Section goal</h3>
-        <CaretUp size={18} aria-hidden />
-      </div>
-      <p className={styles.goalCopy}>{activeSection?.goal}</p>
-      <div className={styles.checklist}>
-        {activeSection?.checklist.map((item) => (
-          <Checkbox
-            checked={item.completed}
-            id={`${surface}-${item.id}`}
-            key={item.id}
-            label={item.label}
-            onChange={(event) => toggleChecklist(item.id, event.target.checked)}
-          />
-        ))}
-      </div>
+      {renderAssistantSectionContext()}
+      {renderGoal(surface, true)}
+      <fieldset className={styles.startChoices}>
+        <legend>How would you like to start?</legend>
+        {(Object.keys(startModeCopy) as AssistantStartMode[]).map((mode) => {
+          const unavailable = mode !== "plan";
+          return (
+            <label
+              className={`${assistantStartMode === mode ? styles.selectedChoice : ""} ${unavailable ? styles.unavailableChoice : ""}`}
+              key={mode}
+            >
+              <input
+                checked={assistantStartMode === mode}
+                disabled={unavailable}
+                name={`${surface}-assistant-start`}
+                onChange={() => setAssistantStartMode(mode)}
+                type="radio"
+                value={mode}
+              />
+              <span>
+                <strong>{startModeCopy[mode].title}</strong>
+                <small>
+                  {startModeCopy[mode].subtitle}
+                  {unavailable ? " · Coming soon" : ""}
+                </small>
+              </span>
+            </label>
+          );
+        })}
+      </fieldset>
+      <label className={styles.directionField}>
+        <span>Add a direction (optional)</span>
+        <input
+          maxLength={1000}
+          onChange={(event) => setAssistantDirection(event.target.value)}
+          placeholder="Use a practical example from software development"
+          value={assistantDirection}
+        />
+      </label>
+      {renderGenerationError()}
+      <button
+        className={styles.primaryAssistantButton}
+        disabled={isGeneratingTalkingPoints}
+        onClick={beginAssistantStart}
+        type="button"
+      >
+        {isGeneratingTalkingPoints
+          ? "Generating talking points…"
+          : "Generate talking points"}
+      </button>
+    </div>
+  );
+
+  const renderImprovementAssistant = (surface: "desktop" | "mobile") => (
+    <div className={styles.assistantContent}>
+      {renderAssistantSectionContext()}
+      {renderGoal(surface)}
       <div className={styles.selectedContext}>
         <span>Selected text</span>
-        <p>
-          {selectedText ||
-            "Select text in your draft to use an assistant action."}
-        </p>
+        <p>“{selectedText}”</p>
       </div>
+      <section className={styles.improvementActions}>
+        <h3>How should I improve it?</h3>
+        <div>
+          {(["clearer", "expand", "example", "tone"] as AssistantAction[]).map(
+            (action) => {
+              const item = actionCopy[action];
+              const Icon = item.icon;
+              return (
+                <button
+                  aria-pressed={assistantAction === action}
+                  className={
+                    assistantAction === action ? styles.activeImproveAction : ""
+                  }
+                  key={action}
+                  onClick={() => setAssistantAction(action)}
+                  type="button"
+                >
+                  <Icon size={19} aria-hidden /> {item.title}
+                </button>
+              );
+            },
+          )}
+        </div>
+        <input
+          aria-label="Tell Inkwell what to change"
+          onChange={(event) => setAssistantInstruction(event.target.value)}
+          placeholder="Tell Inkwell what to change"
+          value={assistantInstruction}
+        />
+        <button
+          className={styles.primaryAssistantButton}
+          onClick={previewSuggestion}
+          type="button"
+        >
+          Preview change
+        </button>
+      </section>
       {suggestion ? (
         <div className={styles.suggestionCard} aria-live="polite">
           <span>Suggested revision</span>
@@ -667,38 +1246,72 @@ export function DraftEditor({
               Accept
             </button>
             <button onClick={() => setSuggestion(null)} type="button">
-              Reject
+              Discard
             </button>
             <button onClick={retrySuggestion} type="button">
               Try again
             </button>
           </div>
         </div>
-      ) : (
-        <div className={styles.actions}>
-          <h3>Suggested actions</h3>
-          {(Object.keys(actionCopy) as AssistantAction[]).map((action) => {
-            const item = actionCopy[action];
-            const Icon = item.icon;
-            return (
-              <button
-                key={action}
-                onClick={() => startSuggestion(action)}
-                type="button"
-              >
-                <Icon size={22} aria-hidden />
-                <span>
-                  <strong>{item.title}</strong>
-                  <small>{item.subtitle}</small>
-                </span>
-                <ArrowRight size={18} aria-hidden />
-              </button>
-            );
-          })}
-        </div>
-      )}
+      ) : null}
+      <button
+        aria-pressed={assistantAction === "transition"}
+        className={styles.transitionAction}
+        onClick={() => setAssistantAction("transition")}
+        type="button"
+      >
+        <ArrowRight size={22} aria-hidden />
+        <span>Add a transition to the next section</span>
+        <CaretRight size={18} aria-hidden />
+      </button>
     </div>
   );
+
+  const renderGuidanceAssistant = (surface: "desktop" | "mobile") => (
+    <div className={styles.assistantContent}>
+      {renderAssistantSectionContext()}
+      {renderGoal(surface)}
+      <div className={styles.selectionPrompt}>
+        <Sparkle size={23} weight="fill" aria-hidden />
+        <h3>Improve a passage</h3>
+        <p>
+          Select text in this section to make it clearer, expand the idea, add
+          an example, or change its tone.
+        </p>
+      </div>
+      <section className={styles.sectionPlanning}>
+        <h3>Plan this section</h3>
+        <label className={styles.directionField}>
+          <span>Add a direction (optional)</span>
+          <input
+            maxLength={1000}
+            onChange={(event) => setAssistantDirection(event.target.value)}
+            placeholder="Focus on a specific angle"
+            value={assistantDirection}
+          />
+        </label>
+        {renderGenerationError()}
+        <button
+          className={styles.primaryAssistantButton}
+          disabled={isGeneratingTalkingPoints}
+          onClick={beginAssistantStart}
+          type="button"
+        >
+          {isGeneratingTalkingPoints
+            ? "Generating talking points…"
+            : "Generate talking points"}
+        </button>
+      </section>
+    </div>
+  );
+
+  const renderAssistant = (surface: "desktop" | "mobile") => {
+    if (generatedResult?.sectionId === activeSectionId)
+      return renderGeneratedAssistant(surface);
+    if (selectedText.trim()) return renderImprovementAssistant(surface);
+    if (activeSectionIsEmpty) return renderStartAssistant(surface);
+    return renderGuidanceAssistant(surface);
+  };
 
   const renderToolbar = (mobile = false) => (
     <div
@@ -810,6 +1423,30 @@ export function DraftEditor({
     );
   }
 
+  if (loadFailure) {
+    return (
+      <main className={styles.loadingPage}>
+        <div className={styles.loadState}>
+          <span role="alert">{loadFailure.message}</span>
+          {loadFailure.kind === "missing-outline" && savedArticleId ? (
+            <Link href={`/articles/new/outline?articleId=${savedArticleId}`}>
+              Create outline
+            </Link>
+          ) : null}
+          {loadFailure.kind === "missing-id" ||
+          loadFailure.kind === "not-found" ? (
+            <Link href="/dashboard?section=articles">Back to articles</Link>
+          ) : null}
+          {loadFailure.retryable ? (
+            <button type="button" onClick={() => setRetryKey((key) => key + 1)}>
+              Try again
+            </button>
+          ) : null}
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className={styles.page}>
       {!isMobile ? (
@@ -819,26 +1456,35 @@ export function DraftEditor({
             identity={identity}
             showSettings={false}
           />
-          <div className={styles.desktopWorkspace}>
+          <div
+            className={`${styles.desktopWorkspace} ${!isAssistantOpen ? styles.assistantClosed : ""}`}
+          >
             <header className={styles.desktopTopbar}>
               <div className={styles.saveMeta} role="status" aria-live="polite">
                 {saveStatus === "saved" ? (
                   <Check size={18} weight="bold" aria-hidden />
                 ) : null}
                 <span>{saveLabel}</span>
-                {saveStatus === "failed" ? (
-                  <button onClick={() => saveDraft("retrying")} type="button">
+                {saveStatus === "failed" && saveRetryable ? (
+                  <button
+                    onClick={() => void saveDraft("retrying")}
+                    type="button"
+                  >
                     Retry
                   </button>
                 ) : null}
                 <span>{wordCount.toLocaleString()} words</span>
               </div>
-              <ArticleProgress currentStep="draft" compact />
+              <ArticleProgress
+                currentStep="draft"
+                compact
+                articleId={articleId}
+              />
               <div className={styles.topActions}>
                 <button onClick={() => setPreviewOpen(true)} type="button">
                   Preview
                 </button>
-                <button onClick={reviewArticle} type="button">
+                <button onClick={() => void reviewArticle()} type="button">
                   Review article
                 </button>
               </div>
@@ -860,32 +1506,52 @@ export function DraftEditor({
                 <div className={styles.articleBody}>
                   <h1>{draft.title}</h1>
                   {draft.sections.map((section, index) => (
-                    <DraftRichSection
-                      index={index}
-                      key={section.id}
-                      onChange={updateSectionEditor}
-                      onEditor={registerEditor}
-                      onFocus={onEditorFocus}
-                      onSelection={(sectionId, text) => {
-                        if (text.trim()) {
-                          setActiveSectionId(sectionId);
-                          setSelectedText(text);
-                        }
-                      }}
-                      section={section}
-                    />
+                    <Fragment key={section.id}>
+                      <DraftRichSection
+                        index={index}
+                        onChange={updateSectionEditor}
+                        onEditor={registerEditor}
+                        onFocus={onEditorFocus}
+                        onSelection={(sectionId, text) => {
+                          activateSection(sectionId);
+                          setSelectedText(text.trim());
+                        }}
+                        section={section}
+                      />
+                      {generatedResult?.sectionId === section.id ? (
+                        <section
+                          aria-label="AI talking-points preview"
+                          className={styles.generatedPreview}
+                        >
+                          <span>AI talking-points preview</span>
+                          {generatedResult.points.map((point) => (
+                            <p key={point}>• {point}</p>
+                          ))}
+                        </section>
+                      ) : null}
+                    </Fragment>
                   ))}
                 </div>
                 {renderToolbar()}
               </article>
               <aside
-                className={styles.assistantPanel}
+                aria-hidden={!isAssistantOpen}
                 aria-label="Writing assistant"
+                className={`${styles.assistantPanel} ${isAssistantOpen ? styles.assistantPanelOpen : ""}`}
+                id={DRAFT_ASSISTANT_ID}
+                inert={!isAssistantOpen}
               >
                 <header>
                   <Sparkle size={23} weight="fill" aria-hidden />
                   <strong>Writing assistant</strong>
-                  <button aria-label="Close writing assistant" type="button">
+                  <button
+                    aria-controls={DRAFT_ASSISTANT_ID}
+                    aria-expanded={isAssistantOpen}
+                    aria-label="Close writing assistant"
+                    onClick={closeAssistant}
+                    ref={assistantCloseRef}
+                    type="button"
+                  >
                     <X size={21} aria-hidden />
                   </button>
                 </header>
@@ -898,6 +1564,19 @@ export function DraftEditor({
                   </a>
                 </p>
               </aside>
+              <button
+                aria-controls={DRAFT_ASSISTANT_ID}
+                aria-expanded={isAssistantOpen}
+                aria-hidden={isAssistantOpen}
+                aria-label="Open writing assistant"
+                className={`${styles.assistantOpenButton} ${!isAssistantOpen ? styles.assistantOpenButtonVisible : ""}`}
+                onClick={openAssistant}
+                ref={assistantOpenRef}
+                inert={isAssistantOpen}
+                type="button"
+              >
+                <Sparkle size={22} weight="fill" aria-hidden />
+              </button>
             </div>
           </div>
         </>
@@ -925,23 +1604,33 @@ export function DraftEditor({
               <DotsThree size={27} weight="bold" aria-hidden />
             </button>
           </header>
-          <ArticleProgress currentStep="draft" compact />
+          <ArticleProgress currentStep="draft" compact articleId={articleId} />
           <article className={styles.mobileArticle}>
             {draft.sections.map((section, index) => (
-              <DraftRichSection
-                index={index}
-                key={section.id}
-                onChange={updateSectionEditor}
-                onEditor={registerEditor}
-                onFocus={onEditorFocus}
-                onSelection={(sectionId, text) => {
-                  if (text.trim()) {
-                    setActiveSectionId(sectionId);
-                    setSelectedText(text);
-                  }
-                }}
-                section={section}
-              />
+              <Fragment key={section.id}>
+                <DraftRichSection
+                  index={index}
+                  onChange={updateSectionEditor}
+                  onEditor={registerEditor}
+                  onFocus={onEditorFocus}
+                  onSelection={(sectionId, text) => {
+                    activateSection(sectionId);
+                    setSelectedText(text.trim());
+                  }}
+                  section={section}
+                />
+                {generatedResult?.sectionId === section.id ? (
+                  <section
+                    aria-label="AI talking-points preview"
+                    className={styles.generatedPreview}
+                  >
+                    <span>AI talking-points preview</span>
+                    {generatedResult.points.map((point) => (
+                      <p key={point}>• {point}</p>
+                    ))}
+                  </section>
+                ) : null}
+              </Fragment>
             ))}
           </article>
           <section
@@ -972,7 +1661,7 @@ export function DraftEditor({
                     <button onClick={() => setPreviewOpen(true)} type="button">
                       Preview article <ArrowRight size={18} aria-hidden />
                     </button>
-                    <button onClick={reviewArticle} type="button">
+                    <button onClick={() => void reviewArticle()} type="button">
                       Mark ready for review <ArrowRight size={18} aria-hidden />
                     </button>
                     <p>
@@ -1029,7 +1718,7 @@ export function DraftEditor({
               <ArrowLeft size={19} aria-hidden /> Back to editor
             </button>
             <strong>Preview</strong>
-            <button onClick={reviewArticle} type="button">
+            <button onClick={() => void reviewArticle()} type="button">
               Review article
             </button>
           </header>
@@ -1068,12 +1757,18 @@ export function DraftEditor({
               onChange={(event) => setNewSectionTitle(event.target.value)}
               value={newSectionTitle}
             />
+            <label htmlFor="new-section-goal">Section goal</label>
+            <textarea
+              id="new-section-goal"
+              onChange={(event) => setNewSectionGoal(event.target.value)}
+              value={newSectionGoal}
+            />
             <div>
               <button onClick={() => setAddSectionOpen(false)} type="button">
                 Cancel
               </button>
               <button
-                disabled={!newSectionTitle.trim()}
+                disabled={!newSectionTitle.trim() || !newSectionGoal.trim()}
                 onClick={addSection}
                 type="button"
               >

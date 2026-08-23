@@ -1,56 +1,51 @@
-# Export page design QA
+# Draft Writing Assistant Design QA
 
 ## Comparison target
 
-- Desktop source: `public/designs/mvp/export-article-desktop.png`
-- Desktop implementation: `design-reference/export-implementation-desktop.png`
-- Desktop viewport: 1487 × 1058 CSS px, device scale factor 1; both images are 1487 × 1058 px.
-- Mobile source: `public/designs/mvp/export-article-mobile.png` (853 × 1844 px, treated as a 2× design asset).
-- Mobile normalized source: `design-reference/export-source-mobile-normalized.png` (426 × 922 px).
-- Mobile implementation: `design-reference/export-implementation-mobile.png`
-- Mobile viewport: 426 × 922 CSS px, device scale factor 1; normalized source and implementation are both 426 × 922 px.
-- State: default Copy formatted text selection, inclusion options expanded, Title/Author/Sources/Article summary selected, Publishing metadata unselected.
+- Source visual truth:
+  - `C:\Users\Dell\Downloads\ChatGPT Image Aug 21, 2026, 03_33_31 PM (1).png` — empty-section setup
+  - `C:\Users\Dell\Downloads\ChatGPT Image Aug 21, 2026, 03_33_32 PM (2).png` — generated-draft review
+  - `C:\Users\Dell\Downloads\ChatGPT Image Aug 21, 2026, 03_33_32 PM (3).png` — selected-text improvement
+- Source pixel dimensions: 1586 × 992 for each reference.
+- Intended CSS viewport: 1586 × 992 at device scale factor 1, plus responsive checks at 1024px, 801px, and 800px widths.
+- Implementation route: `/articles/new/draft`.
+- Implementation screenshot: unavailable.
 
-## Evidence reviewed
+## Evidence status
 
-- Full-view side-by-side comparisons:
-  - `design-reference/export-comparison-desktop.png`
-  - `design-reference/export-comparison-mobile.png`
-- Focused regions reviewed within the full-resolution comparisons: desktop progress/header, format rows, inclusion controls, summary preview, fixed action bar; mobile header, selected/disabled format states, disclosure and checkbox rows, compact summary, primary CTA.
-- Fonts and typography: Manrope and Newsreader match the existing product and target hierarchy; wrapping, weights, line heights, and editorial title treatment remain stable at both viewports.
-- Spacing and layout: desktop sidebar, two-column grid, action bar, mobile stack, card dimensions, row rhythm, and normalized mobile density align without overlap or overflow.
-- Colors and tokens: navy, crimson, paper, blue selection, borders, disabled opacity, and warm summary surface map to the target and existing tokens.
-- Image and icon quality: existing Inkwell raster logos are used; all UI icons come from the installed Phosphor family. No placeholder imagery, custom SVG, CSS art, or generated asset substitutes are present.
-- Copy and content: static UI copy follows the target. Live word count, read time, estimated size, and preview text are derived from the current draft.
+- Full-view comparison: blocked because the in-app browser runtime could not establish its trusted local browser connection.
+- Focused assistant-panel comparison: blocked for the same reason.
+- Browser-rendered primary interactions tested: none; browser capture was unavailable. Component tests cover start modes, generation, insertion, section switching, selection improvements, collapse/reopen, and mobile rendering, but they are not a substitute for visual evidence.
+- Browser console errors checked: no; browser capture was unavailable.
+- Density normalization: not performed because no implementation screenshot could be captured.
 
 ## Findings
 
-- No actionable P0, P1, or P2 issues remain.
-- Accepted intentional differences:
-  - Desktop uses the approved existing five-step Brief/Outline/Draft/Review/Export workflow instead of the mock's four alternate labels.
-  - Statistics show the real default draft values (279 words, 2 min read, ~2 KB) instead of hard-coded mock values.
-  - PDF and Word remain visibly disabled and include the approved “Coming soon” clarification.
-- P3: minor optical differences remain between several Phosphor document glyphs and the mock's source icon artwork; sizing, meaning, alignment, and family consistency are acceptable.
+- [P1] Browser-rendered visual evidence is missing.
+  - Location: all three Draft writing-assistant states and responsive breakpoints.
+  - Evidence: source references are available, but there is no same-viewport implementation capture to compare against them.
+  - Impact: typography, proportions, wrapping, spacing, colors, icons, and responsive layout cannot be approved from code and tests alone.
+  - Fix: restore the in-app browser connection, capture each state at matching dimensions, combine each source and implementation image in one comparison input, and resolve all P0–P2 differences.
 
-## Interaction and accessibility verification
+## Required fidelity surfaces
 
-- Playwright tested Markdown selection and download, disabled PDF/Word controls, mobile inclusion disclosure, responsive visibility, and horizontal overflow in desktop and mobile Chromium projects.
-- Component tests cover clipboard fallback, HTML/Markdown downloads, session hydration/persistence, inclusion changes, back navigation, and Review-to-Export navigation.
-- Native radio/checkbox controls, semantic fieldsets, disclosure attributes, keyboard focus styles, disabled states, and live status messages are present.
-- Browser console and page errors were captured during desktop and mobile end-to-end runs: none were reported.
+- Fonts and typography: blocked pending rendered comparison.
+- Spacing and layout rhythm: blocked pending rendered comparison.
+- Colors and visual tokens: blocked pending rendered comparison.
+- Image quality and asset fidelity: no raster assets are required by the assistant panel; icon alignment still requires rendered comparison.
+- Copy and content: implemented from the supplied references and plan; visual wrapping remains unverified.
+- Accessibility and responsive behavior: component and static checks pass, but visual focus, zoom, and viewport resilience remain unverified in-browser.
 
 ## Comparison history
 
-1. Initial mobile capture used the raw 853 px asset width as CSS width, exposing a P1 desktop-layout capture and oversized controls. The source was correctly normalized to 426 × 922 and the implementation was recaptured at that CSS viewport.
-2. First normalized pass found P2 vertical-density drift in the mobile format rows and action placement. Mobile row heights, spacing, summary metrics, and CTA dimensions were recalibrated.
-3. Second pass found P2 icon scale and small vertical offsets. Header/format icons and section spacing were adjusted, then both production views were recaptured.
-4. Final full-view and focused comparisons show no actionable P0/P1/P2 differences.
+- Pass 1: source images opened successfully; implementation capture failed before a comparison could be produced. No visual fixes can be claimed from this pass.
 
 ## Implementation checklist
 
-- [x] Desktop and mobile layouts match the selected sources.
-- [x] Primary selection, disclosure, save, copy, and download interactions work.
-- [x] Responsive overflow and console checks pass.
-- [x] Intentional product/data differences are documented.
+- Restore the in-app browser runtime.
+- Capture empty, generated, and selected-text states at 1586 × 992.
+- Capture responsive states at 1024px, 801px, and 800px.
+- Test collapse/reopen, generation, preview, insertion, replacement, retry, refine, discard, selection improvement, and mobile-sheet interactions in-browser.
+- Check the browser console and repeat comparisons until no P0–P2 findings remain.
 
-final result: passed
+final result: blocked

@@ -30,24 +30,24 @@ import {
 } from "@/lib/articles/client";
 import type {
   ArticleOutline,
+  ArticleOutlinePatch,
   ArticleOutlineSection,
 } from "@/lib/articles/outline";
 import { DEFAULT_AUTH_IDENTITY, type AuthIdentity } from "@/lib/auth/identity";
 import { ArticleProgress } from "../article-progress/article-progress";
 import styles from "./outline-builder.module.css";
 
-type EditableSection = ArticleOutlineSection & { clientId: string };
+type EditableSection = Omit<ArticleOutlineSection, "id"> & {
+  id?: string;
+  clientId: string;
+};
 type ViewState =
   "loading" | "generating" | "ready" | "missing-id" | "not-found" | "error";
 type OutlineError = { code: string; message: string };
 const articleIdSchema = z.string().uuid();
 
 function clientId(section: ArticleOutlineSection, index: number) {
-  const slug = section.heading
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-  return `${slug || "section"}-${index}`;
+  return section.id || `section-${index}`;
 }
 
 function editableSections(outline: ArticleOutline): EditableSection[] {
@@ -57,8 +57,11 @@ function editableSections(outline: ArticleOutline): EditableSection[] {
   }));
 }
 
-function apiSections(sections: EditableSection[]): ArticleOutlineSection[] {
-  return sections.map(({ heading, purpose, key_points }) => ({
+function apiSections(
+  sections: EditableSection[],
+): ArticleOutlinePatch["sections"] {
+  return sections.map(({ id, heading, purpose, key_points }) => ({
+    ...(id ? { id } : {}),
     heading,
     purpose,
     key_points,
@@ -262,6 +265,7 @@ export function OutlineBuilder({
       if (index < 0) return current;
       const copy = {
         ...current[index],
+        id: undefined,
         clientId: `section-copy-${Date.now()}`,
         heading: `${current[index].heading} (copy)`,
         key_points: [...current[index].key_points],
@@ -353,7 +357,6 @@ export function OutlineBuilder({
     setIsDeleting(true);
     try {
       await deleteArticleOutline(articleId);
-      window.sessionStorage.removeItem("inkwell:article-outline");
       push(`/articles/new/brief?articleId=${articleId}`);
     } catch (caught) {
       setError(outlineError(caught));
@@ -367,17 +370,6 @@ export function OutlineBuilder({
     if (!article || !savedOutline) return;
     const persisted = dirty ? await saveOutline() : savedOutline;
     if (!persisted) return;
-    window.sessionStorage.setItem(
-      "inkwell:article-outline",
-      JSON.stringify({
-        workingTitle: article.working_title,
-        targetAudience: article.target_audience.join(", "),
-        sections: persisted.sections.map((section, index) => ({
-          id: clientId(section, index),
-          title: section.heading,
-        })),
-      }),
-    );
     push(`/articles/new/draft?articleId=${article.id}`);
   };
 

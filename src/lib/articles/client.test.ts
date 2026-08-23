@@ -1,11 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  createArticleDraft,
   deleteArticleOutline,
   generateArticleBrief,
   generateArticleOutline,
+  generateTalkingPoints,
+  getArticleDraft,
   getArticleBrief,
   getArticleOutline,
   updateArticleBrief,
+  updateArticleDraft,
   updateArticleOutline,
 } from "./client";
 
@@ -36,6 +40,7 @@ const brief = {
   updated_at: "2026-08-14T12:00:00Z",
 };
 const sections = Array.from({ length: 3 }, (_, index) => ({
+  id: `10000000-0000-4000-8000-00000000000${index}`,
   heading: `Section ${index + 1}`,
   purpose: "Purpose",
   key_points: ["Point"],
@@ -50,6 +55,21 @@ const outline = {
   output_token_count: 20,
   generation_duration_ms: 100,
   is_stale: false,
+  created_at: "2026-08-18T12:00:00Z",
+  updated_at: "2026-08-18T12:00:00Z",
+};
+const draftSection = {
+  id: "20000000-0000-4000-8000-000000000000",
+  outline_section_id: sections[0].id,
+  title: sections[0].heading,
+  goal: sections[0].purpose,
+  checklist: [],
+  editor_state: '{"root":{"children":[]}}',
+};
+const draft = {
+  id: "30000000-0000-4000-8000-000000000000",
+  article_id: articleId,
+  sections: [draftSection],
   created_at: "2026-08-18T12:00:00Z",
   updated_at: "2026-08-18T12:00:00Z",
 };
@@ -81,6 +101,77 @@ describe("article brief client", () => {
       `/api/articles/${articleId}/brief`,
       { method: "POST", headers: {} },
     );
+  });
+
+  it("supports complete draft API persistence", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(draft),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getArticleDraft(articleId);
+    await createArticleDraft(articleId);
+    await updateArticleDraft(articleId, { sections: [draftSection] });
+
+    expect(
+      fetchMock.mock.calls.map(([url, init]) => [url, init?.method ?? "GET"]),
+    ).toEqual([
+      [`/api/articles/${articleId}/draft`, "GET"],
+      [`/api/articles/${articleId}/draft`, "POST"],
+      [`/api/articles/${articleId}/draft`, "PATCH"],
+    ]);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      `/api/articles/${articleId}/draft`,
+      { method: "POST", headers: {} },
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      `/api/articles/${articleId}/draft`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ sections: [draftSection] }),
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  });
+
+  it("generates talking points with optional trimmed instructions", async () => {
+    const result = {
+      section_id: draftSection.id,
+      points: ["First point", "Second point", "Third point"],
+    };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(result),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await generateTalkingPoints(articleId, draftSection.id);
+    await generateTalkingPoints(articleId, draftSection.id, {
+      instruction: "  Focus on operational costs  ",
+    });
+    await generateTalkingPoints(articleId, draftSection.id, {
+      instruction: "   ",
+    });
+
+    const url = `/api/articles/${articleId}/draft/sections/${draftSection.id}/talking-points`;
+    expect(fetchMock).toHaveBeenNthCalledWith(1, url, {
+      method: "POST",
+      headers: {},
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(2, url, {
+      method: "POST",
+      body: JSON.stringify({ instruction: "Focus on operational costs" }),
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(3, url, {
+      method: "POST",
+      headers: {},
+    });
   });
 
   it("updates briefs and supports complete outline CRUD", async () => {

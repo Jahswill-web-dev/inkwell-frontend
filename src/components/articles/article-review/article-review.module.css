@@ -10,6 +10,26 @@
   place-items: center;
 }
 
+.loadState {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 24px;
+  text-align: center;
+}
+
+.loadState a,
+.loadState button {
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 16px;
+  background: var(--color-ink-navy);
+  color: white;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
 .workspace {
   min-height: 100svh;
   margin-left: var(--dashboard-sidebar-width, 215px);

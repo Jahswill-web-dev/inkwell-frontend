@@ -26,7 +26,7 @@ import {
   type Spread,
 } from "lexical";
 import { useEffect, type ReactNode } from "react";
-import type { DraftSection } from "./draft-editor-data";
+import { normalizeEditorState, type DraftSection } from "./draft-editor-data";
 import styles from "./draft-editor.module.css";
 
 type SerializedImageNode = Spread<
@@ -139,7 +139,7 @@ export function DraftRichSection({
   const initialConfig = {
     namespace: `inkwell-draft-${section.id}-${readOnly ? "preview" : "editor"}`,
     editable: !readOnly,
-    editorState: section.editorState,
+    editorState: normalizeEditorState(section.editorState),
     nodes: [
       HeadingNode,
       QuoteNode,

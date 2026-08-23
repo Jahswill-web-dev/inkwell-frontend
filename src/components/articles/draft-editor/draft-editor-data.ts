@@ -1,4 +1,6 @@
-export const DRAFT_STORAGE_KEY = "inkwell:article-draft";
+import type { Article } from "@/lib/articles/article";
+import type { ArticleDraft, ArticleDraftPatch } from "@/lib/articles/draft";
+
 export const DRAFT_SCHEMA_VERSION = 1;
 
 export type DraftChecklistItem = {
@@ -9,6 +11,7 @@ export type DraftChecklistItem = {
 
 export type DraftSection = {
   id: string;
+  outlineSectionId: string | null;
   title: string;
   goal: string;
   checklist: DraftChecklistItem[];
@@ -20,11 +23,6 @@ export type DraftArticleState = {
   title: string;
   sections: DraftSection[];
   savedAt: string | null;
-};
-
-type SavedOutline = {
-  workingTitle?: unknown;
-  sections?: unknown;
 };
 
 const referenceCopy: Record<string, readonly string[]> = {
@@ -91,12 +89,31 @@ export function createEditorState(paragraphs: readonly string[]): string {
   });
 }
 
+export function normalizeEditorState(editorState: string): string {
+  try {
+    const parsed = JSON.parse(editorState) as {
+      root?: { children?: unknown };
+    };
+    if (
+      parsed.root &&
+      Array.isArray(parsed.root.children) &&
+      parsed.root.children.length === 0
+    ) {
+      return createEditorState([""]);
+    }
+  } catch {
+    return editorState;
+  }
+  return editorState;
+}
+
 function makeSection(id: string, title: string, index: number): DraftSection {
   const copy = referenceCopy[id] ?? [
     `Start shaping the key idea for ${title.toLowerCase()} here.`,
   ];
   return {
     id,
+    outlineSectionId: null,
     title,
     goal:
       index === 0
@@ -126,74 +143,49 @@ function makeSection(id: string, title: string, index: number): DraftSection {
   };
 }
 
-export function createDefaultDraft(
-  savedOutline?: string | null,
+export function toDraftArticleState(
+  article: Article,
+  draft: ArticleDraft,
 ): DraftArticleState {
-  let title = "Why Great Ideas Are Hard to Write Down";
-  let sourceSections: readonly { id: string; title: string }[] =
-    referenceSections;
-
-  if (savedOutline) {
-    try {
-      const outline = JSON.parse(savedOutline) as SavedOutline;
-      if (
-        typeof outline.workingTitle === "string" &&
-        outline.workingTitle.trim()
-      ) {
-        title = outline.workingTitle.trim();
-      }
-      if (Array.isArray(outline.sections)) {
-        const parsed = outline.sections.flatMap((section) => {
-          if (!section || typeof section !== "object") return [];
-          const candidate = section as Record<string, unknown>;
-          return typeof candidate.id === "string" &&
-            typeof candidate.title === "string"
-            ? [{ id: candidate.id, title: candidate.title }]
-            : [];
-        });
-        if (parsed.length) sourceSections = parsed;
-      }
-    } catch {
-      // The outline is optional; an invalid value should not block drafting.
-    }
-  }
-
   return {
     schemaVersion: DRAFT_SCHEMA_VERSION,
-    title,
-    sections: sourceSections.map((section, index) =>
+    title: article.working_title,
+    sections: draft.sections.map((section) => ({
+      id: section.id,
+      outlineSectionId: section.outline_section_id,
+      title: section.title,
+      goal: section.goal,
+      checklist: section.checklist,
+      editorState: normalizeEditorState(section.editor_state),
+    })),
+    savedAt: draft.updated_at,
+  };
+}
+
+export function toArticleDraftPatch(
+  draft: DraftArticleState,
+): ArticleDraftPatch {
+  return {
+    sections: draft.sections.map((section) => ({
+      id: section.id,
+      outline_section_id: section.outlineSectionId,
+      title: section.title,
+      goal: section.goal,
+      checklist: section.checklist,
+      editor_state: section.editorState,
+    })),
+  };
+}
+
+export function createDefaultDraft(): DraftArticleState {
+  return {
+    schemaVersion: DRAFT_SCHEMA_VERSION,
+    title: "Why Great Ideas Are Hard to Write Down",
+    sections: referenceSections.map((section, index) =>
       makeSection(section.id, section.title, index),
     ),
     savedAt: null,
   };
-}
-
-export function parseDraft(value: string | null): DraftArticleState | null {
-  if (!value) return null;
-  try {
-    const draft = JSON.parse(value) as Record<string, unknown>;
-    if (
-      draft.schemaVersion !== DRAFT_SCHEMA_VERSION ||
-      typeof draft.title !== "string" ||
-      !Array.isArray(draft.sections)
-    ) {
-      return null;
-    }
-    const validSections = draft.sections.every((section) => {
-      if (!section || typeof section !== "object") return false;
-      const candidate = section as Record<string, unknown>;
-      return (
-        typeof candidate.id === "string" &&
-        typeof candidate.title === "string" &&
-        typeof candidate.goal === "string" &&
-        typeof candidate.editorState === "string" &&
-        Array.isArray(candidate.checklist)
-      );
-    });
-    return validSections ? (draft as unknown as DraftArticleState) : null;
-  } catch {
-    return null;
-  }
 }
 
 export function editorStateText(editorState: string): string {

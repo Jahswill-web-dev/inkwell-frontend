@@ -165,7 +165,7 @@ describe("ArticleBrief", () => {
     render(<ArticleBrief articleId={articleId} />);
     await screen.findByText(brief.summary);
     await userEvent.click(
-      screen.getAllByRole("button", { name: "Generate outline" })[0],
+      screen.getAllByRole("button", { name: "Continue to outline" })[0],
     );
     expect(sessionStorage.getItem("inkwell:article-brief")).toBeNull();
     await waitFor(() =>
@@ -186,7 +186,7 @@ describe("ArticleBrief", () => {
     await userEvent.clear(meta);
     await userEvent.type(meta, "A revised description");
     expect(
-      screen.getAllByRole("button", { name: "Generate outline" })[0],
+      screen.getAllByRole("button", { name: "Continue to outline" })[0],
     ).toBeDisabled();
     await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() =>

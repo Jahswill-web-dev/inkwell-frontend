@@ -83,7 +83,7 @@ export function ArticleProgress({
                 <Link
                   aria-label={step.desktopLabel}
                   href={
-                    articleId && (step.id === "brief" || step.id === "outline")
+                    articleId
                       ? `${step.href}?articleId=${encodeURIComponent(articleId)}`
                       : step.href
                   }

@@ -22,6 +22,7 @@ vi.mock("axios", () => ({
 const articleId = "be5579e3-24fd-4272-a35f-f74740c3887e";
 const context = { params: Promise.resolve({ articleId }) };
 const sections = Array.from({ length: 3 }, (_, index) => ({
+  id: `10000000-0000-4000-8000-00000000000${index}`,
   heading: `Section ${index + 1}`,
   purpose: "Purpose",
   key_points: ["Point"],

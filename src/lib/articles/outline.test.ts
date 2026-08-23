@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { articleOutlinePatchSchema, articleOutlineSchema } from "./outline";
 
 const sections = Array.from({ length: 3 }, (_, index) => ({
+  id: `10000000-0000-4000-8000-00000000000${index}`,
   heading: `Section ${index + 1}`,
   purpose: "A useful purpose",
   key_points: ["A useful point"],

@@ -608,8 +608,8 @@ export function ArticleBrief({
                 >
                   <Sparkle size={25} aria-hidden />
                   {isGeneratingOutline
-                    ? "Generating outline…"
-                    : "Generate outline"}
+                    ? "Opening outline…"
+                    : "Continue to outline"}
                 </button>
               </div>
             </>
@@ -626,7 +626,7 @@ export function ArticleBrief({
               onClick={generateOutline}
               disabled={isGeneratingOutline || isEditing}
             >
-              {isGeneratingOutline ? "Generating outline…" : "Generate outline"}
+              {isGeneratingOutline ? "Opening outline…" : "Continue to outline"}
               <ArrowRight size={19} aria-hidden />
             </button>
           </footer>

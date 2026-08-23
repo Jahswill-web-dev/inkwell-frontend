@@ -1,16 +1,24 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, X } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
+import { z } from "zod";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { DEFAULT_AUTH_IDENTITY, type AuthIdentity } from "@/lib/auth/identity";
+import {
+  ArticleRequestError,
+  getArticle,
+  getArticleDraft,
+  updateArticleDraft,
+} from "@/lib/articles/client";
 import { ArticleProgress } from "../article-progress/article-progress";
 import {
   createDefaultDraft,
-  DRAFT_STORAGE_KEY,
-  parseDraft,
+  toArticleDraftPatch,
+  toDraftArticleState,
   type DraftArticleState,
 } from "../draft-editor/draft-editor-data";
 import { ReviewArticle } from "./review-article";
@@ -30,16 +38,31 @@ import {
 } from "./review-data";
 import styles from "./article-review.module.css";
 
+const articleIdSchema = z.string().uuid();
+type LoadFailure = {
+  kind: "missing-id" | "not-found" | "missing-draft" | "error";
+  message: string;
+  retryable: boolean;
+};
+
 function persistReview(review: ReviewState) {
   window.sessionStorage.setItem(REVIEW_STORAGE_KEY, JSON.stringify(review));
 }
 
 export function ArticleReview({
+  articleId,
   identity = DEFAULT_AUTH_IDENTITY,
 }: {
+  articleId?: string;
   identity?: AuthIdentity;
 }) {
-  const router = useRouter();
+  const { push } = useRouter();
+  const validArticleId = articleIdSchema.safeParse(articleId);
+  const savedArticleId = validArticleId.success ? validArticleId.data : null;
+  const reviewPath = savedArticleId
+    ? `/articles/new/review?articleId=${encodeURIComponent(savedArticleId)}`
+    : "/articles/new/review";
+  const loginPath = `/login?next=${encodeURIComponent(reviewPath)}`;
   const [draft, setDraft] = useState<DraftArticleState>(() =>
     createDefaultDraft(),
   );
@@ -49,23 +72,72 @@ export function ArticleReview({
   const [hydrated, setHydrated] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [status, setStatus] = useState("");
+  const [loadFailure, setLoadFailure] = useState<LoadFailure | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
-    const savedDraft =
-      parseDraft(window.sessionStorage.getItem(DRAFT_STORAGE_KEY)) ??
-      createDefaultDraft();
-    const savedReview =
-      parseReview(window.sessionStorage.getItem(REVIEW_STORAGE_KEY)) ??
-      createDefaultReview();
-    const nextReview = ensureIssueAnchors(savedDraft, savedReview);
-    const timer = window.setTimeout(() => {
-      setDraft(savedDraft);
-      setReview(nextReview);
-      persistReview(nextReview);
-      setHydrated(true);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
+    let active = true;
+    const load = async () => {
+      setLoadFailure(null);
+      if (!savedArticleId) {
+        setLoadFailure({
+          kind: "missing-id",
+          message: "Choose an article before opening its review.",
+          retryable: false,
+        });
+        setHydrated(true);
+        return;
+      }
+      try {
+        const [article, saved] = await Promise.all([
+          getArticle(savedArticleId),
+          getArticleDraft(savedArticleId),
+        ]);
+        if (!active) return;
+        const savedDraft = toDraftArticleState(article, saved);
+        const savedReview =
+          parseReview(window.sessionStorage.getItem(REVIEW_STORAGE_KEY)) ??
+          createDefaultReview();
+        const nextReview = ensureIssueAnchors(savedDraft, savedReview);
+        setDraft(savedDraft);
+        setReview(nextReview);
+        persistReview(nextReview);
+      } catch (caught) {
+        if (!active) return;
+        if (caught instanceof ArticleRequestError && caught.status === 401) {
+          push(loginPath);
+          return;
+        }
+        const code =
+          caught instanceof ArticleRequestError ? caught.code : "review_error";
+        setLoadFailure({
+          kind:
+            code === "article_not_found"
+              ? "not-found"
+              : code === "draft_not_found"
+                ? "missing-draft"
+                : "error",
+          message:
+            code === "article_not_found"
+              ? "This article could not be found."
+              : code === "draft_not_found"
+                ? "Start the article draft before opening Review."
+                : caught instanceof ArticleRequestError
+                  ? caught.message
+                  : "We couldn’t load this draft for review.",
+          retryable:
+            !(caught instanceof ArticleRequestError) ||
+            [502, 503, 504].includes(caught.status),
+        });
+      } finally {
+        if (active) setHydrated(true);
+      }
+    };
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [loginPath, push, retryKey, savedArticleId]);
 
   const filteredIssues = useMemo(() => openIssues(review), [review]);
   const activeIssue =
@@ -118,10 +190,22 @@ export function ArticleReview({
 
     if (nextDraft !== draft) {
       setDraft(nextDraft);
-      window.sessionStorage.setItem(
-        DRAFT_STORAGE_KEY,
-        JSON.stringify({ ...nextDraft, savedAt: new Date().toISOString() }),
-      );
+      if (savedArticleId) {
+        void updateArticleDraft(
+          savedArticleId,
+          toArticleDraftPatch(nextDraft),
+        ).catch((caught) => {
+          if (caught instanceof ArticleRequestError && caught.status === 401) {
+            push(loginPath);
+            return;
+          }
+          setStatus(
+            caught instanceof ArticleRequestError && caught.status === 422
+              ? caught.message
+              : "The draft change could not be saved.",
+          );
+        });
+      }
     }
 
     updateReview((current) => {
@@ -169,11 +253,34 @@ export function ArticleReview({
   const prepare = () => {
     updateReview((current) => ({ ...current, completed: true }));
     setStatus("Review saved. Opening export options.");
-    router.push("/articles/new/export");
+    push(`/articles/new/export?articleId=${savedArticleId}`);
   };
 
   if (!hydrated)
     return <main className={styles.loading}>Opening your review…</main>;
+
+  if (loadFailure)
+    return (
+      <main className={styles.loading}>
+        <div className={styles.loadState}>
+          <span role="alert">{loadFailure.message}</span>
+          {loadFailure.kind === "missing-draft" && savedArticleId ? (
+            <Link href={`/articles/new/draft?articleId=${savedArticleId}`}>
+              Open draft
+            </Link>
+          ) : null}
+          {loadFailure.kind === "missing-id" ||
+          loadFailure.kind === "not-found" ? (
+            <Link href="/dashboard?section=articles">Back to articles</Link>
+          ) : null}
+          {loadFailure.retryable ? (
+            <button type="button" onClick={() => setRetryKey((key) => key + 1)}>
+              Try again
+            </button>
+          ) : null}
+        </div>
+      </main>
+    );
 
   return (
     <main className={styles.page}>
@@ -187,7 +294,9 @@ export function ArticleReview({
           <button
             className={styles.mobileBack}
             aria-label="Back to draft"
-            onClick={() => router.push("/articles/new/draft")}
+            onClick={() =>
+              push(`/articles/new/draft?articleId=${savedArticleId}`)
+            }
             type="button"
           >
             <ArrowLeft size={26} aria-hidden />
@@ -202,7 +311,7 @@ export function ArticleReview({
             />
             <strong>Review</strong>
           </div>
-          <ArticleProgress currentStep="review" compact />
+          <ArticleProgress currentStep="review" compact articleId={articleId} />
           <div className={styles.topActions}>
             <button onClick={() => setPreviewOpen(true)} type="button">
               Preview
@@ -256,7 +365,9 @@ export function ArticleReview({
           <ReviewReadiness
             review={review}
             onReview={showTriage}
-            onBack={() => router.push("/articles/new/draft")}
+            onBack={() =>
+              push(`/articles/new/draft?articleId=${savedArticleId}`)
+            }
           />
         )}
 

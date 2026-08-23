@@ -8,7 +8,17 @@ export const metadata: Metadata = {
   description: "Choose a format and export your finished article.",
 };
 
-export default async function ArticleExportPage() {
-  const user = await requireUser("/articles/new/export");
-  return <ArticleExport identity={toAuthIdentity(user)} />;
+export default async function ArticleExportPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ articleId?: string }>;
+}) {
+  const { articleId } = await searchParams;
+  const next = articleId
+    ? `/articles/new/export?articleId=${encodeURIComponent(articleId)}`
+    : "/articles/new/export";
+  const user = await requireUser(next);
+  return (
+    <ArticleExport articleId={articleId} identity={toAuthIdentity(user)} />
+  );
 }

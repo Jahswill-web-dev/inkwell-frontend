@@ -21,6 +21,16 @@ import {
   type ArticleOutline,
   type ArticleOutlinePatch,
 } from "./outline";
+import {
+  articleDraftPatchSchema,
+  articleDraftSchema,
+  talkingPointsInputSchema,
+  talkingPointsResultSchema,
+  type ArticleDraft,
+  type ArticleDraftPatch,
+  type TalkingPointsInput,
+  type TalkingPointsResult,
+} from "./draft";
 
 export class ArticleRequestError extends Error {
   constructor(
@@ -158,6 +168,50 @@ export function deleteArticleOutline(articleId: string): Promise<void> {
     `/api/articles/${articleId}/outline`,
     { method: "DELETE" },
     () => undefined,
+  );
+}
+
+export function getArticleDraft(articleId: string): Promise<ArticleDraft> {
+  return articleRequest(`/api/articles/${articleId}/draft`, {}, (value) =>
+    articleDraftSchema.parse(value),
+  );
+}
+
+export function createArticleDraft(articleId: string): Promise<ArticleDraft> {
+  return articleRequest(
+    `/api/articles/${articleId}/draft`,
+    { method: "POST" },
+    (value) => articleDraftSchema.parse(value),
+  );
+}
+
+export function updateArticleDraft(
+  articleId: string,
+  input: ArticleDraftPatch,
+): Promise<ArticleDraft> {
+  const body = articleDraftPatchSchema.parse(input);
+  return articleRequest(
+    `/api/articles/${articleId}/draft`,
+    { method: "PATCH", body: JSON.stringify(body) },
+    (value) => articleDraftSchema.parse(value),
+  );
+}
+
+export function generateTalkingPoints(
+  articleId: string,
+  sectionId: string,
+  input?: TalkingPointsInput,
+): Promise<TalkingPointsResult> {
+  const instruction = input?.instruction?.trim();
+  const body = talkingPointsInputSchema.parse(
+    instruction ? { instruction } : {},
+  );
+  return articleRequest(
+    `/api/articles/${articleId}/draft/sections/${sectionId}/talking-points`,
+    body.instruction
+      ? { method: "POST", body: JSON.stringify(body) }
+      : { method: "POST" },
+    (value) => talkingPointsResultSchema.parse(value),
   );
 }
 

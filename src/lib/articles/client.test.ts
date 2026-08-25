@@ -1,14 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createArticleDraft,
+  createSectionInterview,
   deleteArticleOutline,
   generateArticleBrief,
   generateArticleOutline,
-  generateGuidedQuestions,
+  generateSectionInterview,
   generateTalkingPoints,
   getArticleDraft,
   getArticleBrief,
   getArticleOutline,
+  getLatestSectionInterview,
+  getSectionInterview,
+  replaceSectionInterviewAnswers,
   updateArticleBrief,
   updateArticleDraft,
   updateArticleOutline,
@@ -175,10 +179,31 @@ describe("article brief client", () => {
     });
   });
 
-  it("requests backend-guided questions for a draft section", async () => {
+  it("supports the complete section interview workflow", async () => {
     const result = {
+      id: "40000000-0000-4000-8000-000000000000",
+      draft_id: draft.id,
       section_id: draftSection.id,
-      questions: ["First question?", "Second question?", "Third question?"],
+      status: "awaiting_answers",
+      questions: [
+        {
+          id: "50000000-0000-4000-8000-000000000000",
+          missing_piece: "Example",
+          question: "What happened?",
+          answer_guidance: "Describe the outcome.",
+        },
+        {
+          id: "50000000-0000-4000-8000-000000000001",
+          missing_piece: "Lesson",
+          question: "What changed?",
+          answer_guidance: "Describe the lesson.",
+        },
+      ],
+      answers: [],
+      generated_blocks: null,
+      is_stale: false,
+      created_at: "2026-08-25T12:00:00Z",
+      updated_at: "2026-08-25T12:00:00Z",
     };
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -187,11 +212,54 @@ describe("article brief client", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(
-      generateGuidedQuestions(articleId, draftSection.id),
-    ).resolves.toEqual(result);
-    expect(fetchMock).toHaveBeenCalledWith(
-      `/api/articles/${articleId}/draft/sections/${draftSection.id}/questions`,
+    const base = `/api/articles/${articleId}/draft/sections/${draftSection.id}/interviews`;
+    await createSectionInterview(articleId, draftSection.id);
+    await createSectionInterview(articleId, draftSection.id, {
+      instruction: "  Focus on lessons  ",
+    });
+    await getLatestSectionInterview(articleId, draftSection.id);
+    await getSectionInterview(articleId, draftSection.id, result.id);
+    await replaceSectionInterviewAnswers(
+      articleId,
+      draftSection.id,
+      result.id,
+      {
+        answers: [{ question_id: result.questions[0].id, answer: "An answer" }],
+      },
+    );
+    await generateSectionInterview(articleId, draftSection.id, result.id);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, base, {
+      method: "POST",
+      headers: {},
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(2, base, {
+      method: "POST",
+      body: JSON.stringify({ instruction: "Focus on lessons" }),
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(3, `${base}/latest`, {
+      headers: {},
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(4, `${base}/${result.id}`, {
+      headers: {},
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      5,
+      `${base}/${result.id}/answers`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          answers: [
+            { question_id: result.questions[0].id, answer: "An answer" },
+          ],
+        }),
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      6,
+      `${base}/${result.id}/generate`,
       { method: "POST", headers: {} },
     );
   });

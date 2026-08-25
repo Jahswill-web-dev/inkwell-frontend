@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { guidedQuestionsResultSchema } from "@/lib/articles/draft";
+import { sectionInterviewSchema } from "@/lib/articles/interview";
 import {
   articleBackendClient,
   articleErrorResponse,
@@ -13,7 +13,7 @@ type RouteContext = {
   params: Promise<{ articleId: string; sectionId: string }>;
 };
 
-export async function POST(_request: Request, context: RouteContext) {
+export async function GET(_request: Request, context: RouteContext) {
   const [{ articleId, sectionId }, token] = await Promise.all([
     context.params,
     getArticleToken(),
@@ -35,12 +35,15 @@ export async function POST(_request: Request, context: RouteContext) {
     );
 
   try {
-    const path = `/api/v1/articles/${parsedArticleId.data}/draft/sections/${parsedSectionId.data}/questions`;
-    const response = await articleBackendClient(token).post(path);
-    const result = guidedQuestionsResultSchema.safeParse(response.data);
-    if (!result.success || result.data.section_id !== parsedSectionId.data)
-      throw new Error("Invalid guided-questions response");
-    return NextResponse.json(result.data);
+    const path = `/api/v1/articles/${parsedArticleId.data}/draft/sections/${parsedSectionId.data}/interviews/latest`;
+    const response = await articleBackendClient(token).get(path);
+    const interview = sectionInterviewSchema.safeParse(response.data);
+    if (
+      !interview.success ||
+      interview.data.section_id !== parsedSectionId.data
+    )
+      throw new Error("Invalid section-interview response");
+    return NextResponse.json(interview.data);
   } catch (error) {
     return articleUpstreamError(error);
   }

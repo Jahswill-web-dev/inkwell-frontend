@@ -40,14 +40,8 @@ export const talkingPointsResultSchema = z.object({
   points: z.array(requiredText).min(3).max(5),
 });
 
-export const guidedQuestionsResultSchema = z.object({
-  section_id: z.string().uuid(),
-  questions: z.array(requiredText).min(2).max(4),
-});
-
 export type ArticleDraft = z.infer<typeof articleDraftSchema>;
 export type ArticleDraftSection = z.infer<typeof articleDraftSectionSchema>;
 export type ArticleDraftPatch = z.infer<typeof articleDraftPatchSchema>;
 export type TalkingPointsInput = z.infer<typeof talkingPointsInputSchema>;
 export type TalkingPointsResult = z.infer<typeof talkingPointsResultSchema>;
-export type GuidedQuestionsResult = z.infer<typeof guidedQuestionsResultSchema>;

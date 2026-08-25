@@ -2,12 +2,33 @@ import { describe, expect, it } from "vitest";
 import {
   countDraftWords,
   createDefaultDraft,
+  createEditorStateFromBlocks,
   normalizeEditorState,
   toArticleDraftPatch,
   toDraftArticleState,
 } from "./draft-editor-data";
 
 describe("draft editor data", () => {
+  it("converts interview proposal blocks into semantic Lexical nodes", () => {
+    const state = JSON.parse(
+      createEditorStateFromBlocks([
+        { type: "paragraph", text: "Opening" },
+        { type: "subheading", text: "Lesson" },
+        { type: "bulleted_list", items: ["First", "Second"] },
+        { type: "numbered_list", items: ["One", "Two"] },
+      ]),
+    ) as { root: { children: Array<Record<string, unknown>> } };
+
+    expect(state.root.children.map((node) => node.type)).toEqual([
+      "paragraph",
+      "heading",
+      "list",
+      "list",
+    ]);
+    expect(state.root.children[2]).toMatchObject({ listType: "bullet" });
+    expect(state.root.children[3]).toMatchObject({ listType: "number" });
+  });
+
   it("normalizes an API empty root into a Lexical-compatible empty paragraph", () => {
     const backendEmptyState =
       '{"root":{"children":[],"direction":"ltr","format":"","indent":0,"type":"root","version":1}}';

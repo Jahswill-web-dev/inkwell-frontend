@@ -974,6 +974,82 @@
   line-height: 1.55;
 }
 
+.interviewSaveStatus {
+  margin: 8px 0 0;
+  color: #788196;
+  font-size: 0.74rem;
+  text-align: right;
+}
+
+.interviewWarning {
+  margin-bottom: 18px;
+  border: 1px solid #e2b46f;
+  border-radius: 5px;
+  background: #fff8e8;
+  padding: 13px 14px;
+  color: #684b1f;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.interviewWarning p {
+  margin: 0 0 10px;
+}
+
+.interviewWarning button {
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-crimson);
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.interviewProposal > h3 {
+  margin: 23px 0 5px;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 1.2rem;
+}
+
+.interviewProposal > p {
+  margin: 0 0 16px;
+  color: #68738a;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.interviewBlocks {
+  display: grid;
+  gap: 13px;
+  max-height: 330px;
+  overflow-y: auto;
+  margin-bottom: 20px;
+  border: 1px solid var(--color-ink-line);
+  border-radius: 5px;
+  background: #fffdfa;
+  padding: 17px;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 0.94rem;
+  line-height: 1.55;
+}
+
+.interviewBlocks p,
+.interviewBlocks h4,
+.interviewBlocks ul,
+.interviewBlocks ol {
+  margin: 0;
+}
+
+.interviewBlocks h4 {
+  font-size: 1.05rem;
+}
+
+.interviewBlocks ul,
+.interviewBlocks ol {
+  padding-left: 22px;
+}
+
 .directionField {
   margin: 17px 0 20px;
 }

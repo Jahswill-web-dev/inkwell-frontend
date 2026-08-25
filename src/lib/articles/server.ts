@@ -34,6 +34,7 @@ export function articleUpstreamError(error: unknown): NextResponse {
     if (
       (status === 401 ||
         status === 404 ||
+        status === 409 ||
         status === 422 ||
         status === 502 ||
         status === 503 ||

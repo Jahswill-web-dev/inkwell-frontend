@@ -69,18 +69,27 @@ import { DEFAULT_AUTH_IDENTITY, type AuthIdentity } from "@/lib/auth/identity";
 import {
   ArticleRequestError,
   createArticleDraft,
-  generateGuidedQuestions,
+  createSectionInterview,
+  generateSectionInterview,
   generateTalkingPoints,
   getArticle,
   getArticleDraft,
+  getLatestSectionInterview,
+  replaceSectionInterviewAnswers,
   updateArticleDraft,
 } from "@/lib/articles/client";
+import type {
+  SectionAnswer,
+  SectionContentBlock,
+  SectionInterview,
+} from "@/lib/articles/interview";
 import { ArticleProgress } from "../article-progress/article-progress";
 import { Checkbox } from "@/components/ui/checkbox/checkbox";
 import {
   countDraftWords,
   createDefaultDraft,
   createEditorState,
+  createEditorStateFromBlocks,
   editorStateText,
   toArticleDraftPatch,
   toDraftArticleState,
@@ -99,12 +108,18 @@ type DraftLoadFailure = {
 type MobileTab = "outline" | "assistant" | "format" | "more";
 type AssistantAction = "clearer" | "expand" | "example" | "tone" | "transition";
 type AssistantStartMode = "plan" | "guided" | "draft";
-type GuidedSession = {
+type InterviewViewMode = "questions" | "complete" | "proposal";
+type InterviewSaveStatus = "idle" | "saving" | "saved" | "failed";
+type InterviewViewState = {
   active: boolean;
-  answers: string[];
-  completed: boolean;
+  answers: Record<string, string>;
   currentQuestion: number;
-  questions: string[];
+  interview: SectionInterview;
+  mode: InterviewViewMode;
+  revision: number;
+  savedRevision: number;
+  saveError: string | null;
+  saveStatus: InterviewSaveStatus;
 };
 type GeneratedResult = {
   sectionId: string;
@@ -119,14 +134,33 @@ type GenerationError = {
 const DRAFT_OUTLINE_DRAWER_ID = "draft-outline-drawer";
 const DRAFT_ASSISTANT_ID = "draft-writing-assistant";
 const articleIdSchema = z.string().uuid();
+const INTERVIEW_AUTOSAVE_DELAY = 800;
 
-function createGuidedSession(questions: string[]): GuidedSession {
+function createInterviewView(interview: SectionInterview): InterviewViewState {
+  const savedAnswers = new Map(
+    interview.answers.map((answer) => [
+      answer.question_id,
+      answer.answer ?? "",
+    ]),
+  );
   return {
     active: true,
-    answers: questions.map(() => ""),
-    completed: false,
+    answers: Object.fromEntries(
+      interview.questions.map((question) => [
+        question.id,
+        savedAnswers.get(question.id) ?? "",
+      ]),
+    ),
     currentQuestion: 0,
-    questions,
+    interview,
+    mode:
+      interview.status === "generated" && interview.generated_blocks
+        ? "proposal"
+        : "questions",
+    revision: 0,
+    savedRevision: 0,
+    saveError: null,
+    saveStatus: "idle",
   };
 }
 
@@ -263,14 +297,13 @@ export function DraftEditor({
   const [assistantStartMode, setAssistantStartMode] =
     useState<AssistantStartMode>("plan");
   const [assistantDirection, setAssistantDirection] = useState("");
-  const [guidedSessions, setGuidedSessions] = useState<
-    Record<string, GuidedSession>
+  const [interviewViews, setInterviewViews] = useState<
+    Record<string, InterviewViewState>
   >({});
-  const [guidedQuestionsError, setGuidedQuestionsError] = useState<
-    string | null
-  >(null);
-  const [isLoadingGuidedQuestions, setIsLoadingGuidedQuestions] =
-    useState(false);
+  const [interviewError, setInterviewError] = useState<string | null>(null);
+  const [isLoadingInterview, setIsLoadingInterview] = useState(false);
+  const [isGeneratingInterview, setIsGeneratingInterview] = useState(false);
+  const [isApplyingInterview, setIsApplyingInterview] = useState(false);
   const [generatedResult, setGeneratedResult] =
     useState<GeneratedResult | null>(null);
   const [generationError, setGenerationError] =
@@ -313,10 +346,16 @@ export function DraftEditor({
   const assistantOpenRef = useRef<HTMLButtonElement>(null);
   const assistantCloseRef = useRef<HTMLButtonElement>(null);
   const guidedAnswerRef = useRef<HTMLTextAreaElement>(null);
+  const interviewViewsRef = useRef<Record<string, InterviewViewState>>({});
+  const interviewSaveTimersRef = useRef(new Map<string, number>());
+  const interviewSaveChainsRef = useRef(new Map<string, Promise<boolean>>());
+  const flushInterviewAnswersRef = useRef<
+    (sectionId: string) => Promise<boolean>
+  >(async () => true);
   const dirtyRef = useRef(false);
   const skipNextAutosaveRef = useRef(true);
   const generationRequestRef = useRef(0);
-  const guidedRequestRef = useRef(0);
+  const interviewRequestRef = useRef(0);
 
   const activeSection =
     draft.sections.find((section) => section.id === activeSectionId) ??
@@ -328,8 +367,8 @@ export function DraftEditor({
   const activeSectionIsEmpty = activeSection
     ? !editorStateText(activeSection.editorState).trim()
     : true;
-  const activeGuidedSession = activeSection
-    ? guidedSessions[activeSection.id]
+  const activeInterviewView = activeSection
+    ? interviewViews[activeSection.id]
     : undefined;
 
   const openOutline = useCallback(() => {
@@ -343,6 +382,7 @@ export function DraftEditor({
   }, []);
 
   const closeAssistant = useCallback(() => {
+    void flushInterviewAnswersRef.current(activeSectionIdRef.current);
     setIsAssistantOpen(false);
     window.setTimeout(() => assistantOpenRef.current?.focus(), 0);
   }, []);
@@ -354,16 +394,18 @@ export function DraftEditor({
 
   const activateSection = useCallback((sectionId: string) => {
     if (activeSectionIdRef.current !== sectionId) {
+      void flushInterviewAnswersRef.current(activeSectionIdRef.current);
       activeSectionIdRef.current = sectionId;
       setSelectedText("");
       setSuggestion(null);
       setGeneratedResult(null);
       setGenerationError(null);
       generationRequestRef.current += 1;
-      guidedRequestRef.current += 1;
+      interviewRequestRef.current += 1;
       setIsGeneratingTalkingPoints(false);
-      setIsLoadingGuidedQuestions(false);
-      setGuidedQuestionsError(null);
+      setIsLoadingInterview(false);
+      setIsGeneratingInterview(false);
+      setInterviewError(null);
       setAssistantInstruction("");
       setAssistantDirection("");
       setGoalExpanded(true);
@@ -554,6 +596,16 @@ export function DraftEditor({
       window.removeEventListener("beforeunload", beforeUnload);
     };
   }, [saveDraft]);
+
+  useEffect(
+    () => () => {
+      interviewSaveTimersRef.current.forEach((timer) =>
+        window.clearTimeout(timer),
+      );
+      interviewSaveTimersRef.current.clear();
+    },
+    [],
+  );
 
   useEffect(() => {
     const editor = activeEditorRef.current;
@@ -811,105 +863,345 @@ export function DraftEditor({
     }
   };
 
-  const updateGuidedSession = useCallback(
-    (update: (session: GuidedSession) => GuidedSession) => {
-      if (!activeSection) return;
-      setGuidedSessions((current) => {
-        const session = current[activeSection.id];
-        if (!session) return current;
-        return {
-          ...current,
-          [activeSection.id]: update(session),
-        };
-      });
+  const setInterviewView = useCallback(
+    (
+      sectionId: string,
+      update: (view: InterviewViewState) => InterviewViewState,
+    ) => {
+      const current = interviewViewsRef.current[sectionId];
+      if (!current) return;
+      const next = {
+        ...interviewViewsRef.current,
+        [sectionId]: update(current),
+      };
+      interviewViewsRef.current = next;
+      setInterviewViews(next);
     },
-    [activeSection],
+    [],
+  );
+
+  const storeInterview = useCallback((interview: SectionInterview) => {
+    const next = {
+      ...interviewViewsRef.current,
+      [interview.section_id]: createInterviewView(interview),
+    };
+    interviewViewsRef.current = next;
+    setInterviewViews(next);
+  }, []);
+
+  const flushInterviewAnswers = useCallback(
+    async (sectionId: string) => {
+      const timer = interviewSaveTimersRef.current.get(sectionId);
+      if (timer) {
+        window.clearTimeout(timer);
+        interviewSaveTimersRef.current.delete(sectionId);
+      }
+      if (!savedArticleId) return false;
+
+      const previous = interviewSaveChainsRef.current.get(sectionId);
+      const save = (previous ?? Promise.resolve(true)).then(async () => {
+        const view = interviewViewsRef.current[sectionId];
+        if (!view || view.revision === view.savedRevision) return true;
+        const revision = view.revision;
+        const answers: SectionAnswer[] = view.interview.questions.map(
+          (question) => ({
+            question_id: question.id,
+            answer: view.answers[question.id]?.trim() || null,
+          }),
+        );
+        setInterviewView(sectionId, (current) => ({
+          ...current,
+          saveError: null,
+          saveStatus: "saving",
+        }));
+        try {
+          const interview = await replaceSectionInterviewAnswers(
+            savedArticleId,
+            sectionId,
+            view.interview.id,
+            { answers },
+          );
+          setInterviewView(sectionId, (current) => ({
+            ...current,
+            interview,
+            savedRevision: Math.max(current.savedRevision, revision),
+            saveError: null,
+            saveStatus:
+              current.revision > revision ? "idle" : ("saved" as const),
+          }));
+          return true;
+        } catch (caught) {
+          if (caught instanceof ArticleRequestError && caught.status === 401) {
+            push(loginPath);
+            return false;
+          }
+          setInterviewView(sectionId, (current) => ({
+            ...current,
+            saveError:
+              caught instanceof ArticleRequestError
+                ? caught.message
+                : "We couldn’t save your answers. Please try again.",
+            saveStatus: "failed",
+          }));
+          return false;
+        }
+      });
+      interviewSaveChainsRef.current.set(sectionId, save);
+      return save;
+    },
+    [loginPath, push, savedArticleId, setInterviewView],
+  );
+
+  flushInterviewAnswersRef.current = flushInterviewAnswers;
+
+  const scheduleInterviewSave = useCallback(
+    (sectionId: string) => {
+      const existing = interviewSaveTimersRef.current.get(sectionId);
+      if (existing) window.clearTimeout(existing);
+      interviewSaveTimersRef.current.set(
+        sectionId,
+        window.setTimeout(() => {
+          interviewSaveTimersRef.current.delete(sectionId);
+          void flushInterviewAnswers(sectionId);
+        }, INTERVIEW_AUTOSAVE_DELAY),
+      );
+    },
+    [flushInterviewAnswers],
   );
 
   const focusGuidedAnswer = () => {
     window.setTimeout(() => guidedAnswerRef.current?.focus(), 0);
   };
 
+  const createNewInterview = async (sectionId: string) => {
+    if (!savedArticleId || isLoadingInterview) return;
+    if (
+      interviewViewsRef.current[sectionId] &&
+      !(await flushInterviewAnswers(sectionId))
+    )
+      return;
+    const requestId = interviewRequestRef.current + 1;
+    interviewRequestRef.current = requestId;
+    setInterviewError(null);
+    setIsLoadingInterview(true);
+    try {
+      const interview = await createSectionInterview(savedArticleId, sectionId);
+      if (interviewRequestRef.current !== requestId) return;
+      storeInterview(interview);
+      setGoalExpanded(false);
+      focusGuidedAnswer();
+    } catch (caught) {
+      if (interviewRequestRef.current !== requestId) return;
+      if (caught instanceof ArticleRequestError && caught.status === 401) {
+        push(loginPath);
+        return;
+      }
+      setInterviewError(
+        caught instanceof ArticleRequestError
+          ? caught.message
+          : "We couldn’t start the interview. Please try again.",
+      );
+    } finally {
+      if (interviewRequestRef.current === requestId)
+        setIsLoadingInterview(false);
+    }
+  };
+
   const beginAssistantStart = async () => {
     if (assistantStartMode === "guided") {
-      if (!activeSection || !savedArticleId || isLoadingGuidedQuestions) return;
-      const existingSession = guidedSessions[activeSection.id];
-      if (existingSession) {
-        updateGuidedSession((session) => ({ ...session, active: true }));
+      if (!activeSection || !savedArticleId || isLoadingInterview) return;
+      const existingView = interviewViewsRef.current[activeSection.id];
+      if (existingView) {
+        setInterviewView(activeSection.id, (view) => ({
+          ...view,
+          active: true,
+        }));
         setGoalExpanded(false);
         focusGuidedAnswer();
         return;
       }
 
       const requestedSectionId = activeSection.id;
-      const requestId = guidedRequestRef.current + 1;
-      guidedRequestRef.current = requestId;
-      setGuidedQuestionsError(null);
-      setIsLoadingGuidedQuestions(true);
+      const requestId = interviewRequestRef.current + 1;
+      interviewRequestRef.current = requestId;
+      setInterviewError(null);
+      setIsLoadingInterview(true);
       try {
-        const result = await generateGuidedQuestions(
+        const interview = await getLatestSectionInterview(
           savedArticleId,
           requestedSectionId,
         );
-        if (guidedRequestRef.current !== requestId) return;
-        if (result.section_id !== requestedSectionId)
-          throw new ArticleRequestError(
-            502,
-            "invalid_article_response",
-            "The question response did not match this section.",
-          );
-        setGuidedSessions((current) => ({
-          ...current,
-          [requestedSectionId]: createGuidedSession(result.questions),
-        }));
+        if (interviewRequestRef.current !== requestId) return;
+        storeInterview(interview);
         setGoalExpanded(false);
         focusGuidedAnswer();
       } catch (caught) {
-        if (guidedRequestRef.current !== requestId) return;
+        if (interviewRequestRef.current !== requestId) return;
         if (caught instanceof ArticleRequestError && caught.status === 401) {
           push(loginPath);
           return;
         }
-        setGuidedQuestionsError(
+        if (
+          caught instanceof ArticleRequestError &&
+          caught.status === 404 &&
+          caught.code === "section_interview_not_found"
+        ) {
+          setIsLoadingInterview(false);
+          await createNewInterview(requestedSectionId);
+          return;
+        }
+        setInterviewError(
           caught instanceof ArticleRequestError
             ? caught.message
-            : "We couldn’t load the guided questions. Please try again.",
+            : "We couldn’t load the interview. Please try again.",
         );
       } finally {
-        if (guidedRequestRef.current === requestId)
-          setIsLoadingGuidedQuestions(false);
+        if (interviewRequestRef.current === requestId)
+          setIsLoadingInterview(false);
       }
       return;
     }
     void requestTalkingPoints();
   };
 
-  const moveGuidedQuestion = (direction: -1 | 1) => {
-    updateGuidedSession((session) => ({
-      ...session,
+  const moveGuidedQuestion = async (direction: -1 | 1) => {
+    if (!activeSection || !(await flushInterviewAnswers(activeSection.id)))
+      return;
+    setInterviewView(activeSection.id, (view) => ({
+      ...view,
       currentQuestion: Math.min(
-        session.questions.length - 1,
-        Math.max(0, session.currentQuestion + direction),
+        view.interview.questions.length - 1,
+        Math.max(0, view.currentQuestion + direction),
       ),
+      mode: "questions",
     }));
     focusGuidedAnswer();
   };
 
-  const continueGuidedSession = () => {
-    if (!activeGuidedSession) return;
+  const continueGuidedSession = async () => {
+    if (!activeSection || !activeInterviewView) return;
+    if (!(await flushInterviewAnswers(activeSection.id))) return;
     if (
-      activeGuidedSession.currentQuestion ===
-      activeGuidedSession.questions.length - 1
+      activeInterviewView.currentQuestion ===
+      activeInterviewView.interview.questions.length - 1
     ) {
-      updateGuidedSession((session) => ({ ...session, completed: true }));
+      setInterviewView(activeSection.id, (view) => ({
+        ...view,
+        mode: "complete",
+      }));
       return;
     }
-    moveGuidedQuestion(1);
+    setInterviewView(activeSection.id, (view) => ({
+      ...view,
+      currentQuestion: view.currentQuestion + 1,
+      mode: "questions",
+    }));
+    focusGuidedAnswer();
   };
 
-  const exitGuidedSession = () => {
-    updateGuidedSession((session) => ({ ...session, active: false }));
+  const exitGuidedSession = async () => {
+    if (!activeSection || !(await flushInterviewAnswers(activeSection.id)))
+      return;
+    setInterviewView(activeSection.id, (view) => ({ ...view, active: false }));
     setGoalExpanded(true);
+  };
+
+  const generateInterviewProposal = async () => {
+    if (
+      !activeSection ||
+      !activeInterviewView ||
+      !savedArticleId ||
+      isGeneratingInterview
+    )
+      return;
+    if (!(await flushInterviewAnswers(activeSection.id))) return;
+    setInterviewError(null);
+    setIsGeneratingInterview(true);
+    try {
+      const interview = await generateSectionInterview(
+        savedArticleId,
+        activeSection.id,
+        activeInterviewView.interview.id,
+      );
+      setInterviewView(activeSection.id, (view) => ({
+        ...view,
+        interview,
+        mode: "proposal",
+      }));
+    } catch (caught) {
+      if (caught instanceof ArticleRequestError && caught.status === 401) {
+        push(loginPath);
+        return;
+      }
+      if (
+        caught instanceof ArticleRequestError &&
+        caught.code === "section_interview_stale"
+      ) {
+        setInterviewView(activeSection.id, (view) => ({
+          ...view,
+          interview: { ...view.interview, is_stale: true },
+        }));
+      }
+      setInterviewError(
+        caught instanceof ArticleRequestError
+          ? caught.message
+          : "We couldn’t generate the proposal. Please try again.",
+      );
+    } finally {
+      setIsGeneratingInterview(false);
+    }
+  };
+
+  const applyInterviewProposal = async () => {
+    const blocks = activeInterviewView?.interview.generated_blocks;
+    if (
+      !activeSection ||
+      !activeInterviewView ||
+      !savedArticleId ||
+      !blocks ||
+      isApplyingInterview
+    )
+      return;
+    const editorState = createEditorStateFromBlocks(blocks);
+    const nextDraft: DraftArticleState = {
+      ...draft,
+      sections: draft.sections.map((section) =>
+        section.id === activeSection.id ? { ...section, editorState } : section,
+      ),
+    };
+    setInterviewError(null);
+    setIsApplyingInterview(true);
+    try {
+      const saved = await updateArticleDraft(
+        savedArticleId,
+        toArticleDraftPatch(nextDraft),
+      );
+      skipNextAutosaveRef.current = true;
+      dirtyRef.current = false;
+      setDraft({ ...nextDraft, savedAt: saved.updated_at });
+      setLastSavedAt(saved.updated_at);
+      setSaveStatus("saved");
+      const editor = editorsRef.current.get(activeSection.id);
+      if (editor) editor.setEditorState(editor.parseEditorState(editorState));
+      setInterviewView(activeSection.id, (view) => ({
+        ...view,
+        active: false,
+      }));
+      setStatusMessage("The interview proposal replaced this section.");
+      setGoalExpanded(true);
+    } catch (caught) {
+      if (caught instanceof ArticleRequestError && caught.status === 401) {
+        push(loginPath);
+        return;
+      }
+      setInterviewError(
+        caught instanceof ArticleRequestError
+          ? caught.message
+          : "We couldn’t save the proposal. Please try again.",
+      );
+    } finally {
+      setIsApplyingInterview(false);
+    }
   };
 
   const applyGeneratedResult = (replace: boolean) => {
@@ -979,10 +1271,16 @@ export function DraftEditor({
   };
 
   const reviewArticle = async () => {
+    if (!(await flushInterviewAnswers(activeSectionIdRef.current))) return;
     if (await saveDraft("saved", "Draft saved and ready for review.")) {
       setStatusMessage("Draft saved and ready for review.");
       push(`/articles/new/review?articleId=${articleId}`);
     }
+  };
+
+  const openPreview = async () => {
+    if (!(await flushInterviewAnswers(activeSectionIdRef.current))) return;
+    setPreviewOpen(true);
   };
 
   const saveLabel =
@@ -1270,11 +1568,35 @@ export function DraftEditor({
   };
 
   const renderGuidedAssistant = () => {
-    if (!activeGuidedSession || !activeSection) return null;
-    const questionIndex = activeGuidedSession.currentQuestion;
-    const question = activeGuidedSession.questions[questionIndex];
-    const questionCount = activeGuidedSession.questions.length;
+    if (!activeInterviewView || !activeSection) return null;
+    const questionIndex = activeInterviewView.currentQuestion;
+    const questions = activeInterviewView.interview.questions;
+    const question = questions[questionIndex];
+    const questionCount = questions.length;
     const progress = ((questionIndex + 1) / questionCount) * 100;
+    const hasSubstantiveAnswer = Object.values(
+      activeInterviewView.answers,
+    ).some((answer) => answer.trim());
+    const blocks = activeInterviewView.interview.generated_blocks;
+    const saveLabel =
+      activeInterviewView.saveStatus === "saving"
+        ? "Saving answers…"
+        : activeInterviewView.saveStatus === "saved"
+          ? "Answers saved"
+          : activeInterviewView.saveStatus === "failed"
+            ? "Answers not saved"
+            : "";
+
+    const renderBlock = (block: SectionContentBlock, index: number) => {
+      if (block.type === "paragraph") return <p key={index}>{block.text}</p>;
+      if (block.type === "subheading") return <h4 key={index}>{block.text}</h4>;
+      const items = block.items.map((item) => <li key={item}>{item}</li>);
+      return block.type === "numbered_list" ? (
+        <ol key={index}>{items}</ol>
+      ) : (
+        <ul key={index}>{items}</ul>
+      );
+    };
 
     return (
       <div className={styles.assistantContent}>
@@ -1282,11 +1604,77 @@ export function DraftEditor({
         <p className={styles.guidedGoal}>{activeSection.goal}</p>
         <div className={styles.guidedHeader}>
           <span>Write with me</span>
-          <button onClick={exitGuidedSession} type="button">
+          <button onClick={() => void exitGuidedSession()} type="button">
             Exit <X size={19} aria-hidden />
           </button>
         </div>
-        {activeGuidedSession.completed ? (
+        {activeInterviewView.interview.is_stale ? (
+          <div className={styles.interviewWarning} role="alert">
+            <p>
+              This interview uses older article context. Your answers are safe,
+              but a new interview is required before generating.
+            </p>
+            <button
+              disabled={isLoadingInterview}
+              onClick={() => void createNewInterview(activeSection.id)}
+              type="button"
+            >
+              {isLoadingInterview ? "Starting…" : "Start new interview"}
+            </button>
+          </div>
+        ) : null}
+        {interviewError ? (
+          <div className={styles.generationError} role="alert">
+            <span>{interviewError}</span>
+          </div>
+        ) : null}
+        {activeInterviewView.mode === "proposal" && blocks ? (
+          <section
+            aria-labelledby="interview-proposal-title"
+            className={styles.interviewProposal}
+          >
+            <div className={styles.readyStatus} role="status">
+              <CheckCircle size={23} weight="bold" aria-hidden />
+              <span>Section proposal ready</span>
+            </div>
+            <h3 id="interview-proposal-title">Review the proposed section</h3>
+            <p>Nothing changes until you accept this proposal.</p>
+            <div className={styles.interviewBlocks}>
+              {blocks.map(renderBlock)}
+            </div>
+            <button
+              className={styles.primaryAssistantButton}
+              disabled={isApplyingInterview}
+              onClick={() => void applyInterviewProposal()}
+              type="button"
+            >
+              {isApplyingInterview ? "Saving section…" : "Replace section"}
+            </button>
+            <button
+              className={styles.secondaryAssistantButton}
+              disabled={
+                isGeneratingInterview || activeInterviewView.interview.is_stale
+              }
+              onClick={() => void generateInterviewProposal()}
+              type="button"
+            >
+              {isGeneratingInterview ? "Generating…" : "Generate another"}
+            </button>
+            <button
+              className={styles.assistantTextButton}
+              onClick={() => {
+                setInterviewView(activeSection.id, (view) => ({
+                  ...view,
+                  mode: "questions",
+                }));
+                focusGuidedAnswer();
+              }}
+              type="button"
+            >
+              Back to answers
+            </button>
+          </section>
+        ) : activeInterviewView.mode === "complete" ? (
           <section
             aria-labelledby="guided-complete-title"
             className={styles.guidedComplete}
@@ -1294,15 +1682,32 @@ export function DraftEditor({
             <CheckCircle size={34} weight="bold" aria-hidden />
             <h3 id="guided-complete-title">Your answers are ready</h3>
             <p>
-              You can return to the questions whenever you want to refine your
-              ideas.
+              Generate a proposed replacement for this section, or go back to
+              refine your answers.
             </p>
             <button
               className={styles.primaryAssistantButton}
+              disabled={
+                !hasSubstantiveAnswer ||
+                activeInterviewView.interview.is_stale ||
+                isGeneratingInterview
+              }
+              onClick={() => void generateInterviewProposal()}
+              type="button"
+            >
+              {isGeneratingInterview ? "Generating…" : "Generate proposal"}
+            </button>
+            {!hasSubstantiveAnswer ? (
+              <p className={styles.guidedHint}>
+                Answer at least one question to generate a proposal.
+              </p>
+            ) : null}
+            <button
+              className={styles.assistantTextButton}
               onClick={() => {
-                updateGuidedSession((session) => ({
-                  ...session,
-                  completed: false,
+                setInterviewView(activeSection.id, (view) => ({
+                  ...view,
+                  mode: "questions",
                 }));
                 focusGuidedAnswer();
               }}
@@ -1324,7 +1729,7 @@ export function DraftEditor({
                 <button
                   aria-label="Previous question"
                   disabled={questionIndex === 0}
-                  onClick={() => moveGuidedQuestion(-1)}
+                  onClick={() => void moveGuidedQuestion(-1)}
                   type="button"
                 >
                   <ArrowLeft size={19} aria-hidden />
@@ -1332,7 +1737,7 @@ export function DraftEditor({
                 <button
                   aria-label="Next question"
                   disabled={questionIndex === questionCount - 1}
-                  onClick={() => moveGuidedQuestion(1)}
+                  onClick={() => void moveGuidedQuestion(1)}
                   type="button"
                 >
                   <ArrowRight size={19} aria-hidden />
@@ -1349,33 +1754,54 @@ export function DraftEditor({
             >
               <span style={{ width: `${progress}%` }} />
             </div>
-            <h3 id="guided-question-title">{question}</h3>
+            <h3 id="guided-question-title">{question.question}</h3>
             <textarea
               aria-labelledby="guided-question-title"
-              maxLength={2000}
+              maxLength={10_000}
               onChange={(event) => {
                 const answer = event.target.value;
-                updateGuidedSession((session) => ({
-                  ...session,
-                  answers: session.answers.map((current, index) =>
-                    index === questionIndex ? answer : current,
-                  ),
+                setInterviewView(activeSection.id, (view) => ({
+                  ...view,
+                  answers: { ...view.answers, [question.id]: answer },
+                  mode: "questions",
+                  revision: view.revision + 1,
+                  saveError: null,
+                  saveStatus: "idle",
                 }));
+                scheduleInterviewSave(activeSection.id);
               }}
+              onBlur={() => void flushInterviewAnswers(activeSection.id)}
               placeholder="Write your answer here…"
               ref={guidedAnswerRef}
-              value={activeGuidedSession.answers[questionIndex]}
+              value={activeInterviewView.answers[question.id] ?? ""}
             />
-            <p className={styles.guidedHint}>
-              Write naturally — Inkwell will polish it.
-            </p>
+            <p className={styles.guidedHint}>{question.answer_guidance}</p>
+            {saveLabel ? (
+              <p className={styles.interviewSaveStatus} role="status">
+                {saveLabel}
+              </p>
+            ) : null}
+            {activeInterviewView.saveError ? (
+              <div className={styles.generationError} role="alert">
+                <span>{activeInterviewView.saveError}</span>
+                <button
+                  onClick={() => void flushInterviewAnswers(activeSection.id)}
+                  type="button"
+                >
+                  Try again
+                </button>
+              </div>
+            ) : null}
             <div className={styles.guidedActions}>
-              <button onClick={continueGuidedSession} type="button">
+              <button
+                onClick={() => void continueGuidedSession()}
+                type="button"
+              >
                 Skip
               </button>
               <button
                 className={styles.primaryAssistantButton}
-                onClick={continueGuidedSession}
+                onClick={() => void continueGuidedSession()}
                 type="button"
               >
                 Continue
@@ -1434,11 +1860,11 @@ export function DraftEditor({
         />
       </label>
       {renderGenerationError()}
-      {guidedQuestionsError ? (
+      {interviewError ? (
         <div className={styles.generationError} role="alert">
-          <span>{guidedQuestionsError}</span>
+          <span>{interviewError}</span>
           <button
-            disabled={isLoadingGuidedQuestions}
+            disabled={isLoadingInterview}
             onClick={() => void beginAssistantStart()}
             type="button"
           >
@@ -1448,12 +1874,12 @@ export function DraftEditor({
       ) : null}
       <button
         className={styles.primaryAssistantButton}
-        disabled={isGeneratingTalkingPoints || isLoadingGuidedQuestions}
+        disabled={isGeneratingTalkingPoints || isLoadingInterview}
         onClick={() => void beginAssistantStart()}
         type="button"
       >
-        {isLoadingGuidedQuestions
-          ? "Loading questions…"
+        {isLoadingInterview
+          ? "Loading interview…"
           : isGeneratingTalkingPoints
             ? "Generating talking points…"
             : assistantStartMode === "guided"
@@ -1581,7 +2007,7 @@ export function DraftEditor({
     if (generatedResult?.sectionId === activeSectionId)
       return renderGeneratedAssistant(surface);
     if (selectedText.trim()) return renderImprovementAssistant(surface);
-    if (activeGuidedSession?.active) return renderGuidedAssistant();
+    if (activeInterviewView?.active) return renderGuidedAssistant();
     if (activeSectionIsEmpty) return renderStartAssistant(surface);
     return renderGuidanceAssistant(surface);
   };
@@ -1754,7 +2180,7 @@ export function DraftEditor({
                 articleId={articleId}
               />
               <div className={styles.topActions}>
-                <button onClick={() => setPreviewOpen(true)} type="button">
+                <button onClick={() => void openPreview()} type="button">
                   Preview
                 </button>
                 <button onClick={() => void reviewArticle()} type="button">
@@ -1931,7 +2357,7 @@ export function DraftEditor({
                 {mobileTab === "more" ? (
                   <div className={styles.moreActions}>
                     <h2>More</h2>
-                    <button onClick={() => setPreviewOpen(true)} type="button">
+                    <button onClick={() => void openPreview()} type="button">
                       Preview article <ArrowRight size={18} aria-hidden />
                     </button>
                     <button onClick={() => void reviewArticle()} type="button">

@@ -17,7 +17,10 @@ const {
   getDraftMock,
   createDraftMock,
   updateDraftMock,
-  generateQuestionsMock,
+  createInterviewMock,
+  getLatestInterviewMock,
+  replaceAnswersMock,
+  generateInterviewMock,
   generatePointsMock,
 } = vi.hoisted(() => ({
   pushMock: vi.fn(),
@@ -25,7 +28,10 @@ const {
   getDraftMock: vi.fn(),
   createDraftMock: vi.fn(),
   updateDraftMock: vi.fn(),
-  generateQuestionsMock: vi.fn(),
+  createInterviewMock: vi.fn(),
+  getLatestInterviewMock: vi.fn(),
+  replaceAnswersMock: vi.fn(),
+  generateInterviewMock: vi.fn(),
   generatePointsMock: vi.fn(),
 }));
 
@@ -38,7 +44,10 @@ vi.mock("@/lib/articles/client", async (importOriginal) => ({
   getArticleDraft: getDraftMock,
   createArticleDraft: createDraftMock,
   updateArticleDraft: updateDraftMock,
-  generateGuidedQuestions: generateQuestionsMock,
+  createSectionInterview: createInterviewMock,
+  getLatestSectionInterview: getLatestInterviewMock,
+  replaceSectionInterviewAnswers: replaceAnswersMock,
+  generateSectionInterview: generateInterviewMock,
   generateTalkingPoints: generatePointsMock,
 }));
 
@@ -77,6 +86,33 @@ function apiDraft(state = createDefaultDraft()) {
   };
 }
 
+function sectionInterview(
+  sectionId: string,
+  questionCount = 4,
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    id: "40000000-0000-4000-8000-000000000000",
+    draft_id: "30000000-0000-4000-8000-000000000000",
+    section_id: sectionId,
+    status: "awaiting_answers",
+    questions: guidedQuestionNames
+      .slice(0, questionCount)
+      .map((question, index) => ({
+        id: `50000000-0000-4000-8000-00000000000${index}`,
+        missing_piece: `Missing piece ${index + 1}`,
+        question,
+        answer_guidance: `Guidance ${index + 1}`,
+      })),
+    answers: [],
+    generated_blocks: null,
+    is_stale: false,
+    created_at: "2026-08-25T12:00:00Z",
+    updated_at: "2026-08-25T12:00:00Z",
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   getArticleMock.mockResolvedValue(article);
@@ -99,11 +135,30 @@ beforeEach(() => {
       ],
     }),
   );
-  generateQuestionsMock.mockImplementation((_articleId, sectionId) =>
-    Promise.resolve({
-      section_id: sectionId,
-      questions: [...guidedQuestionNames],
-    }),
+  getLatestInterviewMock.mockImplementation((_articleId, sectionId) =>
+    Promise.resolve(sectionInterview(sectionId)),
+  );
+  createInterviewMock.mockImplementation((_articleId, sectionId) =>
+    Promise.resolve(sectionInterview(sectionId)),
+  );
+  replaceAnswersMock.mockImplementation(
+    (_articleId, sectionId, _interviewId, input) =>
+      Promise.resolve(
+        sectionInterview(sectionId, 4, { answers: input.answers }),
+      ),
+  );
+  generateInterviewMock.mockImplementation((_articleId, sectionId) =>
+    Promise.resolve(
+      sectionInterview(sectionId, 4, {
+        status: "generated",
+        generated_blocks: [
+          { type: "paragraph", text: "A generated opening." },
+          { type: "subheading", text: "A useful lesson" },
+          { type: "bulleted_list", items: ["First point", "Second point"] },
+          { type: "numbered_list", items: ["First step", "Second step"] },
+        ],
+      }),
+    ),
   );
   Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
     configurable: true,
@@ -504,7 +559,7 @@ describe("DraftEditor", () => {
       }),
     );
 
-    expect(generateQuestionsMock).toHaveBeenCalledWith(
+    expect(getLatestInterviewMock).toHaveBeenCalledWith(
       articleId,
       emptyDraft.sections[0].id,
     );
@@ -527,6 +582,18 @@ describe("DraftEditor", () => {
     await userEvent.type(firstAnswer, "Readers should focus on fundamentals.");
     await userEvent.click(
       within(assistant).getByRole("button", { name: "Next question" }),
+    );
+    expect(replaceAnswersMock).toHaveBeenCalledWith(
+      articleId,
+      emptyDraft.sections[0].id,
+      "40000000-0000-4000-8000-000000000000",
+      expect.objectContaining({
+        answers: expect.arrayContaining([
+          expect.objectContaining({
+            answer: "Readers should focus on fundamentals.",
+          }),
+        ]),
+      }),
     );
     expect(within(assistant).getByText("Question 2 of 4")).toBeVisible();
     await userEvent.type(
@@ -584,6 +651,62 @@ describe("DraftEditor", () => {
     expect(within(assistant).getByText("Question 4 of 4")).toBeVisible();
   }, 15_000);
 
+  it("serializes answer saves so newer edits cannot be overwritten", async () => {
+    const emptyDraft = createDefaultDraft();
+    emptyDraft.sections[0] = {
+      ...emptyDraft.sections[0],
+      editorState: createEditorState([""]),
+    };
+    getDraftMock.mockResolvedValueOnce(apiDraft(emptyDraft));
+    let resolveFirstSave!: (value: ReturnType<typeof sectionInterview>) => void;
+    replaceAnswersMock
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveFirstSave = resolve;
+        }),
+      )
+      .mockImplementation((_articleId, sectionId, _interviewId, input) =>
+        Promise.resolve(
+          sectionInterview(sectionId, 4, { answers: input.answers }),
+        ),
+      );
+    render(<DraftEditor articleId={articleId} />);
+
+    const assistant = await screen.findByRole("complementary", {
+      name: "Writing assistant",
+    });
+    await userEvent.click(
+      within(assistant).getByRole("radio", { name: /Write with me/ }),
+    );
+    await userEvent.click(
+      within(assistant).getByRole("button", {
+        name: "Start writing together",
+      }),
+    );
+    const answer = within(assistant).getByRole("textbox", {
+      name: guidedQuestionNames[0],
+    });
+    await userEvent.type(answer, "First");
+    await userEvent.tab();
+    await waitFor(() => expect(replaceAnswersMock).toHaveBeenCalledTimes(1));
+
+    await userEvent.click(answer);
+    await userEvent.type(answer, " second");
+    await userEvent.tab();
+    expect(replaceAnswersMock).toHaveBeenCalledTimes(1);
+
+    const firstAnswers = replaceAnswersMock.mock.calls[0][3].answers;
+    resolveFirstSave(
+      sectionInterview(emptyDraft.sections[0].id, 4, {
+        answers: firstAnswers,
+      }),
+    );
+    await waitFor(() => expect(replaceAnswersMock).toHaveBeenCalledTimes(2));
+    expect(replaceAnswersMock.mock.calls[1][3].answers[0].answer).toBe(
+      "First second",
+    );
+  }, 10_000);
+
   it("uses a two-question backend response for navigation bounds", async () => {
     const emptyDraft = createDefaultDraft();
     emptyDraft.sections[0] = {
@@ -591,10 +714,9 @@ describe("DraftEditor", () => {
       editorState: createEditorState([""]),
     };
     getDraftMock.mockResolvedValueOnce(apiDraft(emptyDraft));
-    generateQuestionsMock.mockResolvedValueOnce({
-      section_id: emptyDraft.sections[0].id,
-      questions: guidedQuestionNames.slice(0, 2),
-    });
+    getLatestInterviewMock.mockResolvedValueOnce(
+      sectionInterview(emptyDraft.sections[0].id, 2),
+    );
     render(<DraftEditor articleId={articleId} />);
 
     const assistant = await screen.findByRole("complementary", {
@@ -617,6 +739,190 @@ describe("DraftEditor", () => {
     expect(
       within(assistant).getByRole("button", { name: "Next question" }),
     ).toBeDisabled();
+  });
+
+  it("creates an interview when the section has no latest interview", async () => {
+    const emptyDraft = createDefaultDraft();
+    emptyDraft.sections[0] = {
+      ...emptyDraft.sections[0],
+      editorState: createEditorState([""]),
+    };
+    getDraftMock.mockResolvedValueOnce(apiDraft(emptyDraft));
+    getLatestInterviewMock.mockRejectedValueOnce(
+      new ArticleRequestError(
+        404,
+        "section_interview_not_found",
+        "No interview exists.",
+      ),
+    );
+    render(<DraftEditor articleId={articleId} />);
+
+    const assistant = await screen.findByRole("complementary", {
+      name: "Writing assistant",
+    });
+    await userEvent.click(
+      within(assistant).getByRole("radio", { name: /Write with me/ }),
+    );
+    await userEvent.click(
+      within(assistant).getByRole("button", {
+        name: "Start writing together",
+      }),
+    );
+
+    expect(await within(assistant).findByText("Question 1 of 4")).toBeVisible();
+    expect(createInterviewMock).toHaveBeenCalledWith(
+      articleId,
+      emptyDraft.sections[0].id,
+    );
+  });
+
+  it("blocks stale and unanswered interviews from generating", async () => {
+    const emptyDraft = createDefaultDraft();
+    emptyDraft.sections[0] = {
+      ...emptyDraft.sections[0],
+      editorState: createEditorState([""]),
+    };
+    getDraftMock.mockResolvedValueOnce(apiDraft(emptyDraft));
+    getLatestInterviewMock.mockResolvedValueOnce(
+      sectionInterview(emptyDraft.sections[0].id, 2, { is_stale: true }),
+    );
+    render(<DraftEditor articleId={articleId} />);
+
+    const assistant = await screen.findByRole("complementary", {
+      name: "Writing assistant",
+    });
+    await userEvent.click(
+      within(assistant).getByRole("radio", { name: /Write with me/ }),
+    );
+    await userEvent.click(
+      within(assistant).getByRole("button", {
+        name: "Start writing together",
+      }),
+    );
+    expect(
+      await within(assistant).findByText(/older article context/),
+    ).toBeVisible();
+    await userEvent.click(
+      within(assistant).getByRole("button", { name: "Skip" }),
+    );
+    await userEvent.click(
+      within(assistant).getByRole("button", { name: "Continue" }),
+    );
+
+    expect(
+      within(assistant).getByRole("button", { name: "Generate proposal" }),
+    ).toBeDisabled();
+    expect(
+      within(assistant).getByRole("button", { name: "Start new interview" }),
+    ).toBeEnabled();
+    expect(generateInterviewMock).not.toHaveBeenCalled();
+  });
+
+  it("generates, reviews, and explicitly saves an interview proposal", async () => {
+    const emptyDraft = createDefaultDraft();
+    emptyDraft.sections[0] = {
+      ...emptyDraft.sections[0],
+      editorState: createEditorState([""]),
+    };
+    getDraftMock.mockResolvedValueOnce(apiDraft(emptyDraft));
+    render(<DraftEditor articleId={articleId} />);
+
+    const assistant = await screen.findByRole("complementary", {
+      name: "Writing assistant",
+    });
+    await userEvent.click(
+      within(assistant).getByRole("radio", { name: /Write with me/ }),
+    );
+    await userEvent.click(
+      within(assistant).getByRole("button", {
+        name: "Start writing together",
+      }),
+    );
+    await userEvent.type(
+      within(assistant).getByRole("textbox", {
+        name: guidedQuestionNames[0],
+      }),
+      "A substantive answer",
+    );
+    await userEvent.click(
+      within(assistant).getByRole("button", { name: "Continue" }),
+    );
+    await userEvent.click(
+      within(assistant).getByRole("button", { name: "Skip" }),
+    );
+    await userEvent.click(
+      within(assistant).getByRole("button", { name: "Skip" }),
+    );
+    await userEvent.click(
+      within(assistant).getByRole("button", { name: "Continue" }),
+    );
+
+    updateDraftMock.mockClear();
+    await userEvent.click(
+      within(assistant).getByRole("button", { name: "Generate proposal" }),
+    );
+    expect(
+      await within(assistant).findByText("Section proposal ready"),
+    ).toBeVisible();
+    expect(within(assistant).getByText("A generated opening.")).toBeVisible();
+    expect(generateInterviewMock).toHaveBeenCalled();
+    expect(updateDraftMock).not.toHaveBeenCalled();
+
+    await userEvent.click(
+      within(assistant).getByRole("button", { name: "Replace section" }),
+    );
+    await waitFor(() => expect(updateDraftMock).toHaveBeenCalled());
+    const patch = updateDraftMock.mock.calls.at(-1)?.[1];
+    expect(patch.sections[0].editor_state).toContain('"type":"heading"');
+    expect(patch.sections[0].editor_state).toContain('"listType":"number"');
+    expect(
+      screen.getByRole("textbox", { name: "Introduction draft content" }),
+    ).toHaveTextContent("A generated opening.");
+  }, 15_000);
+
+  it("keeps a restored proposal available when draft replacement fails", async () => {
+    const emptyDraft = createDefaultDraft();
+    emptyDraft.sections[0] = {
+      ...emptyDraft.sections[0],
+      editorState: createEditorState([""]),
+    };
+    getDraftMock.mockResolvedValueOnce(apiDraft(emptyDraft));
+    getLatestInterviewMock.mockResolvedValueOnce(
+      sectionInterview(emptyDraft.sections[0].id, 2, {
+        status: "generated",
+        generated_blocks: [{ type: "paragraph", text: "A restored proposal." }],
+      }),
+    );
+    updateDraftMock.mockRejectedValueOnce(
+      new ArticleRequestError(503, "draft_unavailable", "Save unavailable."),
+    );
+    render(<DraftEditor articleId={articleId} />);
+
+    const assistant = await screen.findByRole("complementary", {
+      name: "Writing assistant",
+    });
+    await userEvent.click(
+      within(assistant).getByRole("radio", { name: /Write with me/ }),
+    );
+    await userEvent.click(
+      within(assistant).getByRole("button", {
+        name: "Start writing together",
+      }),
+    );
+    expect(
+      await within(assistant).findByText("A restored proposal."),
+    ).toBeVisible();
+    await userEvent.click(
+      within(assistant).getByRole("button", { name: "Replace section" }),
+    );
+
+    expect(await within(assistant).findByRole("alert")).toHaveTextContent(
+      "Save unavailable",
+    );
+    expect(within(assistant).getByText("A restored proposal.")).toBeVisible();
+    expect(
+      screen.getByRole("textbox", { name: "Introduction draft content" }),
+    ).not.toHaveTextContent("A restored proposal.");
   });
 
   it("saves dirty section context before requesting talking points", async () => {

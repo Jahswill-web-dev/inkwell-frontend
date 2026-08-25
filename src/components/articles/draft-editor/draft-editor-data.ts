@@ -1,5 +1,19 @@
 import type { Article } from "@/lib/articles/article";
 import type { ArticleDraft, ArticleDraftPatch } from "@/lib/articles/draft";
+import type { SectionContentBlock } from "@/lib/articles/interview";
+import {
+  $createParagraphNode,
+  $createTextNode,
+  $getRoot,
+  createEditor,
+} from "lexical";
+import { $createHeadingNode, HeadingNode } from "@lexical/rich-text";
+import {
+  $createListItemNode,
+  $createListNode,
+  ListItemNode,
+  ListNode,
+} from "@lexical/list";
 
 export const DRAFT_SCHEMA_VERSION = 1;
 
@@ -87,6 +101,40 @@ export function createEditorState(paragraphs: readonly string[]): string {
       version: 1,
     },
   });
+}
+
+export function createEditorStateFromBlocks(
+  blocks: readonly SectionContentBlock[],
+): string {
+  const editor = createEditor({ nodes: [HeadingNode, ListNode, ListItemNode] });
+  editor.update(
+    () => {
+      const root = $getRoot();
+      blocks.forEach((block) => {
+        if (block.type === "paragraph") {
+          root.append(
+            $createParagraphNode().append($createTextNode(block.text)),
+          );
+          return;
+        }
+        if (block.type === "subheading") {
+          root.append(
+            $createHeadingNode("h2").append($createTextNode(block.text)),
+          );
+          return;
+        }
+        const list = $createListNode(
+          block.type === "numbered_list" ? "number" : "bullet",
+        );
+        block.items.forEach((item) => {
+          list.append($createListItemNode().append($createTextNode(item)));
+        });
+        root.append(list);
+      });
+    },
+    { discrete: true },
+  );
+  return JSON.stringify(editor.getEditorState().toJSON());
 }
 
 export function normalizeEditorState(editorState: string): string {

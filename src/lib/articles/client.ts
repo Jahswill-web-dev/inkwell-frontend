@@ -24,15 +24,21 @@ import {
 import {
   articleDraftPatchSchema,
   articleDraftSchema,
-  guidedQuestionsResultSchema,
   talkingPointsInputSchema,
   talkingPointsResultSchema,
   type ArticleDraft,
   type ArticleDraftPatch,
-  type GuidedQuestionsResult,
   type TalkingPointsInput,
   type TalkingPointsResult,
 } from "./draft";
+import {
+  createSectionInterviewInputSchema,
+  replaceSectionInterviewAnswersInputSchema,
+  sectionInterviewSchema,
+  type CreateSectionInterviewInput,
+  type ReplaceSectionInterviewAnswersInput,
+  type SectionInterview,
+} from "./interview";
 
 export class ArticleRequestError extends Error {
   constructor(
@@ -217,14 +223,70 @@ export function generateTalkingPoints(
   );
 }
 
-export function generateGuidedQuestions(
+export function createSectionInterview(
   articleId: string,
   sectionId: string,
-): Promise<GuidedQuestionsResult> {
+  input?: CreateSectionInterviewInput,
+): Promise<SectionInterview> {
+  const instruction = input?.instruction?.trim();
+  const body = createSectionInterviewInputSchema.parse(
+    instruction ? { instruction } : {},
+  );
   return articleRequest(
-    `/api/articles/${articleId}/draft/sections/${sectionId}/questions`,
+    `/api/articles/${articleId}/draft/sections/${sectionId}/interviews`,
+    body.instruction
+      ? { method: "POST", body: JSON.stringify(body) }
+      : { method: "POST" },
+    (value) => sectionInterviewSchema.parse(value),
+  );
+}
+
+export function getLatestSectionInterview(
+  articleId: string,
+  sectionId: string,
+): Promise<SectionInterview> {
+  return articleRequest(
+    `/api/articles/${articleId}/draft/sections/${sectionId}/interviews/latest`,
+    {},
+    (value) => sectionInterviewSchema.parse(value),
+  );
+}
+
+export function getSectionInterview(
+  articleId: string,
+  sectionId: string,
+  interviewId: string,
+): Promise<SectionInterview> {
+  return articleRequest(
+    `/api/articles/${articleId}/draft/sections/${sectionId}/interviews/${interviewId}`,
+    {},
+    (value) => sectionInterviewSchema.parse(value),
+  );
+}
+
+export function replaceSectionInterviewAnswers(
+  articleId: string,
+  sectionId: string,
+  interviewId: string,
+  input: ReplaceSectionInterviewAnswersInput,
+): Promise<SectionInterview> {
+  const body = replaceSectionInterviewAnswersInputSchema.parse(input);
+  return articleRequest(
+    `/api/articles/${articleId}/draft/sections/${sectionId}/interviews/${interviewId}/answers`,
+    { method: "PATCH", body: JSON.stringify(body) },
+    (value) => sectionInterviewSchema.parse(value),
+  );
+}
+
+export function generateSectionInterview(
+  articleId: string,
+  sectionId: string,
+  interviewId: string,
+): Promise<SectionInterview> {
+  return articleRequest(
+    `/api/articles/${articleId}/draft/sections/${sectionId}/interviews/${interviewId}/generate`,
     { method: "POST" },
-    (value) => guidedQuestionsResultSchema.parse(value),
+    (value) => sectionInterviewSchema.parse(value),
   );
 }
 

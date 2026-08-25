@@ -24,10 +24,12 @@ import {
 import {
   articleDraftPatchSchema,
   articleDraftSchema,
+  guidedQuestionsResultSchema,
   talkingPointsInputSchema,
   talkingPointsResultSchema,
   type ArticleDraft,
   type ArticleDraftPatch,
+  type GuidedQuestionsResult,
   type TalkingPointsInput,
   type TalkingPointsResult,
 } from "./draft";
@@ -212,6 +214,17 @@ export function generateTalkingPoints(
       ? { method: "POST", body: JSON.stringify(body) }
       : { method: "POST" },
     (value) => talkingPointsResultSchema.parse(value),
+  );
+}
+
+export function generateGuidedQuestions(
+  articleId: string,
+  sectionId: string,
+): Promise<GuidedQuestionsResult> {
+  return articleRequest(
+    `/api/articles/${articleId}/draft/sections/${sectionId}/questions`,
+    { method: "POST" },
+    (value) => guidedQuestionsResultSchema.parse(value),
   );
 }
 

@@ -798,6 +798,182 @@
   font-size: 0.85rem;
 }
 
+.directionField input:disabled {
+  background: #f2f1ef;
+  color: #8c94a3;
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.guidedGoal {
+  margin: 0;
+  border-bottom: 1px solid var(--color-ink-line);
+  padding: 2px 0 22px;
+  font-size: 0.94rem;
+  line-height: 1.65;
+}
+
+.guidedHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 21px 0 18px;
+  color: var(--color-ink-navy);
+  font-size: 0.78rem;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.guidedHeader > button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-navy);
+  padding: 0 0 0 12px;
+  font: inherit;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.guidedQuestion {
+  display: grid;
+}
+
+.guidedProgressRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: #68738a;
+  font-size: 0.86rem;
+}
+
+.guidedNavigation {
+  display: flex;
+  gap: 7px;
+}
+
+.guidedNavigation button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid #d3d6dc;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-ink-navy);
+  cursor: pointer;
+}
+
+.guidedNavigation button:hover:not(:disabled),
+.guidedNavigation button:focus-visible {
+  border-color: var(--color-ink-crimson);
+  background: #fff3f4;
+  color: var(--color-ink-crimson);
+}
+
+.guidedNavigation button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.guidedProgressTrack {
+  height: 5px;
+  overflow: hidden;
+  margin-top: 12px;
+  border-radius: 999px;
+  background: #dddddc;
+}
+
+.guidedProgressTrack > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-ink-crimson);
+  transition: width 180ms ease;
+}
+
+.guidedQuestion h3 {
+  margin: 27px 0 16px;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 1.18rem;
+  line-height: 1.35;
+}
+
+.guidedQuestion textarea {
+  width: 100%;
+  min-height: 154px;
+  resize: vertical;
+  border: 1px solid #c9c9ca;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-ink-navy);
+  padding: 16px 17px;
+  font: inherit;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.guidedQuestion textarea:focus-visible {
+  border-color: var(--color-ink-crimson);
+  outline: 2px solid rgba(207, 0, 55, 0.14);
+  outline-offset: 2px;
+}
+
+.guidedHint {
+  margin: 10px 0 0;
+  color: #a0a7b5;
+  font-size: 0.76rem;
+}
+
+.guidedActions {
+  display: grid;
+  grid-template-columns: auto minmax(130px, 1fr);
+  align-items: center;
+  gap: 18px;
+  margin-top: 28px;
+}
+
+.guidedActions > button:first-child {
+  min-height: 52px;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-navy);
+  padding: 0 14px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.guidedComplete {
+  display: grid;
+  justify-items: center;
+  padding: 38px 0 8px;
+  text-align: center;
+}
+
+.guidedComplete > svg {
+  color: var(--color-ink-crimson);
+}
+
+.guidedComplete h3 {
+  margin: 17px 0 8px;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 1.3rem;
+}
+
+.guidedComplete p {
+  max-width: 300px;
+  margin: 0 0 24px;
+  color: #68738a;
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
 .directionField {
   margin: 17px 0 20px;
 }

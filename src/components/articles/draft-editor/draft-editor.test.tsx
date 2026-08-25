@@ -17,6 +17,7 @@ const {
   getDraftMock,
   createDraftMock,
   updateDraftMock,
+  generateQuestionsMock,
   generatePointsMock,
 } = vi.hoisted(() => ({
   pushMock: vi.fn(),
@@ -24,6 +25,7 @@ const {
   getDraftMock: vi.fn(),
   createDraftMock: vi.fn(),
   updateDraftMock: vi.fn(),
+  generateQuestionsMock: vi.fn(),
   generatePointsMock: vi.fn(),
 }));
 
@@ -36,10 +38,17 @@ vi.mock("@/lib/articles/client", async (importOriginal) => ({
   getArticleDraft: getDraftMock,
   createArticleDraft: createDraftMock,
   updateArticleDraft: updateDraftMock,
+  generateGuidedQuestions: generateQuestionsMock,
   generateTalkingPoints: generatePointsMock,
 }));
 
 const articleId = "be5579e3-24fd-4272-a35f-f74740c3887e";
+const guidedQuestionNames = [
+  "What is the main point you want readers to understand?",
+  "What personal experience shaped your view on this?",
+  "What example would make this idea clearer?",
+  "What should the reader do next?",
+] as const;
 const article = {
   id: articleId,
   user_id: "46a42280-6ad8-4bb6-a29c-1604adbf0c31",
@@ -88,6 +97,12 @@ beforeEach(() => {
         "Show how inconsistent review cycles create delays.",
         "Connect unclear completion criteria to repeated rework.",
       ],
+    }),
+  );
+  generateQuestionsMock.mockImplementation((_articleId, sectionId) =>
+    Promise.resolve({
+      section_id: sectionId,
+      questions: [...guidedQuestionNames],
     }),
   );
   Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
@@ -447,7 +462,7 @@ describe("DraftEditor", () => {
     expect(savedPatch.sections[0].editor_state).toContain('"type":"list"');
   }, 10_000);
 
-  it("disables unsupported section-draft modes", async () => {
+  it("enables guided writing while keeping full-section drafting unavailable", async () => {
     const emptyDraft = createDefaultDraft();
     emptyDraft.sections[0] = {
       ...emptyDraft.sections[0],
@@ -458,11 +473,150 @@ describe("DraftEditor", () => {
 
     expect(
       await screen.findByRole("radio", { name: /Write with me/ }),
-    ).toBeDisabled();
+    ).toBeEnabled();
     expect(
       screen.getByRole("radio", { name: /Draft this section/ }),
     ).toBeDisabled();
-    expect(screen.getAllByText(/Coming soon/)).toHaveLength(2);
+    expect(screen.getAllByText(/Coming soon/)).toHaveLength(1);
+  });
+
+  it("navigates guided questions, retains answers, and completes locally", async () => {
+    const emptyDraft = createDefaultDraft();
+    emptyDraft.sections[0] = {
+      ...emptyDraft.sections[0],
+      editorState: createEditorState([""]),
+    };
+    getDraftMock.mockResolvedValueOnce(apiDraft(emptyDraft));
+    render(<DraftEditor articleId={articleId} />);
+
+    const assistant = await screen.findByRole("complementary", {
+      name: "Writing assistant",
+    });
+    await userEvent.click(
+      within(assistant).getByRole("radio", { name: /Write with me/ }),
+    );
+    expect(
+      within(assistant).getByRole("textbox", { name: /Add a direction/ }),
+    ).toBeDisabled();
+    await userEvent.click(
+      within(assistant).getByRole("button", {
+        name: "Start writing together",
+      }),
+    );
+
+    expect(generateQuestionsMock).toHaveBeenCalledWith(
+      articleId,
+      emptyDraft.sections[0].id,
+    );
+    expect(within(assistant).getByText("Question 1 of 4")).toBeVisible();
+    expect(
+      within(assistant).getByRole("button", { name: "Previous question" }),
+    ).toBeDisabled();
+    expect(
+      within(assistant).getByRole("button", { name: "Next question" }),
+    ).toBeEnabled();
+    expect(
+      within(assistant).getByRole("progressbar", {
+        name: "Question 1 progress",
+      }),
+    ).toHaveAttribute("aria-valuenow", "1");
+
+    const firstAnswer = within(assistant).getByRole("textbox", {
+      name: guidedQuestionNames[0],
+    });
+    await userEvent.type(firstAnswer, "Readers should focus on fundamentals.");
+    await userEvent.click(
+      within(assistant).getByRole("button", { name: "Next question" }),
+    );
+    expect(within(assistant).getByText("Question 2 of 4")).toBeVisible();
+    await userEvent.type(
+      within(assistant).getByRole("textbox", {
+        name: guidedQuestionNames[1],
+      }),
+      "Building projects changed my view.",
+    );
+
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "Go to The messy nature of great ideas",
+      }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Go to Introduction" }),
+    );
+    expect(within(assistant).getByText("Question 2 of 4")).toBeVisible();
+
+    await userEvent.click(
+      within(assistant).getByRole("button", { name: "Previous question" }),
+    );
+    expect(
+      within(assistant).getByRole("textbox", {
+        name: guidedQuestionNames[0],
+      }),
+    ).toHaveValue("Readers should focus on fundamentals.");
+
+    await userEvent.click(
+      within(assistant).getByRole("button", { name: "Next question" }),
+    );
+    await userEvent.click(
+      within(assistant).getByRole("button", { name: "Skip" }),
+    );
+    expect(within(assistant).getByText("Question 3 of 4")).toBeVisible();
+    expect(
+      within(assistant).getByRole("button", { name: "Next question" }),
+    ).toBeEnabled();
+
+    await userEvent.click(
+      within(assistant).getByRole("button", { name: "Continue" }),
+    );
+    expect(within(assistant).getByText("Question 4 of 4")).toBeVisible();
+    expect(
+      within(assistant).getByRole("button", { name: "Next question" }),
+    ).toBeDisabled();
+
+    await userEvent.click(
+      within(assistant).getByRole("button", { name: "Continue" }),
+    );
+    expect(within(assistant).getByText("Your answers are ready")).toBeVisible();
+    await userEvent.click(
+      within(assistant).getByRole("button", { name: "Back to questions" }),
+    );
+    expect(within(assistant).getByText("Question 4 of 4")).toBeVisible();
+  }, 15_000);
+
+  it("uses a two-question backend response for navigation bounds", async () => {
+    const emptyDraft = createDefaultDraft();
+    emptyDraft.sections[0] = {
+      ...emptyDraft.sections[0],
+      editorState: createEditorState([""]),
+    };
+    getDraftMock.mockResolvedValueOnce(apiDraft(emptyDraft));
+    generateQuestionsMock.mockResolvedValueOnce({
+      section_id: emptyDraft.sections[0].id,
+      questions: guidedQuestionNames.slice(0, 2),
+    });
+    render(<DraftEditor articleId={articleId} />);
+
+    const assistant = await screen.findByRole("complementary", {
+      name: "Writing assistant",
+    });
+    await userEvent.click(
+      within(assistant).getByRole("radio", { name: /Write with me/ }),
+    );
+    await userEvent.click(
+      within(assistant).getByRole("button", {
+        name: "Start writing together",
+      }),
+    );
+
+    expect(within(assistant).getByText("Question 1 of 2")).toBeVisible();
+    await userEvent.click(
+      within(assistant).getByRole("button", { name: "Next question" }),
+    );
+    expect(within(assistant).getByText("Question 2 of 2")).toBeVisible();
+    expect(
+      within(assistant).getByRole("button", { name: "Next question" }),
+    ).toBeDisabled();
   });
 
   it("saves dirty section context before requesting talking points", async () => {

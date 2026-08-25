@@ -4,6 +4,7 @@ import {
   deleteArticleOutline,
   generateArticleBrief,
   generateArticleOutline,
+  generateGuidedQuestions,
   generateTalkingPoints,
   getArticleDraft,
   getArticleBrief,
@@ -172,6 +173,27 @@ describe("article brief client", () => {
       method: "POST",
       headers: {},
     });
+  });
+
+  it("requests backend-guided questions for a draft section", async () => {
+    const result = {
+      section_id: draftSection.id,
+      questions: ["First question?", "Second question?", "Third question?"],
+    };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(result),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      generateGuidedQuestions(articleId, draftSection.id),
+    ).resolves.toEqual(result);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/articles/${articleId}/draft/sections/${draftSection.id}/questions`,
+      { method: "POST", headers: {} },
+    );
   });
 
   it("updates briefs and supports complete outline CRUD", async () => {

@@ -69,6 +69,7 @@ import { DEFAULT_AUTH_IDENTITY, type AuthIdentity } from "@/lib/auth/identity";
 import {
   ArticleRequestError,
   createArticleDraft,
+  generateGuidedQuestions,
   generateTalkingPoints,
   getArticle,
   getArticleDraft,
@@ -98,6 +99,13 @@ type DraftLoadFailure = {
 type MobileTab = "outline" | "assistant" | "format" | "more";
 type AssistantAction = "clearer" | "expand" | "example" | "tone" | "transition";
 type AssistantStartMode = "plan" | "guided" | "draft";
+type GuidedSession = {
+  active: boolean;
+  answers: string[];
+  completed: boolean;
+  currentQuestion: number;
+  questions: string[];
+};
 type GeneratedResult = {
   sectionId: string;
   points: string[];
@@ -111,6 +119,16 @@ type GenerationError = {
 const DRAFT_OUTLINE_DRAWER_ID = "draft-outline-drawer";
 const DRAFT_ASSISTANT_ID = "draft-writing-assistant";
 const articleIdSchema = z.string().uuid();
+
+function createGuidedSession(questions: string[]): GuidedSession {
+  return {
+    active: true,
+    answers: questions.map(() => ""),
+    completed: false,
+    currentQuestion: 0,
+    questions,
+  };
+}
 
 type Suggestion = {
   action: AssistantAction;
@@ -245,6 +263,14 @@ export function DraftEditor({
   const [assistantStartMode, setAssistantStartMode] =
     useState<AssistantStartMode>("plan");
   const [assistantDirection, setAssistantDirection] = useState("");
+  const [guidedSessions, setGuidedSessions] = useState<
+    Record<string, GuidedSession>
+  >({});
+  const [guidedQuestionsError, setGuidedQuestionsError] = useState<
+    string | null
+  >(null);
+  const [isLoadingGuidedQuestions, setIsLoadingGuidedQuestions] =
+    useState(false);
   const [generatedResult, setGeneratedResult] =
     useState<GeneratedResult | null>(null);
   const [generationError, setGenerationError] =
@@ -286,9 +312,11 @@ export function DraftEditor({
   const outlineCloseRef = useRef<HTMLButtonElement>(null);
   const assistantOpenRef = useRef<HTMLButtonElement>(null);
   const assistantCloseRef = useRef<HTMLButtonElement>(null);
+  const guidedAnswerRef = useRef<HTMLTextAreaElement>(null);
   const dirtyRef = useRef(false);
   const skipNextAutosaveRef = useRef(true);
   const generationRequestRef = useRef(0);
+  const guidedRequestRef = useRef(0);
 
   const activeSection =
     draft.sections.find((section) => section.id === activeSectionId) ??
@@ -300,6 +328,9 @@ export function DraftEditor({
   const activeSectionIsEmpty = activeSection
     ? !editorStateText(activeSection.editorState).trim()
     : true;
+  const activeGuidedSession = activeSection
+    ? guidedSessions[activeSection.id]
+    : undefined;
 
   const openOutline = useCallback(() => {
     setIsOutlineExpanded(true);
@@ -329,7 +360,10 @@ export function DraftEditor({
       setGeneratedResult(null);
       setGenerationError(null);
       generationRequestRef.current += 1;
+      guidedRequestRef.current += 1;
       setIsGeneratingTalkingPoints(false);
+      setIsLoadingGuidedQuestions(false);
+      setGuidedQuestionsError(null);
       setAssistantInstruction("");
       setAssistantDirection("");
       setGoalExpanded(true);
@@ -777,7 +811,106 @@ export function DraftEditor({
     }
   };
 
-  const beginAssistantStart = () => void requestTalkingPoints();
+  const updateGuidedSession = useCallback(
+    (update: (session: GuidedSession) => GuidedSession) => {
+      if (!activeSection) return;
+      setGuidedSessions((current) => {
+        const session = current[activeSection.id];
+        if (!session) return current;
+        return {
+          ...current,
+          [activeSection.id]: update(session),
+        };
+      });
+    },
+    [activeSection],
+  );
+
+  const focusGuidedAnswer = () => {
+    window.setTimeout(() => guidedAnswerRef.current?.focus(), 0);
+  };
+
+  const beginAssistantStart = async () => {
+    if (assistantStartMode === "guided") {
+      if (!activeSection || !savedArticleId || isLoadingGuidedQuestions) return;
+      const existingSession = guidedSessions[activeSection.id];
+      if (existingSession) {
+        updateGuidedSession((session) => ({ ...session, active: true }));
+        setGoalExpanded(false);
+        focusGuidedAnswer();
+        return;
+      }
+
+      const requestedSectionId = activeSection.id;
+      const requestId = guidedRequestRef.current + 1;
+      guidedRequestRef.current = requestId;
+      setGuidedQuestionsError(null);
+      setIsLoadingGuidedQuestions(true);
+      try {
+        const result = await generateGuidedQuestions(
+          savedArticleId,
+          requestedSectionId,
+        );
+        if (guidedRequestRef.current !== requestId) return;
+        if (result.section_id !== requestedSectionId)
+          throw new ArticleRequestError(
+            502,
+            "invalid_article_response",
+            "The question response did not match this section.",
+          );
+        setGuidedSessions((current) => ({
+          ...current,
+          [requestedSectionId]: createGuidedSession(result.questions),
+        }));
+        setGoalExpanded(false);
+        focusGuidedAnswer();
+      } catch (caught) {
+        if (guidedRequestRef.current !== requestId) return;
+        if (caught instanceof ArticleRequestError && caught.status === 401) {
+          push(loginPath);
+          return;
+        }
+        setGuidedQuestionsError(
+          caught instanceof ArticleRequestError
+            ? caught.message
+            : "We couldn’t load the guided questions. Please try again.",
+        );
+      } finally {
+        if (guidedRequestRef.current === requestId)
+          setIsLoadingGuidedQuestions(false);
+      }
+      return;
+    }
+    void requestTalkingPoints();
+  };
+
+  const moveGuidedQuestion = (direction: -1 | 1) => {
+    updateGuidedSession((session) => ({
+      ...session,
+      currentQuestion: Math.min(
+        session.questions.length - 1,
+        Math.max(0, session.currentQuestion + direction),
+      ),
+    }));
+    focusGuidedAnswer();
+  };
+
+  const continueGuidedSession = () => {
+    if (!activeGuidedSession) return;
+    if (
+      activeGuidedSession.currentQuestion ===
+      activeGuidedSession.questions.length - 1
+    ) {
+      updateGuidedSession((session) => ({ ...session, completed: true }));
+      return;
+    }
+    moveGuidedQuestion(1);
+  };
+
+  const exitGuidedSession = () => {
+    updateGuidedSession((session) => ({ ...session, active: false }));
+    setGoalExpanded(true);
+  };
 
   const applyGeneratedResult = (replace: boolean) => {
     if (!generatedResult || generatedResult.sectionId !== activeSectionId)
@@ -1136,6 +1269,124 @@ export function DraftEditor({
     );
   };
 
+  const renderGuidedAssistant = () => {
+    if (!activeGuidedSession || !activeSection) return null;
+    const questionIndex = activeGuidedSession.currentQuestion;
+    const question = activeGuidedSession.questions[questionIndex];
+    const questionCount = activeGuidedSession.questions.length;
+    const progress = ((questionIndex + 1) / questionCount) * 100;
+
+    return (
+      <div className={styles.assistantContent}>
+        {renderAssistantSectionContext()}
+        <p className={styles.guidedGoal}>{activeSection.goal}</p>
+        <div className={styles.guidedHeader}>
+          <span>Write with me</span>
+          <button onClick={exitGuidedSession} type="button">
+            Exit <X size={19} aria-hidden />
+          </button>
+        </div>
+        {activeGuidedSession.completed ? (
+          <section
+            aria-labelledby="guided-complete-title"
+            className={styles.guidedComplete}
+          >
+            <CheckCircle size={34} weight="bold" aria-hidden />
+            <h3 id="guided-complete-title">Your answers are ready</h3>
+            <p>
+              You can return to the questions whenever you want to refine your
+              ideas.
+            </p>
+            <button
+              className={styles.primaryAssistantButton}
+              onClick={() => {
+                updateGuidedSession((session) => ({
+                  ...session,
+                  completed: false,
+                }));
+                focusGuidedAnswer();
+              }}
+              type="button"
+            >
+              Back to questions
+            </button>
+          </section>
+        ) : (
+          <section
+            aria-labelledby="guided-question-title"
+            className={styles.guidedQuestion}
+          >
+            <div className={styles.guidedProgressRow}>
+              <span>
+                Question {questionIndex + 1} of {questionCount}
+              </span>
+              <div className={styles.guidedNavigation}>
+                <button
+                  aria-label="Previous question"
+                  disabled={questionIndex === 0}
+                  onClick={() => moveGuidedQuestion(-1)}
+                  type="button"
+                >
+                  <ArrowLeft size={19} aria-hidden />
+                </button>
+                <button
+                  aria-label="Next question"
+                  disabled={questionIndex === questionCount - 1}
+                  onClick={() => moveGuidedQuestion(1)}
+                  type="button"
+                >
+                  <ArrowRight size={19} aria-hidden />
+                </button>
+              </div>
+            </div>
+            <div
+              aria-label={`Question ${questionIndex + 1} progress`}
+              aria-valuemax={questionCount}
+              aria-valuemin={1}
+              aria-valuenow={questionIndex + 1}
+              className={styles.guidedProgressTrack}
+              role="progressbar"
+            >
+              <span style={{ width: `${progress}%` }} />
+            </div>
+            <h3 id="guided-question-title">{question}</h3>
+            <textarea
+              aria-labelledby="guided-question-title"
+              maxLength={2000}
+              onChange={(event) => {
+                const answer = event.target.value;
+                updateGuidedSession((session) => ({
+                  ...session,
+                  answers: session.answers.map((current, index) =>
+                    index === questionIndex ? answer : current,
+                  ),
+                }));
+              }}
+              placeholder="Write your answer here…"
+              ref={guidedAnswerRef}
+              value={activeGuidedSession.answers[questionIndex]}
+            />
+            <p className={styles.guidedHint}>
+              Write naturally — Inkwell will polish it.
+            </p>
+            <div className={styles.guidedActions}>
+              <button onClick={continueGuidedSession} type="button">
+                Skip
+              </button>
+              <button
+                className={styles.primaryAssistantButton}
+                onClick={continueGuidedSession}
+                type="button"
+              >
+                Continue
+              </button>
+            </div>
+          </section>
+        )}
+      </div>
+    );
+  };
+
   const renderStartAssistant = (surface: "desktop" | "mobile") => (
     <div className={styles.assistantContent}>
       {renderAssistantSectionContext()}
@@ -1143,7 +1394,7 @@ export function DraftEditor({
       <fieldset className={styles.startChoices}>
         <legend>How would you like to start?</legend>
         {(Object.keys(startModeCopy) as AssistantStartMode[]).map((mode) => {
-          const unavailable = mode !== "plan";
+          const unavailable = mode === "draft";
           return (
             <label
               className={`${assistantStartMode === mode ? styles.selectedChoice : ""} ${unavailable ? styles.unavailableChoice : ""}`}
@@ -1171,22 +1422,43 @@ export function DraftEditor({
       <label className={styles.directionField}>
         <span>Add a direction (optional)</span>
         <input
+          disabled={assistantStartMode === "guided"}
           maxLength={1000}
           onChange={(event) => setAssistantDirection(event.target.value)}
-          placeholder="Use a practical example from software development"
+          placeholder={
+            assistantStartMode === "guided"
+              ? "Not used for Write with me"
+              : "Use a practical example from software development"
+          }
           value={assistantDirection}
         />
       </label>
       {renderGenerationError()}
+      {guidedQuestionsError ? (
+        <div className={styles.generationError} role="alert">
+          <span>{guidedQuestionsError}</span>
+          <button
+            disabled={isLoadingGuidedQuestions}
+            onClick={() => void beginAssistantStart()}
+            type="button"
+          >
+            Try again
+          </button>
+        </div>
+      ) : null}
       <button
         className={styles.primaryAssistantButton}
-        disabled={isGeneratingTalkingPoints}
-        onClick={beginAssistantStart}
+        disabled={isGeneratingTalkingPoints || isLoadingGuidedQuestions}
+        onClick={() => void beginAssistantStart()}
         type="button"
       >
-        {isGeneratingTalkingPoints
-          ? "Generating talking points…"
-          : "Generate talking points"}
+        {isLoadingGuidedQuestions
+          ? "Loading questions…"
+          : isGeneratingTalkingPoints
+            ? "Generating talking points…"
+            : assistantStartMode === "guided"
+              ? "Start writing together"
+              : "Generate talking points"}
       </button>
     </div>
   );
@@ -1309,6 +1581,7 @@ export function DraftEditor({
     if (generatedResult?.sectionId === activeSectionId)
       return renderGeneratedAssistant(surface);
     if (selectedText.trim()) return renderImprovementAssistant(surface);
+    if (activeGuidedSession?.active) return renderGuidedAssistant();
     if (activeSectionIsEmpty) return renderStartAssistant(surface);
     return renderGuidanceAssistant(surface);
   };

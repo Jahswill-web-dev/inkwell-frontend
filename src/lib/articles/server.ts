@@ -50,9 +50,17 @@ export function articleUpstreamError(error: unknown): NextResponse {
       }
       return response;
     }
+    console.error("Article service request failed.", {
+      code: error.code,
+      method: error.config?.method,
+      status,
+      url: error.config?.url,
+    });
+  } else {
+    console.error("Article service returned an invalid response.", {
+      errorType: error instanceof Error ? error.name : typeof error,
+    });
   }
-
-  console.error("Article service request failed.");
   return articleErrorResponse(
     502,
     "articles_unavailable",

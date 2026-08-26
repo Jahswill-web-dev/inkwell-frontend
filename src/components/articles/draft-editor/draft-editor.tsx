@@ -70,6 +70,7 @@ import {
   ArticleRequestError,
   createArticleDraft,
   createSectionInterview,
+  generateDraftSection,
   generateSectionInterview,
   generateTalkingPoints,
   getArticle,
@@ -126,11 +127,40 @@ type GeneratedResult = {
   points: string[];
   instruction: string;
 };
+type SectionDraftProposal = {
+  sectionId: string;
+  blocks: SectionContentBlock[];
+};
 type GenerationError = {
   message: string;
   retryable: boolean;
   instruction: string;
 };
+
+function StructuredBlocksPreview({
+  blocks,
+}: {
+  blocks: readonly SectionContentBlock[];
+}) {
+  return (
+    <div className={styles.interviewBlocks}>
+      {blocks.map((block, blockIndex) => {
+        if (block.type === "paragraph")
+          return <p key={blockIndex}>{block.text}</p>;
+        if (block.type === "subheading")
+          return <h4 key={blockIndex}>{block.text}</h4>;
+        const items = block.items.map((item, itemIndex) => (
+          <li key={itemIndex}>{item}</li>
+        ));
+        return block.type === "numbered_list" ? (
+          <ol key={blockIndex}>{items}</ol>
+        ) : (
+          <ul key={blockIndex}>{items}</ul>
+        );
+      })}
+    </div>
+  );
+}
 const DRAFT_OUTLINE_DRAWER_ID = "draft-outline-drawer";
 const DRAFT_ASSISTANT_ID = "draft-writing-assistant";
 const articleIdSchema = z.string().uuid();
@@ -310,6 +340,16 @@ export function DraftEditor({
     useState<GenerationError | null>(null);
   const [isGeneratingTalkingPoints, setIsGeneratingTalkingPoints] =
     useState(false);
+  const [sectionDraftProposal, setSectionDraftProposal] =
+    useState<SectionDraftProposal | null>(null);
+  const [sectionDraftError, setSectionDraftError] =
+    useState<GenerationError | null>(null);
+  const [sectionDraftApplyError, setSectionDraftApplyError] = useState<
+    string | null
+  >(null);
+  const [isGeneratingDraftSection, setIsGeneratingDraftSection] =
+    useState(false);
+  const [isApplyingDraftSection, setIsApplyingDraftSection] = useState(false);
   const [goalExpanded, setGoalExpanded] = useState(true);
   const [isAssistantOpen, setIsAssistantOpen] = useState(true);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -355,6 +395,7 @@ export function DraftEditor({
   const dirtyRef = useRef(false);
   const skipNextAutosaveRef = useRef(true);
   const generationRequestRef = useRef(0);
+  const sectionDraftRequestRef = useRef(0);
   const interviewRequestRef = useRef(0);
 
   const activeSection =
@@ -401,8 +442,14 @@ export function DraftEditor({
       setGeneratedResult(null);
       setGenerationError(null);
       generationRequestRef.current += 1;
+      setSectionDraftProposal(null);
+      setSectionDraftError(null);
+      setSectionDraftApplyError(null);
+      sectionDraftRequestRef.current += 1;
       interviewRequestRef.current += 1;
       setIsGeneratingTalkingPoints(false);
+      setIsGeneratingDraftSection(false);
+      setIsApplyingDraftSection(false);
       setIsLoadingInterview(false);
       setIsGeneratingInterview(false);
       setInterviewError(null);
@@ -632,23 +679,6 @@ export function DraftEditor({
     };
   }, [activeSectionId]);
 
-  useEffect(() => {
-    if (typeof IntersectionObserver === "undefined") return;
-    const sections =
-      document.querySelectorAll<HTMLElement>("[data-section-id]");
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.find((entry) => entry.isIntersecting);
-        const id = (visible?.target as HTMLElement | undefined)?.dataset
-          .sectionId;
-        if (id) activateSection(id);
-      },
-      { rootMargin: "-18% 0px -68% 0px" },
-    );
-    sections.forEach((section) => observer.observe(section));
-    return () => observer.disconnect();
-  }, [activateSection, draft.sections.length]);
-
   const updateSectionEditor = useCallback(
     (sectionId: string, editorState: string) => {
       setDraft((current) => ({
@@ -682,10 +712,10 @@ export function DraftEditor({
     [activateSection],
   );
 
-  const onEditorFocus = (sectionId: string) => {
-    activateSection(sectionId);
-    activeEditorRef.current = editorsRef.current.get(sectionId) ?? null;
-  };
+  const onEditorSelection = useCallback((sectionId: string, text: string) => {
+    if (sectionId !== activeSectionIdRef.current) return;
+    setSelectedText(text.trim());
+  }, []);
 
   const toggleChecklist = (itemId: string, checked: boolean) => {
     setDraft((current) => ({
@@ -860,6 +890,120 @@ export function DraftEditor({
     } finally {
       if (generationRequestRef.current === requestId)
         setIsGeneratingTalkingPoints(false);
+    }
+  };
+
+  const requestDraftSection = async (instruction = assistantDirection) => {
+    if (!activeSection || !savedArticleId || isGeneratingDraftSection) return;
+    const requestedSectionId = activeSection.id;
+    const normalizedInstruction = instruction.trim();
+    const requestId = sectionDraftRequestRef.current + 1;
+    sectionDraftRequestRef.current = requestId;
+    setIsGeneratingDraftSection(true);
+    setSectionDraftError(null);
+    setSectionDraftApplyError(null);
+
+    if (dirtyRef.current && !(await saveDraft())) {
+      if (sectionDraftRequestRef.current === requestId) {
+        setSectionDraftError({
+          message: "Save your latest changes before drafting this section.",
+          retryable: true,
+          instruction: normalizedInstruction,
+        });
+        setIsGeneratingDraftSection(false);
+      }
+      return;
+    }
+    if (sectionDraftRequestRef.current !== requestId) return;
+
+    try {
+      const result = await generateDraftSection(
+        savedArticleId,
+        requestedSectionId,
+        normalizedInstruction ? { instruction: normalizedInstruction } : {},
+      );
+      if (sectionDraftRequestRef.current !== requestId) return;
+      if (result.section_id !== requestedSectionId)
+        throw new ArticleRequestError(
+          502,
+          "invalid_article_response",
+          "The generated draft did not match this section.",
+        );
+      setSectionDraftProposal({
+        sectionId: result.section_id,
+        blocks: result.blocks,
+      });
+      setGoalExpanded(false);
+    } catch (caught) {
+      if (sectionDraftRequestRef.current !== requestId) return;
+      if (caught instanceof ArticleRequestError && caught.status === 401) {
+        push(loginPath);
+        return;
+      }
+      setSectionDraftError({
+        message:
+          caught instanceof ArticleRequestError
+            ? caught.message
+            : "We couldn’t draft this section. Please try again.",
+        retryable:
+          !(caught instanceof ArticleRequestError) ||
+          [502, 503, 504].includes(caught.status),
+        instruction: normalizedInstruction,
+      });
+    } finally {
+      if (sectionDraftRequestRef.current === requestId)
+        setIsGeneratingDraftSection(false);
+    }
+  };
+
+  const applyDraftSectionProposal = async () => {
+    if (
+      !activeSection ||
+      !savedArticleId ||
+      !sectionDraftProposal ||
+      sectionDraftProposal.sectionId !== activeSection.id ||
+      isApplyingDraftSection
+    )
+      return;
+    const editorState = createEditorStateFromBlocks(
+      sectionDraftProposal.blocks,
+    );
+    const nextDraft: DraftArticleState = {
+      ...draft,
+      sections: draft.sections.map((section) =>
+        section.id === activeSection.id ? { ...section, editorState } : section,
+      ),
+    };
+    setSectionDraftApplyError(null);
+    setIsApplyingDraftSection(true);
+    try {
+      const saved = await updateArticleDraft(
+        savedArticleId,
+        toArticleDraftPatch(nextDraft),
+      );
+      skipNextAutosaveRef.current = true;
+      dirtyRef.current = false;
+      setDraft({ ...nextDraft, savedAt: saved.updated_at });
+      setLastSavedAt(saved.updated_at);
+      setSaveStatus("saved");
+      const editor = editorsRef.current.get(activeSection.id);
+      if (editor) editor.setEditorState(editor.parseEditorState(editorState));
+      setSectionDraftProposal(null);
+      setSectionDraftError(null);
+      setStatusMessage("The generated draft replaced this section.");
+      setGoalExpanded(true);
+    } catch (caught) {
+      if (caught instanceof ArticleRequestError && caught.status === 401) {
+        push(loginPath);
+        return;
+      }
+      setSectionDraftApplyError(
+        caught instanceof ArticleRequestError
+          ? caught.message
+          : "We couldn’t save the generated draft. Please try again.",
+      );
+    } finally {
+      setIsApplyingDraftSection(false);
     }
   };
 
@@ -1059,6 +1203,10 @@ export function DraftEditor({
         if (interviewRequestRef.current === requestId)
           setIsLoadingInterview(false);
       }
+      return;
+    }
+    if (assistantStartMode === "draft") {
+      void requestDraftSection();
       return;
     }
     void requestTalkingPoints();
@@ -1487,6 +1635,102 @@ export function DraftEditor({
       </div>
     ) : null;
 
+  const renderSectionDraftError = () =>
+    sectionDraftError ? (
+      <div className={styles.generationError} role="alert">
+        <span>{sectionDraftError.message}</span>
+        {sectionDraftError.retryable ? (
+          <button
+            disabled={isGeneratingDraftSection}
+            onClick={() =>
+              void requestDraftSection(sectionDraftError.instruction)
+            }
+            type="button"
+          >
+            Try again
+          </button>
+        ) : null}
+      </div>
+    ) : null;
+
+  const renderSectionDraftAssistant = (surface: "desktop" | "mobile") => {
+    if (!sectionDraftProposal) return null;
+    const generatedWords = sectionDraftProposal.blocks.reduce(
+      (count, block) => {
+        const text = "text" in block ? block.text : block.items.join(" ");
+        const words = text.trim() ? text.trim().split(/\s+/u).length : 0;
+        return count + words;
+      },
+      0,
+    );
+    return (
+      <div className={styles.assistantContent}>
+        {renderAssistantSectionContext()}
+        <div className={styles.readyStatus} role="status">
+          <CheckCircle size={23} weight="bold" aria-hidden />
+          <span>Section draft ready</span>
+        </div>
+        {renderGoal(surface)}
+        {renderSectionDraftError()}
+        <section
+          aria-labelledby="section-draft-proposal-title"
+          className={styles.interviewProposal}
+        >
+          <h3 id="section-draft-proposal-title">Review the proposed section</h3>
+          <p>Nothing changes until you replace the section.</p>
+          <StructuredBlocksPreview blocks={sectionDraftProposal.blocks} />
+          {sectionDraftApplyError ? (
+            <div className={styles.generationError} role="alert">
+              <span>{sectionDraftApplyError}</span>
+            </div>
+          ) : null}
+          <button
+            className={styles.primaryAssistantButton}
+            disabled={isApplyingDraftSection || isGeneratingDraftSection}
+            onClick={() => void applyDraftSectionProposal()}
+            type="button"
+          >
+            {isApplyingDraftSection ? "Saving section…" : "Replace section"}
+          </button>
+          <label className={styles.refineField}>
+            <span>Direction for another draft</span>
+            <textarea
+              disabled={isApplyingDraftSection || isGeneratingDraftSection}
+              maxLength={1000}
+              onChange={(event) => setAssistantDirection(event.target.value)}
+              placeholder="Make it more practical and conversational"
+              value={assistantDirection}
+            />
+          </label>
+          <button
+            className={styles.secondaryAssistantButton}
+            disabled={isApplyingDraftSection || isGeneratingDraftSection}
+            onClick={() => void requestDraftSection()}
+            type="button"
+          >
+            {isGeneratingDraftSection ? "Generating…" : "Generate another"}
+          </button>
+          <button
+            className={styles.assistantTextButton}
+            disabled={isApplyingDraftSection || isGeneratingDraftSection}
+            onClick={() => {
+              setSectionDraftProposal(null);
+              setSectionDraftError(null);
+              setSectionDraftApplyError(null);
+            }}
+            type="button"
+          >
+            Discard
+          </button>
+          <p className={styles.resultMeta}>
+            About {generatedWords} words · {sectionDraftProposal.blocks.length}{" "}
+            blocks
+          </p>
+        </section>
+      </div>
+    );
+  };
+
   const renderGeneratedAssistant = (surface: "desktop" | "mobile") => {
     if (!generatedResult) return null;
     const generatedWords = generatedResult.points
@@ -1587,17 +1831,6 @@ export function DraftEditor({
             ? "Answers not saved"
             : "";
 
-    const renderBlock = (block: SectionContentBlock, index: number) => {
-      if (block.type === "paragraph") return <p key={index}>{block.text}</p>;
-      if (block.type === "subheading") return <h4 key={index}>{block.text}</h4>;
-      const items = block.items.map((item) => <li key={item}>{item}</li>);
-      return block.type === "numbered_list" ? (
-        <ol key={index}>{items}</ol>
-      ) : (
-        <ul key={index}>{items}</ul>
-      );
-    };
-
     return (
       <div className={styles.assistantContent}>
         {renderAssistantSectionContext()}
@@ -1639,9 +1872,7 @@ export function DraftEditor({
             </div>
             <h3 id="interview-proposal-title">Review the proposed section</h3>
             <p>Nothing changes until you accept this proposal.</p>
-            <div className={styles.interviewBlocks}>
-              {blocks.map(renderBlock)}
-            </div>
+            <StructuredBlocksPreview blocks={blocks} />
             <button
               className={styles.primaryAssistantButton}
               disabled={isApplyingInterview}
@@ -1820,15 +2051,15 @@ export function DraftEditor({
       <fieldset className={styles.startChoices}>
         <legend>How would you like to start?</legend>
         {(Object.keys(startModeCopy) as AssistantStartMode[]).map((mode) => {
-          const unavailable = mode === "draft";
           return (
             <label
-              className={`${assistantStartMode === mode ? styles.selectedChoice : ""} ${unavailable ? styles.unavailableChoice : ""}`}
+              className={
+                assistantStartMode === mode ? styles.selectedChoice : ""
+              }
               key={mode}
             >
               <input
                 checked={assistantStartMode === mode}
-                disabled={unavailable}
                 name={`${surface}-assistant-start`}
                 onChange={() => setAssistantStartMode(mode)}
                 type="radio"
@@ -1836,10 +2067,7 @@ export function DraftEditor({
               />
               <span>
                 <strong>{startModeCopy[mode].title}</strong>
-                <small>
-                  {startModeCopy[mode].subtitle}
-                  {unavailable ? " · Coming soon" : ""}
-                </small>
+                <small>{startModeCopy[mode].subtitle}</small>
               </span>
             </label>
           );
@@ -1859,7 +2087,8 @@ export function DraftEditor({
           value={assistantDirection}
         />
       </label>
-      {renderGenerationError()}
+      {assistantStartMode === "plan" ? renderGenerationError() : null}
+      {assistantStartMode === "draft" ? renderSectionDraftError() : null}
       {interviewError ? (
         <div className={styles.generationError} role="alert">
           <span>{interviewError}</span>
@@ -1874,17 +2103,25 @@ export function DraftEditor({
       ) : null}
       <button
         className={styles.primaryAssistantButton}
-        disabled={isGeneratingTalkingPoints || isLoadingInterview}
+        disabled={
+          isGeneratingTalkingPoints ||
+          isLoadingInterview ||
+          isGeneratingDraftSection
+        }
         onClick={() => void beginAssistantStart()}
         type="button"
       >
         {isLoadingInterview
           ? "Loading interview…"
-          : isGeneratingTalkingPoints
-            ? "Generating talking points…"
-            : assistantStartMode === "guided"
-              ? "Start writing together"
-              : "Generate talking points"}
+          : isGeneratingDraftSection
+            ? "Drafting section…"
+            : isGeneratingTalkingPoints
+              ? "Generating talking points…"
+              : assistantStartMode === "guided"
+                ? "Start writing together"
+                : assistantStartMode === "draft"
+                  ? "Draft this section"
+                  : "Generate talking points"}
       </button>
     </div>
   );
@@ -2004,6 +2241,8 @@ export function DraftEditor({
   );
 
   const renderAssistant = (surface: "desktop" | "mobile") => {
+    if (sectionDraftProposal?.sectionId === activeSectionId)
+      return renderSectionDraftAssistant(surface);
     if (generatedResult?.sectionId === activeSectionId)
       return renderGeneratedAssistant(surface);
     if (selectedText.trim()) return renderImprovementAssistant(surface);
@@ -2208,13 +2447,10 @@ export function DraftEditor({
                     <Fragment key={section.id}>
                       <DraftRichSection
                         index={index}
+                        isActive={section.id === activeSectionId}
                         onChange={updateSectionEditor}
                         onEditor={registerEditor}
-                        onFocus={onEditorFocus}
-                        onSelection={(sectionId, text) => {
-                          activateSection(sectionId);
-                          setSelectedText(text.trim());
-                        }}
+                        onSelection={onEditorSelection}
                         section={section}
                       />
                       {generatedResult?.sectionId === section.id ? (
@@ -2309,13 +2545,10 @@ export function DraftEditor({
               <Fragment key={section.id}>
                 <DraftRichSection
                   index={index}
+                  isActive={section.id === activeSectionId}
                   onChange={updateSectionEditor}
                   onEditor={registerEditor}
-                  onFocus={onEditorFocus}
-                  onSelection={(sectionId, text) => {
-                    activateSection(sectionId);
-                    setSelectedText(text.trim());
-                  }}
+                  onSelection={onEditorSelection}
                   section={section}
                 />
                 {generatedResult?.sectionId === section.id ? (

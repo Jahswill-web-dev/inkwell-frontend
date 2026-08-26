@@ -122,18 +122,18 @@ function EditorBridge({
 export function DraftRichSection({
   section,
   index,
+  isActive = false,
   readOnly = false,
   onChange,
   onEditor,
-  onFocus,
   onSelection,
 }: {
   section: DraftSection;
   index: number;
+  isActive?: boolean;
   readOnly?: boolean;
   onChange?: (sectionId: string, editorState: string) => void;
   onEditor?: (sectionId: string, editor: LexicalEditor) => void;
-  onFocus?: (sectionId: string) => void;
   onSelection?: (sectionId: string, text: string) => void;
 }) {
   const initialConfig = {
@@ -172,15 +172,12 @@ export function DraftRichSection({
       id={`draft-section-${section.id}`}
     >
       {index > 0 ? (
-        <h2>
+        <h2 aria-current={isActive ? "location" : undefined}>
           {index}. {section.title}
         </h2>
       ) : null}
       <LexicalComposer initialConfig={initialConfig}>
-        <div
-          className={styles.editorShell}
-          onFocus={() => onFocus?.(section.id)}
-        >
+        <div className={styles.editorShell}>
           <RichTextPlugin
             contentEditable={
               <ContentEditable

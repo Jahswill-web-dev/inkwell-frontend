@@ -1,4 +1,7 @@
 .page {
+  --dashboard-sidebar-open-top: 20px;
+  --dashboard-sidebar-open-translate-y: 0;
+
   min-height: 100svh;
   background: var(--color-ink-paper);
   color: var(--color-ink-navy);
@@ -62,7 +65,10 @@
   border-bottom: 1px solid var(--color-ink-line);
   background: rgba(255, 253, 250, 0.97);
   padding: 0 30px;
-  transition: left 200ms ease;
+  padding-left: max(30px, calc(64px - var(--dashboard-sidebar-width, 215px)));
+  transition:
+    left 200ms ease,
+    padding-left 200ms ease;
 }
 
 .saveMeta,
@@ -387,6 +393,10 @@
   font-size: 1.52rem;
   font-weight: 650;
   line-height: 1.25;
+}
+
+.articleSection > h2[aria-current="location"] {
+  color: var(--color-ink-crimson);
 }
 
 .editorShell {

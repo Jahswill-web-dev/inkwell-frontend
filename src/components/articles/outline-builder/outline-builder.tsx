@@ -4,7 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowClockwise,
   ArrowLeft,
   CaretDown,
   Check,
@@ -509,9 +508,10 @@ export function OutlineBuilder({
                 <button
                   type="button"
                   disabled={dirty || isRegenerating}
+                  aria-busy={isRegenerating || undefined}
                   onClick={() => void regenerate()}
                 >
-                  Regenerate
+                  {isRegenerating ? "Regenerating…" : "Regenerate"}
                 </button>
               </div>
             ) : null}
@@ -758,17 +758,6 @@ export function OutlineBuilder({
 
           <aside className={styles.healthPanel} aria-label="Outline health">
             <OutlineHealth sections={sections} />
-            <button
-              className={styles.regenerateApproach}
-              disabled={dirty || isRegenerating}
-              onClick={() => void regenerate()}
-              type="button"
-            >
-              <ArrowClockwise size={21} aria-hidden />
-              {isRegenerating
-                ? "Generating another approach…"
-                : "Generate another approach"}
-            </button>
           </aside>
         </div>
 

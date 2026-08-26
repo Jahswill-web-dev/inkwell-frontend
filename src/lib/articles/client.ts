@@ -24,10 +24,14 @@ import {
 import {
   articleDraftPatchSchema,
   articleDraftSchema,
+  sectionDraftGenerationInputSchema,
+  sectionDraftGenerationResultSchema,
   talkingPointsInputSchema,
   talkingPointsResultSchema,
   type ArticleDraft,
   type ArticleDraftPatch,
+  type SectionDraftGenerationInput,
+  type SectionDraftGenerationResult,
   type TalkingPointsInput,
   type TalkingPointsResult,
 } from "./draft";
@@ -220,6 +224,24 @@ export function generateTalkingPoints(
       ? { method: "POST", body: JSON.stringify(body) }
       : { method: "POST" },
     (value) => talkingPointsResultSchema.parse(value),
+  );
+}
+
+export function generateDraftSection(
+  articleId: string,
+  sectionId: string,
+  input?: SectionDraftGenerationInput,
+): Promise<SectionDraftGenerationResult> {
+  const instruction = input?.instruction?.trim();
+  const body = sectionDraftGenerationInputSchema.parse(
+    instruction ? { instruction } : {},
+  );
+  return articleRequest(
+    `/api/articles/${articleId}/draft/sections/${sectionId}/generate`,
+    body.instruction
+      ? { method: "POST", body: JSON.stringify(body) }
+      : { method: "POST" },
+    (value) => sectionDraftGenerationResultSchema.parse(value),
   );
 }
 

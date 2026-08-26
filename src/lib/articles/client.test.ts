@@ -5,6 +5,7 @@ import {
   deleteArticleOutline,
   generateArticleBrief,
   generateArticleOutline,
+  generateDraftSection,
   generateSectionInterview,
   generateTalkingPoints,
   getArticleDraft,
@@ -171,6 +172,42 @@ describe("article brief client", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(2, url, {
       method: "POST",
       body: JSON.stringify({ instruction: "Focus on operational costs" }),
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(3, url, {
+      method: "POST",
+      headers: {},
+    });
+  });
+
+  it("generates a structured section draft with optional instructions", async () => {
+    const result = {
+      section_id: draftSection.id,
+      blocks: [{ type: "paragraph", text: "A generated opening." }],
+    };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(result),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await generateDraftSection(articleId, draftSection.id);
+    await generateDraftSection(articleId, draftSection.id, {
+      instruction: "  Keep it practical  ",
+    });
+    await generateDraftSection(articleId, draftSection.id, {
+      instruction: "   ",
+    });
+
+    const url = `/api/articles/${articleId}/draft/sections/${draftSection.id}/generate`;
+    expect(fetchMock).toHaveBeenNthCalledWith(1, url, {
+      method: "POST",
+      headers: {},
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(2, url, {
+      method: "POST",
+      body: JSON.stringify({ instruction: "Keep it practical" }),
       headers: { "Content-Type": "application/json" },
     });
     expect(fetchMock).toHaveBeenNthCalledWith(3, url, {

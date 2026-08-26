@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   articleDraftPatchSchema,
   articleDraftSchema,
+  sectionDraftGenerationInputSchema,
+  sectionDraftGenerationResultSchema,
   talkingPointsInputSchema,
   talkingPointsResultSchema,
 } from "./draft";
@@ -58,6 +60,46 @@ describe("article draft contracts", () => {
     expect(
       talkingPointsInputSchema.safeParse({ instruction: "x".repeat(1001) })
         .success,
+    ).toBe(false);
+  });
+
+  it("validates full-section generation instructions and structured blocks", () => {
+    expect(
+      sectionDraftGenerationInputSchema.parse({
+        instruction: "  Keep it conversational  ",
+      }),
+    ).toEqual({ instruction: "Keep it conversational" });
+    expect(
+      sectionDraftGenerationInputSchema.safeParse({ instruction: "   " })
+        .success,
+    ).toBe(false);
+    expect(
+      sectionDraftGenerationInputSchema.safeParse({
+        instruction: "x".repeat(1001),
+      }).success,
+    ).toBe(false);
+
+    const result = sectionDraftGenerationResultSchema.parse({
+      section_id: section.id,
+      blocks: [
+        { type: "paragraph", text: "Opening paragraph." },
+        { type: "subheading", text: "Practical steps" },
+        { type: "bulleted_list", items: ["First point"] },
+        { type: "numbered_list", items: ["First step"] },
+      ],
+    });
+    expect(result.blocks).toHaveLength(4);
+    expect(
+      sectionDraftGenerationResultSchema.safeParse({
+        section_id: section.id,
+        blocks: [],
+      }).success,
+    ).toBe(false);
+    expect(
+      sectionDraftGenerationResultSchema.safeParse({
+        section_id: section.id,
+        blocks: [{ type: "paragraph", text: "" }],
+      }).success,
     ).toBe(false);
   });
 });

@@ -106,6 +106,9 @@ describe("OutlineBuilder", () => {
     ).toBeVisible();
     expect(screen.getByText("Build the workflow")).toBeVisible();
     expect(generateMock).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("button", { name: "Generate another approach" }),
+    ).not.toBeInTheDocument();
   });
 
   it("generates only after outline_not_found", async () => {
@@ -115,6 +118,81 @@ describe("OutlineBuilder", () => {
     render(<OutlineBuilder articleId={articleId} />);
     expect(await screen.findByText("Build the workflow")).toBeVisible();
     expect(generateMock).toHaveBeenCalledWith(articleId);
+  });
+
+  it("shows progress while regenerating an outline based on an older brief", async () => {
+    let resolveGeneration!: (value: typeof outline) => void;
+    getOutlineMock.mockResolvedValue({ ...outline, is_stale: true });
+    generateMock.mockImplementation(
+      () =>
+        new Promise<typeof outline>((resolve) => {
+          resolveGeneration = resolve;
+        }),
+    );
+
+    render(<OutlineBuilder articleId={articleId} />);
+    await screen.findByText("This outline is based on an older brief.");
+    await userEvent.click(screen.getByRole("button", { name: "Regenerate" }));
+
+    const regeneratingButton = screen.getByRole("button", {
+      name: "Regenerating…",
+    });
+    expect(regeneratingButton).toBeDisabled();
+    expect(regeneratingButton).toHaveAttribute("aria-busy", "true");
+
+    resolveGeneration({
+      ...outline,
+      sections: [
+        { ...outline.sections[0], heading: "A regenerated introduction" },
+        ...outline.sections.slice(1),
+      ],
+    });
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "A regenerated introduction",
+      }),
+    ).toBeVisible();
+    await waitFor(() =>
+      expect(
+        screen.queryByText("This outline is based on an older brief."),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it("restores stale-outline regeneration after a failed request", async () => {
+    let rejectGeneration!: (reason?: unknown) => void;
+    getOutlineMock.mockResolvedValue({ ...outline, is_stale: true });
+    generateMock.mockImplementation(
+      () =>
+        new Promise<typeof outline>((_resolve, reject) => {
+          rejectGeneration = reject;
+        }),
+    );
+
+    render(<OutlineBuilder articleId={articleId} />);
+    await screen.findByText("This outline is based on an older brief.");
+    await userEvent.click(screen.getByRole("button", { name: "Regenerate" }));
+    expect(
+      screen.getByRole("button", { name: "Regenerating…" }),
+    ).toHaveAttribute("aria-busy", "true");
+
+    rejectGeneration(
+      new ArticleRequestError(
+        503,
+        "outline_generation_unavailable",
+        "Outline generation is temporarily unavailable.",
+      ),
+    );
+
+    expect(
+      await screen.findByText("Outline generation is temporarily unavailable."),
+    ).toBeVisible();
+    const regenerateButton = screen.getByRole("button", {
+      name: "Regenerate",
+    });
+    expect(regenerateButton).toBeEnabled();
+    expect(regenerateButton).not.toHaveAttribute("aria-busy");
   });
 
   it("edits, reorders, adds, and persists complete API sections", async () => {
@@ -135,6 +213,7 @@ describe("OutlineBuilder", () => {
   });
 
   it("does not regenerate while dirty and can discard changes", async () => {
+    getOutlineMock.mockResolvedValue({ ...outline, is_stale: true });
     render(<OutlineBuilder articleId={articleId} />);
     await screen.findByText("Build the workflow");
     await userEvent.type(
@@ -142,13 +221,13 @@ describe("OutlineBuilder", () => {
       " revised",
     );
     expect(
-      screen.getByRole("button", { name: "Generate another approach" }),
+      screen.getByRole("button", { name: "Regenerate" }),
     ).toBeDisabled();
     await userEvent.click(
       screen.getByRole("button", { name: "Discard changes" }),
     );
     expect(
-      screen.getByRole("button", { name: "Generate another approach" }),
+      screen.getByRole("button", { name: "Regenerate" }),
     ).toBeEnabled();
   });
 

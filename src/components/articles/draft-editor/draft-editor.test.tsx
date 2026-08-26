@@ -21,6 +21,7 @@ const {
   getLatestInterviewMock,
   replaceAnswersMock,
   generateInterviewMock,
+  generateDraftSectionMock,
   generatePointsMock,
 } = vi.hoisted(() => ({
   pushMock: vi.fn(),
@@ -32,6 +33,7 @@ const {
   getLatestInterviewMock: vi.fn(),
   replaceAnswersMock: vi.fn(),
   generateInterviewMock: vi.fn(),
+  generateDraftSectionMock: vi.fn(),
   generatePointsMock: vi.fn(),
 }));
 
@@ -48,6 +50,7 @@ vi.mock("@/lib/articles/client", async (importOriginal) => ({
   getLatestSectionInterview: getLatestInterviewMock,
   replaceSectionInterviewAnswers: replaceAnswersMock,
   generateSectionInterview: generateInterviewMock,
+  generateDraftSection: generateDraftSectionMock,
   generateTalkingPoints: generatePointsMock,
 }));
 
@@ -132,6 +135,17 @@ beforeEach(() => {
         "Clarify who owns each publishing stage.",
         "Show how inconsistent review cycles create delays.",
         "Connect unclear completion criteria to repeated rework.",
+      ],
+    }),
+  );
+  generateDraftSectionMock.mockImplementation((_articleId, sectionId) =>
+    Promise.resolve({
+      section_id: sectionId,
+      blocks: [
+        { type: "paragraph", text: "A generated opening." },
+        { type: "subheading", text: "A useful lesson" },
+        { type: "bulleted_list", items: ["First point", "Second point"] },
+        { type: "numbered_list", items: ["First step", "Second step"] },
       ],
     }),
   );
@@ -329,6 +343,22 @@ describe("DraftEditor", () => {
     });
     expect(expandButton).toHaveAttribute("aria-expanded", "false");
     expect(introductionMarker).toHaveAttribute("aria-current", "location");
+    const firstSubsectionHeading = screen.getByRole("heading", {
+      name: "1. The messy nature of great ideas",
+    });
+    expect(firstSubsectionHeading).not.toHaveAttribute("aria-current");
+
+    await userEvent.click(
+      screen.getByRole("textbox", {
+        name: "The messy nature of great ideas draft content",
+      }),
+    );
+    expect(introductionMarker).toHaveAttribute("aria-current", "location");
+    expect(
+      within(assistant).getByLabelText(
+        "Current section: Section 1, Introduction",
+      ),
+    ).toBeVisible();
 
     await userEvent.click(
       screen.getByRole("button", { name: "Go to Conclusion" }),
@@ -341,6 +371,10 @@ describe("DraftEditor", () => {
         "Current section: Section 5, Conclusion",
       ),
     ).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "4. Conclusion" }),
+    ).toHaveAttribute("aria-current", "location");
+    expect(firstSubsectionHeading).not.toHaveAttribute("aria-current");
 
     await userEvent.click(expandButton);
     const drawer = screen.getByRole("complementary", {
@@ -358,6 +392,7 @@ describe("DraftEditor", () => {
         name: "1. The messy nature of great ideas",
       }),
     );
+    expect(firstSubsectionHeading).toHaveAttribute("aria-current", "location");
     expect(drawer).toHaveAttribute("aria-hidden", "false");
 
     await userEvent.keyboard("{Escape}");
@@ -517,7 +552,7 @@ describe("DraftEditor", () => {
     expect(savedPatch.sections[0].editor_state).toContain('"type":"list"');
   }, 10_000);
 
-  it("enables guided writing while keeping full-section drafting unavailable", async () => {
+  it("previews and explicitly saves a structured full-section draft", async () => {
     const emptyDraft = createDefaultDraft();
     emptyDraft.sections[0] = {
       ...emptyDraft.sections[0],
@@ -526,13 +561,275 @@ describe("DraftEditor", () => {
     getDraftMock.mockResolvedValueOnce(apiDraft(emptyDraft));
     render(<DraftEditor articleId={articleId} />);
 
+    const draftMode = await screen.findByRole("radio", {
+      name: /Draft this section/,
+    });
+    expect(draftMode).toBeEnabled();
+    await userEvent.click(draftMode);
+    await userEvent.type(
+      screen.getAllByRole("textbox", { name: /Add a direction/ })[0],
+      "Keep it practical",
+    );
+    updateDraftMock.mockClear();
+    await userEvent.click(
+      screen.getAllByRole("button", { name: "Draft this section" })[0],
+    );
+
+    const proposal = await screen.findByRole("region", {
+      name: "Review the proposed section",
+    });
+    expect(generateDraftSectionMock).toHaveBeenCalledWith(
+      articleId,
+      emptyDraft.sections[0].id,
+      { instruction: "Keep it practical" },
+    );
+    expect(within(proposal).getByText("A generated opening.")).toBeVisible();
     expect(
-      await screen.findByRole("radio", { name: /Write with me/ }),
+      within(proposal).getByRole("heading", { name: "A useful lesson" }),
+    ).toBeVisible();
+    const proposalLists = within(proposal).getAllByRole("list");
+    expect(proposalLists[0].tagName).toBe("UL");
+    expect(proposalLists[1].tagName).toBe("OL");
+    const editor = screen.getByRole("textbox", {
+      name: "Introduction draft content",
+    });
+    expect(editor).not.toHaveTextContent("A generated opening.");
+
+    await userEvent.click(
+      within(proposal).getByRole("button", { name: "Replace section" }),
+    );
+    await waitFor(() =>
+      expect(editor).toHaveTextContent("A generated opening."),
+    );
+    expect(editor.querySelector("h2")).toHaveTextContent("A useful lesson");
+    expect(editor.querySelector("ul")).not.toBeNull();
+    expect(editor.querySelector("ol")).not.toBeNull();
+    expect(updateDraftMock).toHaveBeenCalledWith(articleId, expect.any(Object));
+    const savedPatch = updateDraftMock.mock.calls.at(-1)?.[1];
+    expect(savedPatch.sections[0].editor_state).toContain('"type":"heading"');
+    expect(
+      screen.queryByRole("region", { name: "Review the proposed section" }),
+    ).not.toBeInTheDocument();
+  }, 10_000);
+
+  it("keeps the proposal and editor unchanged when saving it fails", async () => {
+    const emptyDraft = createDefaultDraft();
+    emptyDraft.sections[0] = {
+      ...emptyDraft.sections[0],
+      editorState: createEditorState([""]),
+    };
+    getDraftMock.mockResolvedValueOnce(apiDraft(emptyDraft));
+    updateDraftMock.mockRejectedValueOnce(
+      new ArticleRequestError(503, "draft_unavailable", "Save unavailable."),
+    );
+    render(<DraftEditor articleId={articleId} />);
+
+    await userEvent.click(
+      await screen.findByRole("radio", { name: /Draft this section/ }),
+    );
+    await userEvent.click(
+      screen.getAllByRole("button", { name: "Draft this section" })[0],
+    );
+    const proposal = await screen.findByRole("region", {
+      name: "Review the proposed section",
+    });
+    await userEvent.click(
+      within(proposal).getByRole("button", { name: "Replace section" }),
+    );
+
+    expect(await within(proposal).findByRole("alert")).toHaveTextContent(
+      "Save unavailable",
+    );
+    expect(
+      screen.getByRole("textbox", { name: "Introduction draft content" }),
+    ).not.toHaveTextContent("A generated opening.");
+    expect(
+      within(proposal).getByRole("button", { name: "Replace section" }),
     ).toBeEnabled();
-    expect(
+  });
+
+  it("saves dirty context before requesting a section draft", async () => {
+    const emptyDraft = createDefaultDraft();
+    emptyDraft.sections[0] = {
+      ...emptyDraft.sections[0],
+      editorState: createEditorState([""]),
+    };
+    getDraftMock.mockResolvedValueOnce(apiDraft(emptyDraft));
+    render(<DraftEditor articleId={articleId} />);
+
+    await userEvent.click(
+      await screen.findByRole("checkbox", { name: /Add a personal example/ }),
+    );
+    await userEvent.click(
       screen.getByRole("radio", { name: /Draft this section/ }),
-    ).toBeDisabled();
-    expect(screen.getAllByText(/Coming soon/)).toHaveLength(1);
+    );
+    updateDraftMock.mockClear();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Draft this section" }),
+    );
+    await screen.findByText("Section draft ready");
+
+    expect(updateDraftMock).toHaveBeenCalledWith(articleId, expect.any(Object));
+    expect(updateDraftMock.mock.invocationCallOrder[0]).toBeLessThan(
+      generateDraftSectionMock.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("regenerates with the latest direction and discards the proposal", async () => {
+    const emptyDraft = createDefaultDraft();
+    emptyDraft.sections[0] = {
+      ...emptyDraft.sections[0],
+      editorState: createEditorState([""]),
+    };
+    getDraftMock.mockResolvedValueOnce(apiDraft(emptyDraft));
+    render(<DraftEditor articleId={articleId} />);
+
+    await userEvent.click(
+      await screen.findByRole("radio", { name: /Draft this section/ }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Draft this section" }),
+    );
+    const proposal = await screen.findByRole("region", {
+      name: "Review the proposed section",
+    });
+    await userEvent.type(
+      within(proposal).getByRole("textbox", {
+        name: "Direction for another draft",
+      }),
+      "Use shorter paragraphs",
+    );
+    await userEvent.click(
+      within(proposal).getByRole("button", { name: "Generate another" }),
+    );
+    await waitFor(() =>
+      expect(generateDraftSectionMock).toHaveBeenLastCalledWith(
+        articleId,
+        emptyDraft.sections[0].id,
+        { instruction: "Use shorter paragraphs" },
+      ),
+    );
+    await userEvent.click(
+      within(proposal).getByRole("button", { name: "Discard" }),
+    );
+    expect(
+      screen.queryByRole("region", { name: "Review the proposed section" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("ignores a section-draft response after the active section changes", async () => {
+    const emptyDraft = createDefaultDraft();
+    emptyDraft.sections[0] = {
+      ...emptyDraft.sections[0],
+      editorState: createEditorState([""]),
+    };
+    getDraftMock.mockResolvedValueOnce(apiDraft(emptyDraft));
+    let resolveGeneration: (value: unknown) => void = () => undefined;
+    generateDraftSectionMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveGeneration = resolve;
+      }),
+    );
+    render(<DraftEditor articleId={articleId} />);
+
+    await userEvent.click(
+      await screen.findByRole("radio", { name: /Draft this section/ }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Draft this section" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "Go to The messy nature of great ideas",
+      }),
+    );
+    resolveGeneration({
+      section_id: emptyDraft.sections[0].id,
+      blocks: [{ type: "paragraph", text: "A stale response." }],
+    });
+
+    await waitFor(() =>
+      expect(screen.queryByText("A stale response.")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("retries service errors and does not retry blocked section drafts", async () => {
+    const emptyDraft = createDefaultDraft();
+    emptyDraft.sections[0] = {
+      ...emptyDraft.sections[0],
+      editorState: createEditorState([""]),
+    };
+    getDraftMock.mockResolvedValueOnce(apiDraft(emptyDraft));
+    generateDraftSectionMock
+      .mockRejectedValueOnce(
+        new ArticleRequestError(
+          503,
+          "section_draft_generation_unavailable",
+          "Section generation is unavailable.",
+        ),
+      )
+      .mockResolvedValueOnce({
+        section_id: emptyDraft.sections[0].id,
+        blocks: [{ type: "paragraph", text: "A recovered draft." }],
+      })
+      .mockRejectedValueOnce(
+        new ArticleRequestError(
+          422,
+          "section_draft_generation_blocked",
+          "This section cannot be generated.",
+        ),
+      );
+    render(<DraftEditor articleId={articleId} />);
+
+    await userEvent.click(
+      await screen.findByRole("radio", { name: /Draft this section/ }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Draft this section" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("unavailable");
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    const proposal = await screen.findByRole("region", {
+      name: "Review the proposed section",
+    });
+    await userEvent.click(
+      within(proposal).getByRole("button", { name: "Discard" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Draft this section" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "cannot be generated",
+    );
+    expect(
+      screen.queryByRole("button", { name: "Try again" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("returns section-draft authentication failures to login", async () => {
+    const emptyDraft = createDefaultDraft();
+    emptyDraft.sections[0] = {
+      ...emptyDraft.sections[0],
+      editorState: createEditorState([""]),
+    };
+    getDraftMock.mockResolvedValueOnce(apiDraft(emptyDraft));
+    generateDraftSectionMock.mockRejectedValueOnce(
+      new ArticleRequestError(401, "invalid_token", "Session expired."),
+    );
+    render(<DraftEditor articleId={articleId} />);
+
+    await userEvent.click(
+      await screen.findByRole("radio", { name: /Draft this section/ }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Draft this section" }),
+    );
+
+    await waitFor(() =>
+      expect(pushMock).toHaveBeenCalledWith(
+        `/login?next=${encodeURIComponent(`/articles/new/draft?articleId=${articleId}`)}`,
+      ),
+    );
   });
 
   it("navigates guided questions, retains answers, and completes locally", async () => {
@@ -1166,19 +1463,41 @@ describe("DraftEditor", () => {
     expect(
       await screen.findByRole("button", { name: "Assistant" }),
     ).toBeVisible();
+
+    await userEvent.click(screen.getByRole("button", { name: "Outline" }));
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "1. The messy nature of great ideas",
+      }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Assistant" }));
+    expect(
+      screen.getByLabelText(
+        "Current section: Section 2, The messy nature of great ideas",
+      ),
+    ).toBeVisible();
   });
 
   it("opens preview and marks the draft ready for review", async () => {
     render(<DraftEditor articleId={articleId} />);
 
     await screen.findByRole("complementary", { name: "Writing assistant" });
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "Go to The messy nature of great ideas",
+      }),
+    );
 
     await userEvent.click(
       screen.getAllByRole("button", { name: "Preview" })[0],
     );
+    const preview = screen.getByRole("dialog", { name: "Article preview" });
+    expect(preview).toBeVisible();
     expect(
-      screen.getByRole("dialog", { name: "Article preview" }),
-    ).toBeVisible();
+      within(preview).getByRole("heading", {
+        name: "1. The messy nature of great ideas",
+      }),
+    ).not.toHaveAttribute("aria-current");
     await userEvent.click(
       screen.getByRole("button", { name: /Back to editor/ }),
     );

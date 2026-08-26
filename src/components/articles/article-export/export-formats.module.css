@@ -1,0 +1,146 @@
+.fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.fieldset legend {
+  margin-bottom: 11px;
+  padding: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.options {
+  overflow: hidden;
+  border: 1px solid var(--color-ink-line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.option {
+  position: relative;
+  display: grid;
+  min-height: 75px;
+  grid-template-columns: 48px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 13px;
+  margin: 0 12px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--color-ink-line);
+  cursor: pointer;
+}
+
+.option:last-child {
+  border-bottom: 0;
+}
+
+.icon {
+  color: var(--color-ink-navy);
+}
+
+.copy {
+  display: grid;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.copy strong {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.description {
+  color: #3e506f;
+  font-size: 0.82rem;
+}
+
+.copy small {
+  position: absolute;
+  right: 55px;
+  color: var(--color-ink-muted);
+  font-size: 0.68rem;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.option input {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  accent-color: var(--color-ink-crimson);
+  cursor: pointer;
+}
+
+.disabled {
+  cursor: not-allowed;
+}
+
+.disabled .copy,
+.disabled .icon {
+  opacity: 0.76;
+}
+
+@media (max-width: 800px) {
+  .fieldset legend {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .options {
+    border-radius: 13px;
+  }
+
+  .option {
+    min-height: 55px;
+    grid-template-columns: 29px minmax(0, 1fr) 21px;
+    gap: 8px;
+    margin: 0;
+    padding: 0 18px;
+  }
+
+  .selected {
+    min-height: 68px;
+    background: var(--color-ink-blue-soft);
+  }
+
+  .icon {
+    width: 31px;
+    height: 31px;
+  }
+
+  .selected .icon {
+    color: #1976df;
+  }
+
+  .copy strong {
+    font-size: 0.93rem;
+  }
+
+  .description {
+    display: none;
+    margin-top: 2px;
+    font-size: 0.76rem;
+  }
+
+  .selected .description {
+    display: block;
+  }
+
+  .copy small {
+    position: static;
+    margin-top: 1px;
+    font-size: 0.5rem;
+  }
+
+  .option input {
+    width: 20px;
+    height: 20px;
+    accent-color: #1976df;
+  }
+}

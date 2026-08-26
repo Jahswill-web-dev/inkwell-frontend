@@ -1,0 +1,141 @@
+.summary {
+  align-self: start;
+  min-width: 0;
+  border: 1px solid #e3ddd4;
+  border-radius: 7px;
+  background: #fffdf9;
+  padding: 41px 43px 25px;
+}
+
+.eyebrow {
+  margin: 0 0 12px;
+  font-size: 0.83rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.summary h2 {
+  max-width: 390px;
+  margin: 0;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 1.75rem;
+  font-weight: 550;
+  letter-spacing: -0.015em;
+  line-height: 1.14;
+}
+
+.desktopMetrics {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin: 15px 0 18px;
+  color: #3e506f;
+  font-size: 0.84rem;
+}
+
+.details {
+  margin: 0;
+}
+
+.details > div {
+  display: grid;
+  gap: 4px;
+  padding: 18px 0;
+  border-top: 1px solid var(--color-ink-line);
+}
+
+.details dt,
+.preview h3 {
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.details dd {
+  margin: 0;
+  color: #3e506f;
+  font-size: 0.82rem;
+}
+
+.preview {
+  padding-top: 18px;
+  border-top: 1px solid var(--color-ink-line);
+}
+
+.preview h3 {
+  margin: 0 0 11px;
+}
+
+.preview > div {
+  min-height: 288px;
+  max-height: 330px;
+  overflow: hidden;
+  border: 1px solid var(--color-ink-line);
+  border-radius: 6px;
+  padding: 17px;
+  font-family: var(--font-newsreader), Georgia, serif;
+}
+
+.preview p {
+  margin: 0 0 19px;
+  font-size: 0.83rem;
+  line-height: 1.48;
+}
+
+.preview p:last-child {
+  margin-bottom: 0;
+}
+
+.mobileMetrics {
+  display: none;
+}
+
+@media (max-width: 800px) {
+  .summary {
+    margin-top: 9px;
+    border-color: #eadbc2;
+    border-radius: 13px;
+    background: #fffaf1;
+    padding: 16px 15px 18px;
+  }
+
+  .eyebrow {
+    margin-bottom: 12px;
+    font-size: 0.8rem;
+    text-transform: none;
+  }
+
+  .summary h2 {
+    max-width: none;
+    font-size: 1rem;
+    line-height: 1.26;
+  }
+
+  .desktopMetrics,
+  .details,
+  .preview {
+    display: none;
+  }
+
+  .mobileMetrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px 12px;
+    margin-top: 14px;
+  }
+
+  .mobileMetrics span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.72rem;
+    white-space: nowrap;
+  }
+
+  .mobileMetrics svg {
+    width: 24px;
+    height: 24px;
+    padding: 5px;
+    border-radius: 50%;
+    background: #f5f5f4;
+  }
+}

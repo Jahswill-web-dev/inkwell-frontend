@@ -1,0 +1,237 @@
+.issuePanel {
+  position: fixed;
+  inset: 91px 0 0 auto;
+  width: 355px;
+  overflow-y: auto;
+  border-left: 1px solid var(--color-ink-line);
+  background: var(--color-ink-paper);
+  padding: 31px 21px 35px;
+}
+
+.issueNavigation,
+.issueNavigation span,
+.issueDescription h2,
+.issueActions span,
+.summaryLink {
+  display: flex;
+  align-items: center;
+}
+
+.issueNavigation {
+  justify-content: space-between;
+  text-transform: uppercase;
+}
+
+.issueNavigation strong {
+  font-size: 0.74rem;
+  letter-spacing: 0.035em;
+}
+
+.issueNavigation span {
+  gap: 16px;
+}
+
+.issueNavigation button {
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+.issueNavigation button:disabled {
+  opacity: 0.3;
+}
+
+.issueDescription {
+  margin-top: 28px;
+  padding-bottom: 31px;
+  border-bottom: 1px solid var(--color-ink-line);
+}
+
+.issueDescription h2 {
+  gap: 10px;
+  margin: 0 0 10px;
+  font-size: 1rem;
+}
+
+.issueDescription h2 svg {
+  color: var(--color-ink-crimson);
+}
+
+.issueDescription p,
+.disclaimer {
+  margin: 0;
+  color: #31446e;
+  font-size: 0.85rem;
+  line-height: 1.65;
+}
+
+.revision {
+  display: grid;
+  gap: 10px;
+  padding-top: 29px;
+}
+
+.revision label {
+  margin-top: 2px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.revision div,
+.revision textarea {
+  min-height: 110px;
+  border: 1px solid var(--color-ink-line);
+  border-radius: 5px;
+  background: #fffefa;
+  color: inherit;
+  padding: 17px 14px;
+  font: inherit;
+  font-size: 0.8rem;
+  line-height: 1.62;
+}
+
+.revision .suggestion,
+.revision textarea {
+  min-height: 130px;
+  border-color: #b7d4fb;
+  background: #f1f7ff;
+}
+
+.revision textarea {
+  resize: vertical;
+}
+
+.issueActions {
+  display: grid;
+  gap: 12px;
+  margin-top: 38px;
+}
+
+.issueActions > button,
+.issueActions span button,
+.emptyState button {
+  min-height: 47px;
+  border: 1px solid #cbd3e1;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.issueActions > button {
+  border-color: var(--color-ink-crimson);
+  background: var(--color-ink-crimson);
+  color: #fff;
+}
+
+.issueActions span {
+  gap: 12px;
+}
+
+.issueActions span button {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.summaryLink {
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 22px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 10px 0;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.disclaimer {
+  margin-top: 20px;
+  font-size: 0.68rem;
+}
+
+.disclaimer a {
+  color: inherit;
+}
+
+.emptyState {
+  display: grid;
+  min-height: 440px;
+  align-content: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.emptyState h2,
+.emptyState p {
+  margin: 0;
+}
+
+@media (max-width: 800px) {
+  .issuePanel {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 12;
+    width: auto;
+    max-height: 41svh;
+    overflow-y: auto;
+    border: 1px solid var(--color-ink-line);
+    border-radius: 24px 24px 0 0;
+    background: rgba(255, 255, 255, 0.98);
+    padding: 17px 28px 30px;
+    box-shadow: 0 -8px 30px rgba(7, 25, 79, 0.08);
+  }
+
+  .issuePanel::before {
+    display: block;
+    width: 44px;
+    height: 5px;
+    margin: -10px auto 10px;
+    border-radius: 4px;
+    background: #b9b9b9;
+    content: "";
+  }
+
+  .issueDescription {
+    margin-top: 8px;
+    padding-bottom: 10px;
+  }
+
+  .revision {
+    gap: 6px;
+    padding-top: 10px;
+  }
+
+  .revision > label:first-child,
+  .revision > div:first-of-type {
+    display: none;
+  }
+
+  .issueActions {
+    margin-top: 10px;
+  }
+
+  .revision .suggestion,
+  .revision textarea {
+    min-height: 100px;
+    padding: 12px;
+  }
+
+  .summaryLink {
+    margin-top: 10px;
+  }
+
+  .disclaimer {
+    display: none;
+  }
+}

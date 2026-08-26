@@ -1,0 +1,37 @@
+.optionsRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 24px;
+}
+
+.forgotLink {
+  color: var(--color-ink-crimson);
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.25;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.forgotLink:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 800px) {
+  .optionsRow {
+    gap: 16px;
+  }
+
+  .forgotLink {
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .optionsRow {
+    align-items: flex-start;
+    gap: 12px;
+  }
+}

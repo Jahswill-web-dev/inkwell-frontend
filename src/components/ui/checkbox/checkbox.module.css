@@ -1,0 +1,31 @@
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 13px;
+  color: var(--color-ink-navy);
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.25;
+  cursor: pointer;
+}
+
+.input {
+  width: 25px;
+  height: 25px;
+  flex: none;
+  margin: 0;
+  accent-color: var(--color-ink-navy);
+  cursor: pointer;
+}
+
+@media (max-width: 800px) {
+  .checkbox {
+    gap: 12px;
+    font-size: 0.9rem;
+  }
+
+  .input {
+    width: 20px;
+    height: 20px;
+  }
+}

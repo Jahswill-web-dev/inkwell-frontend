@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-ink-navy: #07194f; /*Primary color*/
+  --color-ink-navy: #07194f;  /*Primary color*/
   --color-ink-navy-deep: #030b24; /*Dark Primary color*/
   --color-ink-crimson: #c50032; /*Secondary color*/
   --color-ink-crimson-dark: #a70029; /*Dark Secondary*/
@@ -15,10 +15,6 @@
   --font-sans: var(--font-manrope), "Segoe UI", sans-serif; /*Body and UI text*/
   --font-display: var(--font-newsreader), Georgia, serif; /*Editorial headings*/
   --shadow-product: 0 24px 64px rgba(7, 25, 79, 0.13); /*Product screenshots and previews*/
-}
-
-:root {
-  --dashboard-sidebar-width: 215px;
 }
 
 @layer base {

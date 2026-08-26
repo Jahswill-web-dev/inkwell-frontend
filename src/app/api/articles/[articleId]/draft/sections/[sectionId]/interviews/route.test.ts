@@ -83,7 +83,9 @@ describe("section interview proxies", () => {
         )
       ).status,
     ).toBe(200);
-    expect(postMock).toHaveBeenNthCalledWith(1, basePath);
+    expect(postMock).toHaveBeenNthCalledWith(1, basePath, undefined, {
+      timeout: 120_000,
+    });
 
     await createInterview(
       new Request("http://local", {
@@ -92,9 +94,12 @@ describe("section interview proxies", () => {
       }),
       sectionContext,
     );
-    expect(postMock).toHaveBeenNthCalledWith(2, basePath, {
-      instruction: "Focus on lessons",
-    });
+    expect(postMock).toHaveBeenNthCalledWith(
+      2,
+      basePath,
+      { instruction: "Focus on lessons" },
+      { timeout: 120_000 },
+    );
   });
 
   it("gets the latest and a particular interview", async () => {
@@ -135,6 +140,8 @@ describe("section interview proxies", () => {
     );
     expect(postMock).toHaveBeenCalledWith(
       `${basePath}/${interviewId}/generate`,
+      undefined,
+      { timeout: 120_000 },
     );
   });
 
@@ -196,6 +203,34 @@ describe("section interview proxies", () => {
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({
       error: { code: "section_interview_stale" },
+    });
+  });
+
+  it("returns specific 504 errors when Write with me times out", async () => {
+    postMock.mockRejectedValueOnce({
+      isAxiosError: true,
+      code: "ECONNABORTED",
+    });
+    const createResponse = await createInterview(
+      new Request("http://local", { method: "POST" }),
+      sectionContext,
+    );
+    expect(createResponse.status).toBe(504);
+    expect(await createResponse.json()).toMatchObject({
+      error: { code: "section_interview_creation_timeout" },
+    });
+
+    postMock.mockRejectedValueOnce({
+      isAxiosError: true,
+      code: "ETIMEDOUT",
+    });
+    const generateResponse = await generateInterview(
+      new Request("http://local", { method: "POST" }),
+      interviewContext,
+    );
+    expect(generateResponse.status).toBe(504);
+    expect(await generateResponse.json()).toMatchObject({
+      error: { code: "section_interview_generation_timeout" },
     });
   });
 });

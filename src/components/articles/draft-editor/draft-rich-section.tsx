@@ -127,6 +127,7 @@ export function DraftRichSection({
   onChange,
   onEditor,
   onSelection,
+  temporaryContent,
 }: {
   section: DraftSection;
   index: number;
@@ -135,6 +136,7 @@ export function DraftRichSection({
   onChange?: (sectionId: string, editorState: string) => void;
   onEditor?: (sectionId: string, editor: LexicalEditor) => void;
   onSelection?: (sectionId: string, text: string) => void;
+  temporaryContent?: ReactNode;
 }) {
   const initialConfig = {
     namespace: `inkwell-draft-${section.id}-${readOnly ? "preview" : "editor"}`,
@@ -176,41 +178,44 @@ export function DraftRichSection({
           {index}. {section.title}
         </h2>
       ) : null}
-      <LexicalComposer initialConfig={initialConfig}>
-        <div className={styles.editorShell}>
-          <RichTextPlugin
-            contentEditable={
-              <ContentEditable
-                aria-label={`${section.title} draft content`}
-                className={styles.editorContent}
-              />
-            }
-            placeholder={
-              <span className={styles.editorPlaceholder}>
-                Start writing this section…
-              </span>
-            }
-            ErrorBoundary={({ children }) => children}
-          />
-          {!readOnly ? (
-            <>
-              <HistoryPlugin />
-              <ListPlugin />
-              <LinkPlugin />
-              <OnChangePlugin
-                ignoreSelectionChange
-                onChange={(editorState: EditorState) =>
-                  onChange?.(section.id, JSON.stringify(editorState.toJSON()))
-                }
-              />
-              <EditorBridge
-                onEditor={(editor) => onEditor?.(section.id, editor)}
-                onSelection={(text) => onSelection?.(section.id, text)}
-              />
-            </>
-          ) : null}
-        </div>
-      </LexicalComposer>
+      <div hidden={Boolean(temporaryContent)}>
+        <LexicalComposer initialConfig={initialConfig}>
+          <div className={styles.editorShell}>
+            <RichTextPlugin
+              contentEditable={
+                <ContentEditable
+                  aria-label={`${section.title} draft content`}
+                  className={styles.editorContent}
+                />
+              }
+              placeholder={
+                <span className={styles.editorPlaceholder}>
+                  Start writing this section…
+                </span>
+              }
+              ErrorBoundary={({ children }) => children}
+            />
+            {!readOnly ? (
+              <>
+                <HistoryPlugin />
+                <ListPlugin />
+                <LinkPlugin />
+                <OnChangePlugin
+                  ignoreSelectionChange
+                  onChange={(editorState: EditorState) =>
+                    onChange?.(section.id, JSON.stringify(editorState.toJSON()))
+                  }
+                />
+                <EditorBridge
+                  onEditor={(editor) => onEditor?.(section.id, editor)}
+                  onSelection={(text) => onSelection?.(section.id, text)}
+                />
+              </>
+            ) : null}
+          </div>
+        </LexicalComposer>
+      </div>
+      {temporaryContent}
     </section>
   );
 }

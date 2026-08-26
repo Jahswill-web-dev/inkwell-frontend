@@ -5,6 +5,8 @@ import { createAuthApiClient } from "@/lib/auth/backend";
 import { AUTH_COOKIE_NAME, authCookieOptions } from "@/lib/auth/constants";
 import { articleApiErrorSchema } from "./article";
 
+export const ARTICLE_GENERATION_TIMEOUT_MS = 120_000;
+
 export function articleErrorResponse(
   status: number,
   code: string,
@@ -25,6 +27,13 @@ export function articleBackendClient(token: string) {
   const client = createAuthApiClient();
   client.defaults.headers.common.Authorization = `Bearer ${token}`;
   return client;
+}
+
+export function isArticleRequestTimeout(error: unknown): boolean {
+  return (
+    axios.isAxiosError(error) &&
+    (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT")
+  );
 }
 
 export function articleUpstreamError(error: unknown): NextResponse {

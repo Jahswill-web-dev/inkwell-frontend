@@ -5,10 +5,12 @@ import {
   talkingPointsResultSchema,
 } from "@/lib/articles/draft";
 import {
+  ARTICLE_GENERATION_TIMEOUT_MS,
   articleBackendClient,
   articleErrorResponse,
   articleUpstreamError,
   getArticleToken,
+  isArticleRequestTimeout,
 } from "@/lib/articles/server";
 
 const idSchema = z.string().uuid();
@@ -63,13 +65,23 @@ export async function POST(request: Request, context: RouteContext) {
     const path = `/api/v1/articles/${parsedArticleId.data}/draft/sections/${parsedSectionId.data}/talking-points`;
     const client = articleBackendClient(token);
     const response = input.data.instruction
-      ? await client.post(path, input.data)
-      : await client.post(path);
+      ? await client.post(path, input.data, {
+          timeout: ARTICLE_GENERATION_TIMEOUT_MS,
+        })
+      : await client.post(path, undefined, {
+          timeout: ARTICLE_GENERATION_TIMEOUT_MS,
+        });
     const result = talkingPointsResultSchema.safeParse(response.data);
     if (!result.success || result.data.section_id !== parsedSectionId.data)
       throw new Error("Invalid talking-points response");
     return NextResponse.json(result.data);
   } catch (error) {
+    if (isArticleRequestTimeout(error))
+      return articleErrorResponse(
+        504,
+        "talking_points_generation_timeout",
+        "Talking-point generation timed out. Please try again.",
+      );
     return articleUpstreamError(error);
   }
 }

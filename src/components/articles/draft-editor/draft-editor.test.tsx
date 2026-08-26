@@ -570,13 +570,16 @@ describe("DraftEditor", () => {
       screen.getAllByRole("textbox", { name: /Add a direction/ })[0],
       "Keep it practical",
     );
+    const editor = screen.getByRole("textbox", {
+      name: "Introduction draft content",
+    });
     updateDraftMock.mockClear();
     await userEvent.click(
       screen.getAllByRole("button", { name: "Draft this section" })[0],
     );
 
     const proposal = await screen.findByRole("region", {
-      name: "Review the proposed section",
+      name: "AI draft for Introduction",
     });
     expect(generateDraftSectionMock).toHaveBeenCalledWith(
       articleId,
@@ -590,13 +593,14 @@ describe("DraftEditor", () => {
     const proposalLists = within(proposal).getAllByRole("list");
     expect(proposalLists[0].tagName).toBe("UL");
     expect(proposalLists[1].tagName).toBe("OL");
-    const editor = screen.getByRole("textbox", {
-      name: "Introduction draft content",
-    });
     expect(editor).not.toHaveTextContent("A generated opening.");
+    const assistant = screen.getByRole("complementary", {
+      name: "Writing assistant",
+    });
+    expect(within(assistant).queryByText("A generated opening.")).toBeNull();
 
     await userEvent.click(
-      within(proposal).getByRole("button", { name: "Replace section" }),
+      within(proposal).getByRole("button", { name: "Use this draft" }),
     );
     await waitFor(() =>
       expect(editor).toHaveTextContent("A generated opening."),
@@ -608,7 +612,7 @@ describe("DraftEditor", () => {
     const savedPatch = updateDraftMock.mock.calls.at(-1)?.[1];
     expect(savedPatch.sections[0].editor_state).toContain('"type":"heading"');
     expect(
-      screen.queryByRole("region", { name: "Review the proposed section" }),
+      screen.queryByRole("region", { name: "AI draft for Introduction" }),
     ).not.toBeInTheDocument();
   }, 10_000);
 
@@ -623,6 +627,9 @@ describe("DraftEditor", () => {
       new ArticleRequestError(503, "draft_unavailable", "Save unavailable."),
     );
     render(<DraftEditor articleId={articleId} />);
+    const editor = await screen.findByRole("textbox", {
+      name: "Introduction draft content",
+    });
 
     await userEvent.click(
       await screen.findByRole("radio", { name: /Draft this section/ }),
@@ -631,20 +638,18 @@ describe("DraftEditor", () => {
       screen.getAllByRole("button", { name: "Draft this section" })[0],
     );
     const proposal = await screen.findByRole("region", {
-      name: "Review the proposed section",
+      name: "AI draft for Introduction",
     });
     await userEvent.click(
-      within(proposal).getByRole("button", { name: "Replace section" }),
+      within(proposal).getByRole("button", { name: "Use this draft" }),
     );
 
     expect(await within(proposal).findByRole("alert")).toHaveTextContent(
       "Save unavailable",
     );
+    expect(editor).not.toHaveTextContent("A generated opening.");
     expect(
-      screen.getByRole("textbox", { name: "Introduction draft content" }),
-    ).not.toHaveTextContent("A generated opening.");
-    expect(
-      within(proposal).getByRole("button", { name: "Replace section" }),
+      within(proposal).getByRole("button", { name: "Use this draft" }),
     ).toBeEnabled();
   });
 
@@ -667,7 +672,7 @@ describe("DraftEditor", () => {
     await userEvent.click(
       screen.getByRole("button", { name: "Draft this section" }),
     );
-    await screen.findByText("Section draft ready");
+    await screen.findByText("Draft ready — review it in the article.");
 
     expect(updateDraftMock).toHaveBeenCalledWith(articleId, expect.any(Object));
     expect(updateDraftMock.mock.invocationCallOrder[0]).toBeLessThan(
@@ -684,23 +689,25 @@ describe("DraftEditor", () => {
     getDraftMock.mockResolvedValueOnce(apiDraft(emptyDraft));
     render(<DraftEditor articleId={articleId} />);
 
+    const draftMode = await screen.findByRole("radio", {
+      name: /Draft this section/,
+    });
+    await userEvent.click(draftMode);
+    await waitFor(() => expect(draftMode).toBeChecked());
     await userEvent.click(
-      await screen.findByRole("radio", { name: /Draft this section/ }),
-    );
-    await userEvent.click(
-      screen.getByRole("button", { name: "Draft this section" }),
+      await screen.findByRole("button", { name: "Draft this section" }),
     );
     const proposal = await screen.findByRole("region", {
-      name: "Review the proposed section",
+      name: "AI draft for Introduction",
     });
     await userEvent.type(
-      within(proposal).getByRole("textbox", {
-        name: "Direction for another draft",
+      screen.getByRole("textbox", {
+        name: "Direction for regeneration",
       }),
       "Use shorter paragraphs",
     );
     await userEvent.click(
-      within(proposal).getByRole("button", { name: "Generate another" }),
+      within(proposal).getByRole("button", { name: "Regenerate" }),
     );
     await waitFor(() =>
       expect(generateDraftSectionMock).toHaveBeenLastCalledWith(
@@ -713,7 +720,7 @@ describe("DraftEditor", () => {
       within(proposal).getByRole("button", { name: "Discard" }),
     );
     expect(
-      screen.queryByRole("region", { name: "Review the proposed section" }),
+      screen.queryByRole("region", { name: "AI draft for Introduction" }),
     ).not.toBeInTheDocument();
   });
 
@@ -736,7 +743,7 @@ describe("DraftEditor", () => {
       await screen.findByRole("radio", { name: /Draft this section/ }),
     );
     await userEvent.click(
-      screen.getByRole("button", { name: "Draft this section" }),
+      await screen.findByRole("button", { name: "Draft this section" }),
     );
     await userEvent.click(
       screen.getByRole("button", {
@@ -790,7 +797,7 @@ describe("DraftEditor", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("unavailable");
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     const proposal = await screen.findByRole("region", {
-      name: "Review the proposed section",
+      name: "AI draft for Introduction",
     });
     await userEvent.click(
       within(proposal).getByRole("button", { name: "Discard" }),
@@ -1476,6 +1483,51 @@ describe("DraftEditor", () => {
         "Current section: Section 2, The messy nature of great ideas",
       ),
     ).toBeVisible();
+  });
+
+  it("collapses mobile tools and reveals inline section generation", async () => {
+    const emptyDraft = createDefaultDraft();
+    emptyDraft.sections[0] = {
+      ...emptyDraft.sections[0],
+      editorState: createEditorState([""]),
+    };
+    getDraftMock.mockResolvedValueOnce(apiDraft(emptyDraft));
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      addEventListener: vi.fn(),
+      matches: query === "(max-width: 800px)",
+      media: query,
+      onchange: null,
+      removeEventListener: vi.fn(),
+    }));
+    let resolveGeneration: (value: unknown) => void = () => undefined;
+    generateDraftSectionMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveGeneration = resolve;
+      }),
+    );
+    render(<DraftEditor articleId={articleId} />);
+
+    await screen.findByRole("button", { name: "Assistant" });
+    const mobileDraftMode = await screen.findByRole("radio", {
+      name: /Draft this section/,
+    });
+    await userEvent.click(mobileDraftMode);
+    await waitFor(() => expect(mobileDraftMode).toBeChecked());
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Draft this section" }),
+    );
+
+    expect(
+      await screen.findByRole("status", { name: "Drafting Introduction" }),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Expand tools" })).toBeVisible();
+    resolveGeneration({
+      section_id: emptyDraft.sections[0].id,
+      blocks: [{ type: "paragraph", text: "A mobile draft preview." }],
+    });
+    expect(
+      await screen.findByRole("region", { name: "AI draft for Introduction" }),
+    ).toHaveTextContent("A mobile draft preview.");
   });
 
   it("opens preview and marks the draft ready for review", async () => {

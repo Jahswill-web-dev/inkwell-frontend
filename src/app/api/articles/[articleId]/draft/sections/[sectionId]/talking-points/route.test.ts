@@ -44,7 +44,9 @@ describe("talking-points proxy", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(postMock).toHaveBeenCalledWith(path);
+    expect(postMock).toHaveBeenCalledWith(path, undefined, {
+      timeout: 120_000,
+    });
   });
 
   it("trims and forwards an optional instruction", async () => {
@@ -57,9 +59,11 @@ describe("talking-points proxy", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(postMock).toHaveBeenCalledWith(path, {
-      instruction: "Focus on costs",
-    });
+    expect(postMock).toHaveBeenCalledWith(
+      path,
+      { instruction: "Focus on costs" },
+      { timeout: 120_000 },
+    );
   });
 
   it("validates authentication, IDs, and instructions", async () => {
@@ -121,6 +125,23 @@ describe("talking-points proxy", () => {
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({
       error: { code: "talking_points_generation_unavailable" },
+    });
+  });
+
+  it("returns a specific 504 when frontend generation times out", async () => {
+    postMock.mockRejectedValueOnce({
+      isAxiosError: true,
+      code: "ECONNABORTED",
+    });
+
+    const response = await POST(
+      new Request("http://local", { method: "POST" }),
+      context,
+    );
+
+    expect(response.status).toBe(504);
+    expect(await response.json()).toMatchObject({
+      error: { code: "talking_points_generation_timeout" },
     });
   });
 });

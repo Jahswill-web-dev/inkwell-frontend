@@ -5,10 +5,12 @@ import {
   sectionInterviewSchema,
 } from "@/lib/articles/interview";
 import {
+  ARTICLE_GENERATION_TIMEOUT_MS,
   articleBackendClient,
   articleErrorResponse,
   articleUpstreamError,
   getArticleToken,
+  isArticleRequestTimeout,
 } from "@/lib/articles/server";
 
 const idSchema = z.string().uuid();
@@ -63,8 +65,12 @@ export async function POST(request: Request, context: RouteContext) {
     const path = `/api/v1/articles/${parsedArticleId.data}/draft/sections/${parsedSectionId.data}/interviews`;
     const client = articleBackendClient(token);
     const response = input.data.instruction
-      ? await client.post(path, input.data)
-      : await client.post(path);
+      ? await client.post(path, input.data, {
+          timeout: ARTICLE_GENERATION_TIMEOUT_MS,
+        })
+      : await client.post(path, undefined, {
+          timeout: ARTICLE_GENERATION_TIMEOUT_MS,
+        });
     const interview = sectionInterviewSchema.safeParse(response.data);
     if (
       !interview.success ||
@@ -74,6 +80,12 @@ export async function POST(request: Request, context: RouteContext) {
       throw new Error("Invalid section-interview response");
     return NextResponse.json(interview.data);
   } catch (error) {
+    if (isArticleRequestTimeout(error))
+      return articleErrorResponse(
+        504,
+        "section_interview_creation_timeout",
+        "Starting Write with me timed out. Please try again.",
+      );
     return articleUpstreamError(error);
   }
 }

@@ -164,10 +164,21 @@ export function toArticleInputFromSetup(values: ArticleSetup): ArticleInput {
   });
 }
 
-export type ArticleSetupMetadata = Omit<
-  ArticleSetup,
-  "workingTitle" | "targetAudience" | "articleGoal" | "existingNotes"
->;
+export const articleSetupMetadataSchema = z.object({
+  clientName: z.string().trim().min(1).max(120),
+  contentType: z.enum(contentTypes),
+  mainAngle: z.string().trim().min(1).max(1_000),
+  keyMessage: z.string().trim().min(1).max(1_000),
+  callToAction: z.string().trim().max(500),
+  tone: z.string().trim().min(1).max(500),
+  targetLength: z.enum(targetLengths),
+  seoKeyword: z.string().trim().max(200),
+  interviewMethod: z.enum(interviewMethods),
+  intervieweeName: z.string().trim().max(120),
+  interviewInstructions: z.string().trim().max(1_000),
+});
+
+export type ArticleSetupMetadata = z.infer<typeof articleSetupMetadataSchema>;
 
 export function toArticleSetupMetadata(
   values: ArticleSetup,

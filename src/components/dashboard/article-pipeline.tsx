@@ -23,7 +23,7 @@ type ArticlePipelineProps = {
 };
 
 function articleHref(articleId: string) {
-  return `/articles/new/brief?articleId=${encodeURIComponent(articleId)}`;
+  return `/articles/${encodeURIComponent(articleId)}`;
 }
 
 export function ArticlePipeline({

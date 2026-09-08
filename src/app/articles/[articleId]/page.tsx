@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { ArticleEditScreen } from "@/components/articles/new-article/article-edit-screen";
+import { ArticleWorkspace } from "@/components/articles/article-workspace/article-workspace";
 import { requireUser } from "@/lib/auth/session";
 import { toAuthIdentity } from "@/lib/auth/identity";
 
 export const metadata: Metadata = {
-  title: "Edit article",
-  description: "Update or delete an article intake.",
+  title: "Article workspace",
+  description:
+    "Manage article interviews, source material, and writing progress.",
 };
 
 export default async function ArticlePage({
@@ -15,5 +16,7 @@ export default async function ArticlePage({
 }) {
   const { articleId } = await params;
   const user = await requireUser(`/articles/${articleId}`);
-  return <ArticleEditScreen articleId={articleId} identity={toAuthIdentity(user)} />;
+  return (
+    <ArticleWorkspace articleId={articleId} identity={toAuthIdentity(user)} />
+  );
 }

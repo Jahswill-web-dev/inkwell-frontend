@@ -78,7 +78,7 @@ describe("DashboardHome", () => {
       for (const title of titles) {
         expect(title.closest("a")).toHaveAttribute(
           "href",
-          `/articles/new/brief?articleId=${encodeURIComponent(article.id)}`,
+          `/articles/${encodeURIComponent(article.id)}`,
         );
       }
     }

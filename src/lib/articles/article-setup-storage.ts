@@ -1,4 +1,5 @@
 import {
+  articleSetupMetadataSchema,
   articleSetupSchema,
   type ArticleSetupMetadata,
   type ArticleSetupValues,
@@ -42,4 +43,18 @@ export function saveArticleSetupMetadata(
     `${METADATA_PREFIX}${articleId}`,
     JSON.stringify(metadata),
   );
+}
+
+export function loadArticleSetupMetadata(
+  articleId: string,
+): ArticleSetupMetadata | null {
+  if (!storageAvailable()) return null;
+  try {
+    const raw = window.sessionStorage.getItem(`${METADATA_PREFIX}${articleId}`);
+    if (!raw) return null;
+    const result = articleSetupMetadataSchema.safeParse(JSON.parse(raw));
+    return result.success ? result.data : null;
+  } catch {
+    return null;
+  }
 }

@@ -5,7 +5,7 @@ import { isOverdue } from "@/lib/dashboard/agency-filters";
 import styles from "./attention-panel.module.css";
 
 function articleHref(articleId: string) {
-  return `/articles/new/brief?articleId=${encodeURIComponent(articleId)}`;
+  return `/articles/${encodeURIComponent(articleId)}`;
 }
 
 export function AttentionPanel({

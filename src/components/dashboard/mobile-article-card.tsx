@@ -9,7 +9,7 @@ import { dueDateTone, formatDueDate } from "@/lib/dashboard/agency-format";
 import styles from "./article-pipeline.module.css";
 
 function articleHref(articleId: string) {
-  return `/articles/new/brief?articleId=${encodeURIComponent(articleId)}`;
+  return `/articles/${encodeURIComponent(articleId)}`;
 }
 
 export function MobileArticleCard({

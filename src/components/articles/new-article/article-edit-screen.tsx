@@ -41,7 +41,7 @@ export function ArticleEditScreen({
     <main className={styles.statePage}>
       {state === "loading" ? <><h1>Loading article…</h1><p>Please wait while we load your intake.</p></> : null}
       {state === "not-found" ? <><h1>Article not found</h1><p>This article is unavailable or does not belong to your account.</p><Link href="/dashboard">Return to dashboard</Link></> : null}
-      {state === "unauthorized" ? <><h1>Your session expired</h1><p>Sign in again to continue editing.</p><Link href={`/login?next=${encodeURIComponent(`/articles/${articleId}`)}`}>Sign in</Link></> : null}
+      {state === "unauthorized" ? <><h1>Your session expired</h1><p>Sign in again to continue editing.</p><Link href={`/login?next=${encodeURIComponent(`/articles/${articleId}/edit`)}`}>Sign in</Link></> : null}
       {state === "error" ? <><h1>We couldn’t load this article</h1><p>The article service may be temporarily unavailable.</p><button type="button" onClick={() => { setState("loading"); setRetryKey((key) => key + 1); }}>Try again</button></> : null}
     </main>
   );

@@ -131,7 +131,7 @@ test("keeps the existing primary dashboard actions", async ({ page }) => {
   await expect(page).toHaveURL(/\/articles\/new$/);
   await expect(
     page.getByRole("heading", {
-      name: "Turn your notes into a clear article.",
+      name: "Create a client article",
     }),
   ).toBeVisible();
 });

@@ -28,6 +28,25 @@ async function completeEditorialSetup(page: import("@playwright/test").Page) {
   await page.getByRole("button", { name: /Continue/ }).click();
 }
 
+async function mockEmptyWorkspaceResources(
+  page: import("@playwright/test").Page,
+) {
+  for (const resource of ["brief", "outline", "draft"]) {
+    await page.route(
+      `**/api/articles/${article.id}/${resource}`,
+      async (route) => {
+        await route.fulfill({
+          status: 404,
+          contentType: "application/json",
+          body: JSON.stringify({
+            error: { code: "not_found", message: "Not found" },
+          }),
+        });
+      },
+    );
+  }
+}
+
 test("creates a client article and prepares its interview handoff", async ({
   page,
 }) => {
@@ -47,6 +66,7 @@ test("creates a client article and prepares its interview handoff", async ({
       body: JSON.stringify(article),
     });
   });
+  await mockEmptyWorkspaceResources(page);
 
   await page.goto("/articles/new");
   await expect(
@@ -63,11 +83,15 @@ test("creates a client article and prepares its interview handoff", async ({
     new RegExp(`/articles/${article.id}\\?next=client-interview$`),
   );
   await expect(
-    page.getByRole("heading", { name: "Refine your article intake." }),
+    page.getByRole("heading", { name: article.working_title }),
   ).toBeVisible();
   await expect(
-    page.getByRole("textbox", { name: /Working title/ }),
-  ).toHaveValue(article.working_title);
+    page.getByRole("heading", { name: "Create the client interview link" }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: /Edit setup/ })).toHaveAttribute(
+    "href",
+    `/articles/${article.id}/edit`,
+  );
 });
 
 test("creates an article from existing material and continues to the brief", async ({

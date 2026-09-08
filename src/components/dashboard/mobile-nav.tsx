@@ -2,7 +2,7 @@ import { Article, Gear, House, Lightbulb } from "@phosphor-icons/react";
 import styles from "./dashboard.module.css";
 
 const items = [
-  { label: "Home", icon: House },
+  { label: "Workspace", icon: House },
   { label: "Articles", icon: Article },
   { label: "Ideas", icon: Lightbulb },
   { label: "Settings", icon: Gear },

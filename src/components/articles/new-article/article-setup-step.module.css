@@ -1,0 +1,132 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 26px 30px;
+}
+
+.field {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.field > span,
+.methods legend {
+  color: var(--color-ink-navy);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #d6d1ca;
+  border-radius: 6px;
+  background: #fffefa;
+  color: var(--color-ink-navy);
+  font: inherit;
+  font-size: 0.94rem;
+  padding: 0 15px;
+}
+
+.field input,
+.field select {
+  height: 51px;
+}
+
+.field textarea {
+  min-height: 116px;
+  padding-block: 13px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: var(--color-ink-navy);
+  box-shadow: 0 0 0 3px rgb(7 25 79 / 10%);
+  outline: none;
+}
+
+.field [aria-invalid="true"] {
+  border-color: var(--color-ink-crimson);
+}
+
+.field small {
+  color: #65728b;
+  font-size: 0.77rem;
+  line-height: 1.35;
+}
+
+.field .error {
+  color: var(--color-ink-crimson);
+}
+
+.interviewStep {
+  display: grid;
+  gap: 28px;
+}
+
+.methods {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.methods legend {
+  margin-bottom: 12px;
+}
+
+.method {
+  display: flex;
+  min-height: 78px;
+  box-sizing: border-box;
+  align-items: flex-start;
+  gap: 13px;
+  padding: 16px;
+  border: 1px solid #d6d1ca;
+  border-radius: 8px;
+  background: #fffefa;
+  cursor: pointer;
+}
+
+.method[data-selected="true"] {
+  border-color: var(--color-ink-navy);
+  box-shadow: 0 0 0 2px rgb(7 25 79 / 8%);
+}
+
+.method input {
+  width: 17px;
+  height: 17px;
+  margin: 3px 0 0;
+  accent-color: var(--color-ink-crimson);
+}
+
+.method span {
+  display: grid;
+  gap: 4px;
+}
+
+.method strong {
+  font-size: 0.94rem;
+}
+
+.method small {
+  color: #556684;
+  font-size: 0.82rem;
+  line-height: 1.42;
+}
+
+@media (max-width: 760px) {
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+}

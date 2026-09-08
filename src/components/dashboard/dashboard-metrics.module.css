@@ -1,0 +1,113 @@
+.metricGrid {
+  display: grid;
+  margin-top: 28px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metricCard {
+  display: flex;
+  min-width: 0;
+  min-height: 92px;
+  align-items: center;
+  gap: 14px;
+  padding: 17px;
+  border: 1px solid var(--color-ink-line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.metricIcon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: none;
+  place-items: center;
+  border-radius: 7px;
+  background: #eef2f8;
+  color: var(--color-ink-navy);
+}
+
+.metricCard[data-tone="amber"] .metricIcon {
+  background: #fff3dd;
+  color: #9b6300;
+}
+
+.metricCard[data-tone="green"] .metricIcon {
+  background: #e8f4eb;
+  color: #2f7144;
+}
+
+.metricCard[data-tone="blue"] .metricIcon {
+  background: #eaf1ff;
+  color: #315f9d;
+}
+
+.metricCard div {
+  min-width: 0;
+}
+
+.metricCard strong,
+.metricCard span:last-child {
+  display: block;
+}
+
+.metricCard strong {
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.metricCard div > span {
+  overflow: hidden;
+  margin-top: 5px;
+  color: #5d6b84;
+  font-size: 0.76rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1180px) {
+  .metricGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 800px) {
+  .metricGrid {
+    margin-top: 22px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+
+  .metricCard {
+    min-height: 84px;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .metricIcon {
+    width: 35px;
+    height: 35px;
+  }
+
+  .metricCard strong {
+    font-size: 1.45rem;
+  }
+
+  .metricCard div > span {
+    font-size: 0.65rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .metricCard {
+    padding: 10px;
+  }
+
+  .metricIcon {
+    display: none;
+  }
+}

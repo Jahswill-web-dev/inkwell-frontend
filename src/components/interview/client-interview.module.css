@@ -1,0 +1,381 @@
+.page,
+.statePage,
+.loading {
+  min-height: 100svh;
+  background:
+    radial-gradient(circle at 10% 0%, rgb(197 0 50 / 7%), transparent 30%),
+    var(--color-ink-paper);
+  color: var(--color-ink-navy);
+}
+
+.publicHeader {
+  display: flex;
+  width: min(100% - 48px, 1040px);
+  min-height: 76px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 auto;
+  border-bottom: 1px solid var(--color-ink-line);
+}
+
+.brand {
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 1.42rem;
+  font-weight: 700;
+}
+
+.publicHeader > span {
+  color: #6e788c;
+  font-size: 0.74rem;
+}
+
+.publicHeader > button {
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: #53617a;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.welcome,
+.conversation {
+  width: min(100% - 40px, 720px);
+  margin: 0 auto;
+}
+
+.welcome {
+  display: grid;
+  justify-items: center;
+  padding: clamp(70px, 11vh, 120px) 0 50px;
+  text-align: center;
+}
+
+.clientLabel,
+.eyebrow,
+.thankYou > span {
+  color: var(--color-ink-crimson);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.welcome h1,
+.conversation h1,
+.stateCard h1,
+.thankYou h1 {
+  margin: 13px 0 0;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-weight: 560;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+}
+
+.welcome h1 {
+  max-width: 680px;
+  font-size: clamp(2.25rem, 6vw, 3.45rem);
+}
+
+.welcome > p {
+  max-width: 600px;
+  margin: 20px 0 0;
+  color: #56647c;
+  font-size: 0.93rem;
+  line-height: 1.7;
+}
+
+.expectations {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.expectations span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 13px;
+  border: 1px solid #dedad4;
+  border-radius: 7px;
+  background: #fffefa;
+  color: #465672;
+  font-size: 0.76rem;
+}
+
+.primaryButton,
+.secondaryButton,
+.thankYou button,
+.stateCard button {
+  display: inline-flex;
+  min-height: 45px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 18px;
+  border: 1px solid var(--color-ink-crimson);
+  border-radius: 5px;
+  background: var(--color-ink-crimson);
+  color: white;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.welcome > button {
+  margin-top: 30px;
+}
+
+.welcome > small {
+  margin-top: 12px;
+  color: #7a8393;
+  font-size: 0.7rem;
+}
+
+.conversation {
+  padding: 46px 0 70px;
+}
+
+.progressHeader {
+  display: flex;
+  justify-content: space-between;
+  color: #69758a;
+  font-size: 0.71rem;
+  font-weight: 650;
+}
+
+.progressTrack {
+  height: 6px;
+  overflow: hidden;
+  margin-top: 9px;
+  border-radius: 99px;
+  background: #e6e2dc;
+}
+
+.progressTrack span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-ink-crimson);
+  transition: width 240ms ease;
+}
+
+.eyebrow {
+  margin: 48px 0 0;
+}
+
+.conversation h1 {
+  max-width: 690px;
+  font-size: clamp(2rem, 5vw, 2.8rem);
+}
+
+.answerField {
+  display: grid;
+  gap: 8px;
+  margin-top: 28px;
+  color: #32435f;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.answerField textarea {
+  width: 100%;
+  min-height: 190px;
+  resize: vertical;
+  box-sizing: border-box;
+  padding: 17px;
+  border: 1px solid #cfd1d6;
+  border-radius: 7px;
+  background: #fffefa;
+  color: var(--color-ink-navy);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 450;
+  line-height: 1.6;
+}
+
+.answerField textarea:focus {
+  border-color: #9e2946;
+}
+
+.answerField small {
+  justify-self: end;
+  color: #848b99;
+  font-size: 0.67rem;
+  font-weight: 500;
+}
+
+.questionActions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.secondaryButton {
+  border-color: #c9ccd3;
+  background: transparent;
+  color: var(--color-ink-navy);
+}
+
+.primaryButton:disabled {
+  border-color: #d5d2cd;
+  background: #dedbd6;
+  color: #7c8390;
+  cursor: not-allowed;
+}
+
+.finishButton {
+  display: block;
+  margin: 20px auto 0;
+  padding: 8px;
+  border: 0;
+  background: transparent;
+  color: #69758a;
+  font: inherit;
+  font-size: 0.73rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.offline,
+.serviceError {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #7b5007;
+  font-size: 0.76rem;
+}
+
+.offline {
+  justify-content: center;
+  padding: 11px 18px;
+  background: #fff0cf;
+}
+
+.serviceError {
+  margin-top: 12px;
+  padding: 11px 13px;
+  border-radius: 6px;
+  background: #fff0e7;
+}
+
+.serviceError button {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.statePage,
+.loading {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  padding: 28px;
+}
+
+.statePage > .brand {
+  margin-bottom: 22px;
+}
+
+.stateCard,
+.thankYou {
+  display: grid;
+  width: min(100%, 540px);
+  box-sizing: border-box;
+  justify-items: center;
+  padding: 42px;
+  border: 1px solid #ddd8d1;
+  border-radius: 11px;
+  background: #fffefa;
+  text-align: center;
+}
+
+.stateCard > svg {
+  color: #9a6b17;
+}
+
+.thankYou > svg {
+  margin-bottom: 18px;
+  color: #43805c;
+}
+
+.stateCard h1,
+.thankYou h1 {
+  font-size: 2rem;
+}
+
+.stateCard p,
+.thankYou p {
+  margin: 13px 0 0;
+  color: #5c6980;
+  font-size: 0.84rem;
+  line-height: 1.6;
+}
+
+.stateCard small {
+  margin-top: 17px;
+  color: #818897;
+  font-size: 0.7rem;
+}
+
+.stateCard button,
+.thankYou button {
+  margin-top: 22px;
+}
+
+.thankYou button {
+  border-color: #c8cbd2;
+  background: transparent;
+  color: var(--color-ink-navy);
+}
+
+.loading span {
+  color: #667187;
+  font-size: 0.84rem;
+}
+
+@media (max-width: 600px) {
+  .publicHeader {
+    width: min(100% - 32px, 1040px);
+  }
+
+  .publicHeader > span {
+    display: none;
+  }
+
+  .welcome {
+    padding-top: 60px;
+  }
+
+  .conversation {
+    padding-top: 32px;
+  }
+
+  .eyebrow {
+    margin-top: 38px;
+  }
+
+  .questionActions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .questionActions .primaryButton {
+    grid-row: 1;
+  }
+
+  .stateCard,
+  .thankYou {
+    padding: 34px 22px;
+  }
+}

@@ -9,6 +9,9 @@ export const interviewProgressStates = [
 
 export const interviewInvitationSchema = z.object({
   articleId: z.string().min(1),
+  articleTitle: z.string().trim().min(1).max(200).optional(),
+  clientName: z.string().trim().min(1).max(120).optional(),
+  writerName: z.string().trim().min(1).max(120).optional(),
   participantName: z.string().trim().min(1).max(120),
   participantEmail: z.string().trim().email().max(254),
   token: z.string().min(20).max(200),
@@ -70,12 +73,18 @@ export function createInterviewInvitation(
     now?: Date;
     tokenFactory?: () => string;
     generation?: number;
+    articleTitle?: string;
+    clientName?: string;
+    writerName?: string;
   } = {},
 ): InterviewInvitation {
   const values = interviewInvitationInputSchema.parse(input);
   const now = options.now ?? new Date();
   return interviewInvitationSchema.parse({
     articleId,
+    articleTitle: options.articleTitle,
+    clientName: options.clientName,
+    writerName: options.writerName,
     participantName: values.participantName,
     participantEmail: values.participantEmail.toLowerCase(),
     token: (options.tokenFactory ?? createToken)(),

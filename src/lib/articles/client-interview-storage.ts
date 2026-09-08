@@ -32,3 +32,22 @@ export function saveInterviewInvitation(invitation: InterviewInvitation) {
     JSON.stringify(invitation),
   );
 }
+
+export function findInterviewInvitationByToken(
+  token: string,
+): InterviewInvitation | null {
+  if (!storageAvailable() || !token) return null;
+  for (let index = 0; index < window.sessionStorage.length; index += 1) {
+    const key = window.sessionStorage.key(index);
+    if (!key?.startsWith(INVITATION_PREFIX)) continue;
+    try {
+      const raw = window.sessionStorage.getItem(key);
+      if (!raw) continue;
+      const result = interviewInvitationSchema.safeParse(JSON.parse(raw));
+      if (result.success && result.data.token === token) return result.data;
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}

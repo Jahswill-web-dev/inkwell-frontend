@@ -162,6 +162,9 @@ export function ClientInterviewManager({
     persist(
       createInterviewInvitation(workspace.article.id, result.data, {
         generation: (invitation?.generation ?? 0) + 1,
+        articleTitle: workspace.article.working_title,
+        clientName: workspace.clientName,
+        writerName: workspace.assignee,
       }),
     );
   }
@@ -195,7 +198,12 @@ export function ClientInterviewManager({
           participantEmail: invitation.participantEmail,
           expiresOn: reusableExpiration,
         },
-        { generation: invitation.generation + 1 },
+        {
+          generation: invitation.generation + 1,
+          articleTitle: workspace.article.working_title,
+          clientName: workspace.clientName,
+          writerName: workspace.assignee,
+        },
       ),
     );
     setExpiresOn(reusableExpiration);

@@ -203,5 +203,6 @@ export function nextArticlePath(
   method: ArticleSetup["interviewMethod"],
 ) {
   if (method === "notes") return `/articles/new/brief?articleId=${articleId}`;
-  return `/articles/${articleId}?next=${method === "client" ? "client-interview" : "self-interview"}`;
+  if (method === "client") return `/articles/${articleId}/interviews`;
+  return `/articles/${articleId}?next=self-interview`;
 }

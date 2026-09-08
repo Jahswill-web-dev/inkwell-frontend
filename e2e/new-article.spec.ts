@@ -80,7 +80,7 @@ test("creates a client article and prepares its interview handoff", async ({
     .getByRole("button", { name: "Create article & prepare interview" })
     .click();
   await expect(page).toHaveURL(
-    new RegExp(`/articles/${article.id}\\?next=client-interview$`),
+    new RegExp(`/articles/${article.id}/interviews$`),
   );
   await expect(
     page.getByRole("heading", { name: article.working_title }),

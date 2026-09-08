@@ -7,6 +7,7 @@ import { formatDueDate } from "@/lib/dashboard/agency-format";
 import type { AuthIdentity } from "@/lib/auth/identity";
 import { ArticleWorkspaceNav } from "./article-workspace-nav";
 import { ArticleWorkspaceOverview } from "./article-workspace-overview";
+import { ClientInterviewManager } from "./client-interview-manager";
 import { useArticleWorkspace } from "./use-article-workspace";
 import styles from "./article-workspace.module.css";
 
@@ -65,9 +66,11 @@ function WorkspaceFeedback({
 export function ArticleWorkspace({
   articleId,
   identity,
+  activeTab = "overview",
 }: {
   articleId: string;
   identity: AuthIdentity;
+  activeTab?: "overview" | "interviews";
 }) {
   const { state, retry } = useArticleWorkspace(articleId, identity.username);
 
@@ -125,8 +128,12 @@ export function ArticleWorkspace({
             </Link>
           </header>
 
-          <ArticleWorkspaceNav articleId={articleId} />
-          <ArticleWorkspaceOverview workspace={workspace} />
+          <ArticleWorkspaceNav activeTab={activeTab} articleId={articleId} />
+          {activeTab === "interviews" ? (
+            <ClientInterviewManager workspace={workspace} />
+          ) : (
+            <ArticleWorkspaceOverview workspace={workspace} />
+          )}
         </div>
       </div>
     </main>

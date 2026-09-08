@@ -108,6 +108,92 @@ describe("ArticleWorkspace", () => {
     );
   });
 
+  it("creates, copies, previews, revokes, and regenerates a client link", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    render(
+      <ArticleWorkspace
+        activeTab="interviews"
+        articleId={article.id}
+        identity={DEFAULT_AUTH_IDENTITY}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Create a private interview link",
+      }),
+    ).toBeVisible();
+    await userEvent.type(
+      screen.getByLabelText("Participant email"),
+      "avery@client.com",
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Create interview link" }),
+    );
+
+    const link = screen.getByLabelText("Client interview link");
+    expect((link as HTMLInputElement).value).toContain("/interview/");
+    await userEvent.click(screen.getByRole("button", { name: "Copy link" }));
+    expect(writeText).toHaveBeenCalledWith(
+      expect.stringContaining("/interview/"),
+    );
+    expect(screen.getByText("Link copied")).toBeVisible();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Preview experience" }),
+    );
+    expect(screen.getByRole("dialog")).toBeVisible();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Close interview preview" }),
+    );
+
+    const firstLink = (link as HTMLInputElement).value;
+    await userEvent.click(screen.getByRole("button", { name: "Revoke link" }));
+    expect(screen.getByText("Revoked")).toBeVisible();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Regenerate link" }),
+    );
+    expect(screen.getByLabelText("Client interview link")).not.toHaveValue(
+      firstLink,
+    );
+  });
+
+  it("shows summarized in-progress state from persisted invitation data", async () => {
+    sessionStorage.setItem(
+      "inkwell:client-interview:" + article.id,
+      JSON.stringify({
+        articleId: article.id,
+        participantName: "Avery Chen",
+        participantEmail: "avery@client.com",
+        token: "a".repeat(48),
+        status: "active",
+        createdAt: "2026-09-08T12:00:00.000Z",
+        expiresAt: null,
+        progressState: "in_progress",
+        questionsAnswered: 3,
+        estimatedQuestions: 8,
+        openedAt: "2026-09-08T12:03:00.000Z",
+        completedAt: null,
+        generation: 1,
+      }),
+    );
+    render(
+      <ArticleWorkspace
+        activeTab="interviews"
+        articleId={article.id}
+        identity={DEFAULT_AUTH_IDENTITY}
+      />,
+    );
+    expect(await screen.findByText("In progress")).toBeVisible();
+    expect(screen.getByLabelText("38% complete")).toBeVisible();
+    expect(screen.getByText(/3 questions answered/)).toBeVisible();
+    expect(screen.queryByText(/answer content/i)).not.toBeInTheDocument();
+  });
+
   it("keeps transient failures retryable", async () => {
     articleMock.mockRejectedValueOnce(
       new ArticleRequestError(503, "unavailable", "Unavailable"),

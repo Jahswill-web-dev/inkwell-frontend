@@ -1,0 +1,471 @@
+.layout {
+  display: grid;
+  gap: 20px;
+  margin-top: 26px;
+}
+
+.intro,
+.card,
+.mockNote {
+  border: 1px solid #ddd8d1;
+  border-radius: 9px;
+  background: #fffefa;
+}
+
+.intro {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 28px;
+  padding: 24px;
+  background: linear-gradient(135deg, rgb(7 25 79 / 4%), #fffefa 68%);
+}
+
+.intro p,
+.card header p {
+  margin: 0 0 5px;
+  color: #68758d;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.intro h2,
+.card h3 {
+  margin: 0;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-weight: 600;
+}
+
+.intro h2 {
+  font-size: 1.65rem;
+}
+
+.intro > div > span,
+.card header div > span {
+  display: block;
+  max-width: 650px;
+  margin-top: 6px;
+  color: #596781;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.privacyNote {
+  display: flex;
+  max-width: 340px;
+  flex: 0 0 auto;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 7px;
+  background: #eef2f8;
+  color: #344666;
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+
+.privacyNote svg {
+  flex: 0 0 auto;
+}
+
+.card {
+  padding: 24px;
+}
+
+.card > header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.iconBox {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 8px;
+  background: #f5e9ec;
+  color: var(--color-ink-crimson);
+}
+
+.card h3 {
+  font-size: 1.3rem;
+}
+
+.formGrid {
+  display: grid;
+  gap: 16px;
+  margin-top: 22px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.formGrid label:last-child {
+  grid-column: 1 / -1;
+  max-width: 320px;
+}
+
+.formGrid label,
+.linkField {
+  display: grid;
+  gap: 7px;
+  color: #263958;
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+
+.formGrid label span,
+.linkField span {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.formGrid em {
+  color: #7b8495;
+  font-size: 0.67rem;
+  font-style: normal;
+  font-weight: 500;
+}
+
+.formGrid input,
+.linkField input {
+  min-height: 44px;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0 12px;
+  border: 1px solid #cfd2d9;
+  border-radius: 5px;
+  background: white;
+  color: var(--color-ink-navy);
+  font: inherit;
+  font-weight: 500;
+}
+
+.formGrid input[aria-invalid="true"] {
+  border-color: var(--color-ink-crimson);
+}
+
+.formGrid small {
+  color: var(--color-ink-crimson);
+  font-size: 0.7rem;
+  font-weight: 550;
+}
+
+.formActions,
+.inactiveActions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.formActions > span,
+.inactiveActions > span {
+  color: #748095;
+  font-size: 0.72rem;
+}
+
+.primaryButton,
+.actionRow button,
+.inactiveActions button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 15px;
+  border: 1px solid #c7cbd3;
+  border-radius: 5px;
+  background: white;
+  color: var(--color-ink-navy);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primaryButton {
+  border-color: var(--color-ink-crimson);
+  background: var(--color-ink-crimson);
+  color: white;
+}
+
+.invitationHeader {
+  justify-content: space-between;
+}
+
+.invitationHeader > strong {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #fff0cf;
+  color: #77510b;
+  font-size: 0.7rem;
+}
+
+.invitationHeader > strong[data-state="completed"] {
+  background: #dff2e7;
+  color: #24613e;
+}
+
+.invitationHeader > strong[data-state="inactive"] {
+  background: #ececf0;
+  color: #6c7280;
+}
+
+.progressSummary {
+  margin-top: 22px;
+  padding: 17px;
+  border-radius: 7px;
+  background: #f8f6f2;
+}
+
+.progressSummary > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  color: #344666;
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+
+.progressTrack {
+  height: 6px;
+  overflow: hidden;
+  margin-top: 9px;
+  border-radius: 99px;
+  background: #e1ded8;
+}
+
+.progressTrack span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-ink-crimson);
+}
+
+.progressSummary p {
+  margin: 10px 0 0;
+  color: #647087;
+  font-size: 0.76rem;
+}
+
+.invitationFacts {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.invitationFacts div {
+  padding-right: 12px;
+  border-right: 1px solid #e5e1db;
+}
+
+.invitationFacts div:last-child {
+  border: 0;
+}
+
+.invitationFacts dt {
+  color: #758096;
+  font-size: 0.68rem;
+}
+
+.invitationFacts dd {
+  margin: 3px 0 0;
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+.linkField input {
+  background: #f8f7f4;
+  color: #52617a;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.72rem;
+}
+
+.actionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 14px;
+}
+
+.actionRow button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.actionRow .dangerButton {
+  border-color: #ddc5cb;
+  color: #9a1637;
+}
+
+.copyMessage {
+  min-height: 18px;
+  margin: 7px 0 0;
+  color: #397452;
+  font-size: 0.72rem;
+}
+
+.mockNote {
+  display: flex;
+  gap: 12px;
+  padding: 14px 17px;
+  color: #647087;
+  font-size: 0.73rem;
+  line-height: 1.45;
+}
+
+.mockNote strong {
+  flex: 0 0 auto;
+  color: #334563;
+}
+
+.backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(3 11 36 / 56%);
+}
+
+.preview {
+  position: relative;
+  display: grid;
+  width: min(100%, 560px);
+  box-sizing: border-box;
+  justify-items: center;
+  padding: 46px;
+  border-radius: 13px;
+  background: var(--color-ink-paper);
+  box-shadow: 0 28px 70px rgb(3 11 36 / 25%);
+  text-align: center;
+}
+
+.closeButton {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #eeece7;
+  color: var(--color-ink-navy);
+  cursor: pointer;
+}
+
+.previewMark {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--color-ink-navy);
+  color: white;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 1.7rem;
+}
+
+.preview p {
+  margin: 16px 0 5px;
+  color: var(--color-ink-crimson);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.preview h2 {
+  margin: 0;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 1.8rem;
+  line-height: 1.15;
+}
+
+.preview > span:not(.previewMark) {
+  max-width: 430px;
+  margin-top: 14px;
+  color: #596781;
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+
+.preview > button:not(.closeButton) {
+  min-height: 43px;
+  margin-top: 22px;
+  padding: 0 21px;
+  border: 0;
+  border-radius: 5px;
+  background: var(--color-ink-crimson);
+  color: white;
+  font: inherit;
+  font-weight: 700;
+  opacity: 0.72;
+}
+
+.preview small {
+  margin-top: 12px;
+  color: #7d8594;
+  font-size: 0.68rem;
+}
+
+@media (max-width: 700px) {
+  .intro {
+    display: grid;
+    padding: 19px;
+  }
+
+  .privacyNote {
+    max-width: none;
+  }
+
+  .card {
+    padding: 19px;
+  }
+
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .formGrid label:last-child {
+    grid-column: auto;
+    max-width: none;
+  }
+
+  .formActions,
+  .inactiveActions,
+  .mockNote {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .invitationFacts {
+    grid-template-columns: 1fr;
+  }
+
+  .invitationFacts div {
+    padding: 0 0 10px;
+    border-right: 0;
+    border-bottom: 1px solid #e5e1db;
+  }
+
+  .actionRow {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .actionRow button,
+  .primaryButton {
+    width: 100%;
+  }
+
+  .preview {
+    padding: 42px 22px 28px;
+  }
+}

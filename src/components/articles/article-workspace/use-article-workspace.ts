@@ -7,6 +7,7 @@ import {
   getArticleOutline,
 } from "@/lib/articles/client";
 import { loadArticleSetupMetadata } from "@/lib/articles/article-setup-storage";
+import { loadInterviewInvitation } from "@/lib/articles/client-interview-storage";
 import type { ArticleWorkspaceViewModel } from "@/lib/articles/article-workspace";
 import { toArticleWorkspaceViewModel } from "@/lib/articles/article-workspace";
 
@@ -41,6 +42,7 @@ async function loadWorkspace(articleId: string, currentWriter: string) {
     currentWriter,
     loadArticleSetupMetadata(articleId),
     { hasBrief, hasOutline, hasDraft },
+    loadInterviewInvitation(articleId),
   );
 }
 

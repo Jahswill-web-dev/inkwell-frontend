@@ -40,8 +40,38 @@ describe("article workspace view model", () => {
       name: "Avery Chen",
       state: "Link not created",
     });
-    expect(view.nextAction.href).toBeNull();
+    expect(view.nextAction.href).toBe(
+      "/articles/" + article.id + "/interviews",
+    );
     expect(view.nextAction.title).toContain("interview link");
+  });
+
+  it("reflects completed interview progress in readiness and status", () => {
+    const view = toArticleWorkspaceViewModel(
+      article,
+      "writer",
+      metadata,
+      { hasBrief: false, hasOutline: false, hasDraft: false },
+      {
+        articleId: article.id,
+        participantName: "Avery Chen",
+        participantEmail: "avery@client.com",
+        token: "a".repeat(48),
+        status: "active",
+        createdAt: "2026-09-08T12:00:00.000Z",
+        expiresAt: null,
+        progressState: "completed",
+        questionsAnswered: 6,
+        estimatedQuestions: 8,
+        openedAt: "2026-09-08T12:03:00.000Z",
+        completedAt: "2026-09-08T12:09:00.000Z",
+        generation: 1,
+      },
+    );
+    expect(view.status).toBe("ready_to_draft");
+    expect(view.participants[0].state).toBe("Completed");
+    expect(view.readiness[0].state).toBe("complete");
+    expect(view.nextAction.title).toContain("Review");
   });
 
   it("derives the next available stage from persisted resources", () => {

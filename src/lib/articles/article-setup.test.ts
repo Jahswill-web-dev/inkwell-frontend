@@ -40,9 +40,7 @@ describe("article setup", () => {
   });
 
   it("chooses a compatible next route for each collection method", () => {
-    expect(nextArticlePath("article-id", "client")).toContain(
-      "next=client-interview",
-    );
+    expect(nextArticlePath("article-id", "client")).toContain("/interviews");
     expect(nextArticlePath("article-id", "self")).toContain(
       "next=self-interview",
     );

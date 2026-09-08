@@ -108,9 +108,7 @@ describe("ArticleSetupWizard", () => {
       interviewMethod: "client",
       intervieweeName: "Avery Chen",
     });
-    expect(pushMock).toHaveBeenCalledWith(
-      `/articles/${article.id}?next=client-interview`,
-    );
+    expect(pushMock).toHaveBeenCalledWith(`/articles/${article.id}/interviews`);
   });
 
   it("requires source material when the writer skips interviews", async () => {

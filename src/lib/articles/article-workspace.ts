@@ -1,6 +1,11 @@
 import type { Article } from "./article";
 import type { ArticleSetupMetadata } from "./article-setup";
 import {
+  interviewInvitationLabel,
+  isInterviewInvitationExpired,
+  type InterviewInvitation,
+} from "./client-interview-invitation";
+import {
   agencyStatusLabels,
   type AgencyArticleStatus,
 } from "@/lib/dashboard/agency-dashboard";
@@ -47,6 +52,7 @@ export type ArticleWorkspaceViewModel = {
 
 function interviewReadiness(
   metadata: ArticleSetupMetadata | null,
+  invitation: InterviewInvitation | null,
 ): WorkspaceReadiness {
   if (metadata?.interviewMethod === "notes") {
     return {
@@ -57,6 +63,28 @@ function interviewReadiness(
     };
   }
   if (metadata?.interviewMethod === "client") {
+    if (invitation?.progressState === "completed") {
+      return {
+        id: "interviews",
+        label: "Client interview",
+        detail: "The client interview is complete and ready to review.",
+        state: "complete",
+      };
+    }
+    if (
+      invitation?.status === "active" &&
+      !isInterviewInvitationExpired(invitation)
+    ) {
+      return {
+        id: "interviews",
+        label: "Client interview",
+        detail:
+          invitation.progressState === "not_opened"
+            ? "The interview link is ready and waiting for the client."
+            : "The client has started the interview.",
+        state: "waiting",
+      };
+    }
     return {
       id: "interviews",
       label: "Client interview",
@@ -126,13 +154,16 @@ function resourceReadiness(
 function participants(
   metadata: ArticleSetupMetadata | null,
   currentWriter: string,
+  invitation: InterviewInvitation | null,
 ): WorkspaceParticipant[] {
   if (metadata?.interviewMethod === "client") {
     return [
       {
-        name: metadata.intervieweeName,
+        name: invitation?.participantName || metadata.intervieweeName,
         role: "Client expert",
-        state: "Link not created",
+        state: invitation
+          ? interviewInvitationLabel(invitation)
+          : "Link not created",
       },
     ];
   }
@@ -148,6 +179,7 @@ function nextAction(
   articleId: string,
   metadata: ArticleSetupMetadata | null,
   resources: WorkspaceResources,
+  invitation: InterviewInvitation | null,
 ): ArticleWorkspaceViewModel["nextAction"] {
   const encodedId = encodeURIComponent(articleId);
   if (resources.hasDraft) {
@@ -172,12 +204,32 @@ function nextAction(
     };
   }
   if (metadata?.interviewMethod === "client") {
+    if (invitation?.progressState === "completed") {
+      return {
+        title: "Review the client interview",
+        description:
+          "The interview is complete. Review its progress before building the brief.",
+        href: "/articles/" + encodedId + "/interviews",
+      };
+    }
+    if (
+      invitation?.status === "active" &&
+      !isInterviewInvitationExpired(invitation)
+    ) {
+      return {
+        title: "Track the client interview",
+        description:
+          invitation.progressState === "not_opened"
+            ? "The link is ready. Copy it or check whether the client has opened it."
+            : "The client has started. Follow summarized progress here.",
+        href: "/articles/" + encodedId + "/interviews",
+      };
+    }
     return {
       title: "Create the client interview link",
       description:
         "Prepare a focused interview for the selected client expert.",
-      href: null,
-      unavailableLabel: "Available in the next milestone",
+      href: "/articles/" + encodedId + "/interviews",
     };
   }
   if (metadata?.interviewMethod === "self") {
@@ -200,11 +252,12 @@ export function toArticleWorkspaceViewModel(
   currentWriter: string,
   metadata: ArticleSetupMetadata | null,
   resources: WorkspaceResources,
+  invitation: InterviewInvitation | null = null,
   now = new Date(),
 ): ArticleWorkspaceViewModel {
   const agencyArticle = toAgencyArticleSummary(article, currentWriter, now);
   const readiness = [
-    interviewReadiness(metadata),
+    interviewReadiness(metadata, invitation),
     ...resourceReadiness(resources),
   ];
   const completedStages =
@@ -214,7 +267,9 @@ export function toArticleWorkspaceViewModel(
     : resources.hasOutline
       ? "ready_to_draft"
       : metadata?.interviewMethod === "client"
-        ? "waiting_for_client"
+        ? invitation?.progressState === "completed"
+          ? "ready_to_draft"
+          : "waiting_for_client"
         : metadata
           ? "setup"
           : agencyArticle.status;
@@ -229,8 +284,8 @@ export function toArticleWorkspaceViewModel(
     progress: Math.round((completedStages / 7) * 100),
     progressLabel: `${completedStages} of 7 stages complete`,
     readiness,
-    participants: participants(metadata, currentWriter),
-    nextAction: nextAction(article.id, metadata, resources),
+    participants: participants(metadata, currentWriter, invitation),
+    nextAction: nextAction(article.id, metadata, resources, invitation),
     sourceSummary: `${article.notes.length.toLocaleString()} characters of setup context and source material`,
   };
 }

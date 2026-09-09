@@ -112,7 +112,7 @@ describe("article workspace view model", () => {
       role: "Writer · Whole article",
       state: "Complete",
     });
-    expect(view.nextAction.href).toContain("/brief?articleId=");
+    expect(view.nextAction.href).toBe(`/articles/${article.id}/sources`);
   });
 
   it("derives the next available stage from persisted resources", () => {

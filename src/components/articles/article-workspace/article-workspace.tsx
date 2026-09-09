@@ -14,6 +14,7 @@ import { ArticleWorkspaceNav } from "./article-workspace-nav";
 import { ArticleWorkspaceOverview } from "./article-workspace-overview";
 import { ClientInterviewManager } from "./client-interview-manager";
 import { WriterInterviewPanel } from "./writer-interview-panel";
+import { SourceReview } from "../source-review/source-review";
 import { useArticleWorkspace } from "./use-article-workspace";
 import styles from "./article-workspace.module.css";
 
@@ -76,7 +77,7 @@ export function ArticleWorkspace({
 }: {
   articleId: string;
   identity: AuthIdentity;
-  activeTab?: "overview" | "interviews";
+  activeTab?: "overview" | "interviews" | "sources";
 }) {
   const { state, retry } = useArticleWorkspace(articleId, identity.username);
 
@@ -153,6 +154,8 @@ export function ArticleWorkspace({
               <WriterInterviewPanel workspace={workspace} />
               <ClientInterviewManager workspace={workspace} />
             </>
+          ) : activeTab === "sources" ? (
+            <SourceReview workspace={workspace} />
           ) : (
             <ArticleWorkspaceOverview workspace={workspace} />
           )}

@@ -24,6 +24,7 @@ import {
 } from "@/lib/articles/client";
 import { DEFAULT_AUTH_IDENTITY, type AuthIdentity } from "@/lib/auth/identity";
 import { ArticleProgress } from "../article-progress/article-progress";
+import { PipelineSourceStatus } from "../pipeline-source-status/pipeline-source-status";
 import {
   changedBriefFields,
   createBriefEditState,
@@ -412,6 +413,15 @@ export function ArticleBrief({
                   )}
                 </div>
               </header>
+
+              <PipelineSourceStatus
+                articleId={articleId}
+                contentLabel="brief"
+                contentUpdatedAt={brief.updated_at}
+                onRegenerate={() => void regenerate()}
+                regenerateDisabled={isEditing}
+                regenerating={isRegenerating}
+              />
 
               {brief.is_stale ? (
                 <div className={styles.stale} role="status">

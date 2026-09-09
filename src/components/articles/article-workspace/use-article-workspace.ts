@@ -14,6 +14,10 @@ import {
   loadWriterInterviewMaterial,
   WRITER_INTERVIEW_UPDATED_EVENT,
 } from "@/lib/articles/writer-interview-storage";
+import {
+  loadSourceReview,
+  SOURCE_REVIEW_UPDATED_EVENT,
+} from "@/lib/articles/source-review-storage";
 
 type WorkspaceLoadState =
   | { type: "loading" }
@@ -48,6 +52,7 @@ async function loadWorkspace(articleId: string, currentWriter: string) {
     { hasBrief, hasOutline, hasDraft },
     loadInterviewInvitation(articleId),
     loadWriterInterviewMaterial(articleId),
+    loadSourceReview(articleId),
   );
 }
 
@@ -87,9 +92,11 @@ export function useArticleWorkspace(articleId: string, currentWriter: string) {
       }
     }
     window.addEventListener(WRITER_INTERVIEW_UPDATED_EVENT, refresh);
+    window.addEventListener(SOURCE_REVIEW_UPDATED_EVENT, refresh);
     window.addEventListener("storage", refresh);
     return () => {
       window.removeEventListener(WRITER_INTERVIEW_UPDATED_EVENT, refresh);
+      window.removeEventListener(SOURCE_REVIEW_UPDATED_EVENT, refresh);
       window.removeEventListener("storage", refresh);
     };
   }, [articleId]);

@@ -84,6 +84,7 @@ import type {
   SectionInterview,
 } from "@/lib/articles/interview";
 import { ArticleProgress } from "../article-progress/article-progress";
+import { PipelineSourceStatus } from "../pipeline-source-status/pipeline-source-status";
 import { Checkbox } from "@/components/ui/checkbox/checkbox";
 import {
   countDraftWords,
@@ -2291,6 +2292,11 @@ export function DraftEditor({
               </aside>
               <article className={styles.articleCanvas}>
                 <div className={styles.articleBody}>
+                  <PipelineSourceStatus
+                    articleId={articleId}
+                    contentLabel="draft"
+                    contentUpdatedAt={lastSavedAt}
+                  />
                   <h1>{draft.title}</h1>
                   {draft.sections.map((section, index) => (
                     <Fragment key={section.id}>
@@ -2391,6 +2397,11 @@ export function DraftEditor({
           </header>
           <ArticleProgress currentStep="draft" compact articleId={articleId} />
           <article className={styles.mobileArticle}>
+            <PipelineSourceStatus
+              articleId={articleId}
+              contentLabel="draft"
+              contentUpdatedAt={lastSavedAt}
+            />
             {draft.sections.map((section, index) => (
               <Fragment key={section.id}>
                 <DraftRichSection

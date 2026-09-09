@@ -34,6 +34,7 @@ import type {
 } from "@/lib/articles/outline";
 import { DEFAULT_AUTH_IDENTITY, type AuthIdentity } from "@/lib/auth/identity";
 import { ArticleProgress } from "../article-progress/article-progress";
+import { PipelineSourceStatus } from "../pipeline-source-status/pipeline-source-status";
 import styles from "./outline-builder.module.css";
 
 type EditableSection = Omit<ArticleOutlineSection, "id"> & {
@@ -500,6 +501,15 @@ export function OutlineBuilder({
                 </button>
               </div>
             </header>
+
+            <PipelineSourceStatus
+              articleId={articleId}
+              contentLabel="outline"
+              contentUpdatedAt={savedOutline.updated_at}
+              onRegenerate={() => void regenerate()}
+              regenerateDisabled={dirty}
+              regenerating={isRegenerating}
+            />
 
             {savedOutline.is_stale ? (
               <div className={styles.stale}>

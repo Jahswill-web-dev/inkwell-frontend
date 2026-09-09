@@ -104,7 +104,7 @@ describe("ArticleExport", () => {
     expect(screen.getByRole("radio", { name: /Word document/ })).toBeDisabled();
     expect(
       screen.getByRole("navigation", { name: "Article progress" }),
-    ).toHaveTextContent("Export");
+    ).toHaveTextContent("Publish");
   });
 
   it("changes inclusions, persists settings, and navigates back", async () => {

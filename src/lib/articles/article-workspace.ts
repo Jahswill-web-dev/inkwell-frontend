@@ -14,6 +14,7 @@ import {
   writerInterviewSummary,
   type WriterInterviewMaterial,
 } from "./writer-interview-storage";
+import type { SourceReview } from "./source-review";
 
 export type WorkspaceResources = {
   hasBrief: boolean;
@@ -22,7 +23,7 @@ export type WorkspaceResources = {
 };
 
 export type WorkspaceReadiness = {
-  id: "interviews" | "brief" | "outline" | "draft";
+  id: "interviews" | "sources" | "brief" | "outline" | "draft";
   label: string;
   detail: string;
   state: "complete" | "ready" | "waiting";
@@ -58,7 +59,41 @@ export type ArticleWorkspaceViewModel = {
     responses: number;
     href: string;
   };
+  sourceReview: {
+    state: "not_started" | "in_progress" | "approved";
+    included: number;
+    total: number;
+    href: string;
+  };
 };
+
+function sourceReviewReadiness(
+  review: SourceReview | null,
+  hasReviewableMaterial: boolean,
+): WorkspaceReadiness {
+  if (review?.status === "approved") {
+    return {
+      id: "sources",
+      label: "Source review",
+      detail: `${review.items.filter((item) => item.included).length} source items approved for generation.`,
+      state: "complete",
+    };
+  }
+  if (review?.items.length || hasReviewableMaterial) {
+    return {
+      id: "sources",
+      label: "Source review",
+      detail: "Review, edit, include, or exclude collected material.",
+      state: "ready",
+    };
+  }
+  return {
+    id: "sources",
+    label: "Source review",
+    detail: "Waiting for interview material.",
+    state: "waiting",
+  };
+}
 
 function interviewReadiness(
   metadata: ArticleSetupMetadata | null,
@@ -218,6 +253,7 @@ function nextAction(
   resources: WorkspaceResources,
   invitation: InterviewInvitation | null,
   writerMaterial: WriterInterviewMaterial | null,
+  sourceReview: SourceReview | null,
 ): ArticleWorkspaceViewModel["nextAction"] {
   const encodedId = encodeURIComponent(articleId);
   if (resources.hasDraft) {
@@ -241,13 +277,21 @@ function nextAction(
       href: `/articles/new/outline?articleId=${encodedId}`,
     };
   }
+  if (sourceReview?.status === "approved") {
+    return {
+      title: "Build the article brief",
+      description:
+        "Use the approved source material to create the working brief.",
+      href: `/articles/new/brief?articleId=${encodedId}`,
+    };
+  }
   if (metadata?.interviewMethod === "client") {
     if (invitation?.progressState === "completed") {
       return {
-        title: "Review the client interview",
+        title: "Review collected source material",
         description:
-          "The interview is complete. Review its progress before building the brief.",
-        href: "/articles/" + encodedId + "/interviews",
+          "The interview is complete. Approve what Inkwell may use before building the brief.",
+        href: "/articles/" + encodedId + "/sources",
       };
     }
     if (
@@ -274,10 +318,10 @@ function nextAction(
     const writer = writerInterviewSummary(writerMaterial);
     if (writer.state === "completed") {
       return {
-        title: "Build the article brief",
+        title: "Review your source material",
         description:
-          "Your writer-supplied material is saved. Continue with the brief while source review is prepared next.",
-        href: `/articles/new/brief?articleId=${encodedId}`,
+          "Your writer-supplied material is ready. Approve what Inkwell may use before generation.",
+        href: `/articles/${encodedId}/sources`,
       };
     }
     return {
@@ -303,11 +347,16 @@ export function toArticleWorkspaceViewModel(
   resources: WorkspaceResources,
   invitation: InterviewInvitation | null = null,
   writerMaterial: WriterInterviewMaterial | null = null,
+  sourceReview: SourceReview | null = null,
   now = new Date(),
 ): ArticleWorkspaceViewModel {
   const agencyArticle = toAgencyArticleSummary(article, currentWriter, now);
+  const hasReviewableMaterial =
+    invitation?.progressState === "completed" ||
+    writerInterviewSummary(writerMaterial).responses > 0;
   const readiness = [
     interviewReadiness(metadata, invitation, writerMaterial),
+    sourceReviewReadiness(sourceReview, hasReviewableMaterial),
     ...resourceReadiness(resources),
   ];
   const completedStages =
@@ -331,8 +380,8 @@ export function toArticleWorkspaceViewModel(
     dueDate: agencyArticle.dueDate,
     status,
     statusLabel: agencyStatusLabels[status],
-    progress: Math.round((completedStages / 7) * 100),
-    progressLabel: `${completedStages} of 7 stages complete`,
+    progress: Math.round((completedStages / 8) * 100),
+    progressLabel: `${completedStages} of 8 stages complete`,
     readiness,
     participants: participants(
       metadata,
@@ -346,11 +395,23 @@ export function toArticleWorkspaceViewModel(
       resources,
       invitation,
       writerMaterial,
+      sourceReview,
     ),
     sourceSummary: `${article.notes.length.toLocaleString()} characters of setup context and source material`,
     writerInterview: {
       ...writerInterviewSummary(writerMaterial),
       href: `/articles/${encodeURIComponent(article.id)}/writer-interview`,
+    },
+    sourceReview: {
+      state:
+        sourceReview?.status === "approved"
+          ? "approved"
+          : sourceReview?.items.length
+            ? "in_progress"
+            : "not_started",
+      included: sourceReview?.items.filter((item) => item.included).length ?? 0,
+      total: sourceReview?.items.length ?? 0,
+      href: `/articles/${encodeURIComponent(article.id)}/sources`,
     },
   };
 }

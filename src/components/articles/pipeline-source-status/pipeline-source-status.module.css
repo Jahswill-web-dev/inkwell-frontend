@@ -1,0 +1,75 @@
+.approved,
+.warning {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin: 0 0 22px;
+  padding: 14px 16px;
+  border: 1px solid #cddfd5;
+  border-radius: 10px;
+  background: #f4faf6;
+  color: #163c2c;
+  font-size: 0.84rem;
+}
+
+.warning {
+  border-color: #e5cda0;
+  background: #fff9ed;
+  color: #6c4811;
+}
+
+.approved > div,
+.warning > div:first-of-type {
+  display: grid;
+  gap: 2px;
+}
+
+.approved span,
+.warning span {
+  line-height: 1.4;
+}
+
+.approved a,
+.warning a,
+.warning button {
+  color: inherit;
+  font-weight: 700;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid currentColor;
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+@media (max-width: 800px) {
+  .approved,
+  .warning {
+    grid-template-columns: auto minmax(0, 1fr);
+    margin-bottom: 16px;
+  }
+
+  .approved > a,
+  .actions {
+    grid-column: 2;
+    justify-self: start;
+  }
+}

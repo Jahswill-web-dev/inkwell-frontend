@@ -4,6 +4,7 @@ import styles from "./article-workspace.module.css";
 const tabs = [
   { label: "Overview", path: null },
   { label: "Interviews", path: "interviews" },
+  { label: "Sources", path: "sources" },
   { label: "Brief", path: "brief" },
   { label: "Outline", path: "outline" },
   { label: "Draft", path: "draft" },
@@ -15,6 +16,9 @@ function tabHref(articleId: string, path: string | null) {
   if (path === "interviews") {
     return "/articles/" + encodeURIComponent(articleId) + "/interviews";
   }
+  if (path === "sources") {
+    return "/articles/" + encodeURIComponent(articleId) + "/sources";
+  }
   if (!path) return `/articles/${encodeURIComponent(articleId)}`;
   return `/articles/new/${path}?articleId=${encodeURIComponent(articleId)}`;
 }
@@ -24,7 +28,7 @@ export function ArticleWorkspaceNav({
   activeTab = "overview",
 }: {
   articleId: string;
-  activeTab?: "overview" | "interviews";
+  activeTab?: "overview" | "interviews" | "sources";
 }) {
   return (
     <nav className={styles.tabs} aria-label="Article workspace">

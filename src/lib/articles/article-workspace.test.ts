@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { Article } from "./article";
 import type { ArticleSetupMetadata } from "./article-setup";
 import { toArticleWorkspaceViewModel } from "./article-workspace";
+import { createWriterInterviewMaterial } from "./writer-interview-storage";
+import {
+  completeClientInterview,
+  startClientInterview,
+  submitClientInterviewAnswer,
+} from "./client-interview-session";
 
 const article: Article = {
   id: "be5579e3-24fd-4272-a35f-f74740c3887e",
@@ -72,6 +78,41 @@ describe("article workspace view model", () => {
     expect(view.participants[0].state).toBe("Completed");
     expect(view.readiness[0].state).toBe("complete");
     expect(view.nextAction.title).toContain("Review");
+  });
+
+  it("makes a completed self-interview available as writer-supplied material", () => {
+    const selfMetadata = { ...metadata, interviewMethod: "self" as const };
+    const material = createWriterInterviewMaterial(article.id);
+    const answered = submitClientInterviewAnswer(
+      startClientInterview(material.session),
+      "A detailed writer perspective based on direct experience with agency content workflows.",
+    );
+    const writerMaterial = {
+      ...material,
+      session: completeClientInterview(answered),
+    };
+    const view = toArticleWorkspaceViewModel(
+      article,
+      "writer",
+      selfMetadata,
+      { hasBrief: false, hasOutline: false, hasDraft: false },
+      null,
+      writerMaterial,
+    );
+
+    expect(view.writerInterview).toMatchObject({
+      state: "completed",
+      responses: 1,
+    });
+    expect(view.readiness[0]).toMatchObject({
+      label: "Writer interview",
+      state: "complete",
+    });
+    expect(view.participants[0]).toMatchObject({
+      role: "Writer · Whole article",
+      state: "Complete",
+    });
+    expect(view.nextAction.href).toContain("/brief?articleId=");
   });
 
   it("derives the next available stage from persisted resources", () => {

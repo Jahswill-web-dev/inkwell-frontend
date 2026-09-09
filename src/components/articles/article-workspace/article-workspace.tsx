@@ -1,13 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarBlank, PencilSimple, User } from "@phosphor-icons/react";
+import {
+  CalendarBlank,
+  Microphone,
+  PencilSimple,
+  User,
+} from "@phosphor-icons/react";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { formatDueDate } from "@/lib/dashboard/agency-format";
 import type { AuthIdentity } from "@/lib/auth/identity";
 import { ArticleWorkspaceNav } from "./article-workspace-nav";
 import { ArticleWorkspaceOverview } from "./article-workspace-overview";
 import { ClientInterviewManager } from "./client-interview-manager";
+import { WriterInterviewPanel } from "./writer-interview-panel";
 import { useArticleWorkspace } from "./use-article-workspace";
 import styles from "./article-workspace.module.css";
 
@@ -120,17 +126,33 @@ export function ArticleWorkspace({
                 </span>
               </div>
             </div>
-            <Link
-              className={styles.editLink}
-              href={`/articles/${encodeURIComponent(articleId)}/edit`}
-            >
-              <PencilSimple size={16} aria-hidden /> Edit setup
-            </Link>
+            <div className={styles.headerActions}>
+              <Link
+                className={styles.interviewLink}
+                href={workspace.writerInterview.href}
+              >
+                <Microphone size={17} aria-hidden />
+                {workspace.writerInterview.state === "completed"
+                  ? "View writer interview"
+                  : workspace.writerInterview.state === "in_progress"
+                    ? "Continue interview"
+                    : "Interview me"}
+              </Link>
+              <Link
+                className={styles.editLink}
+                href={`/articles/${encodeURIComponent(articleId)}/edit`}
+              >
+                <PencilSimple size={16} aria-hidden /> Edit setup
+              </Link>
+            </div>
           </header>
 
           <ArticleWorkspaceNav activeTab={activeTab} articleId={articleId} />
           {activeTab === "interviews" ? (
-            <ClientInterviewManager workspace={workspace} />
+            <>
+              <WriterInterviewPanel workspace={workspace} />
+              <ClientInterviewManager workspace={workspace} />
+            </>
           ) : (
             <ArticleWorkspaceOverview workspace={workspace} />
           )}

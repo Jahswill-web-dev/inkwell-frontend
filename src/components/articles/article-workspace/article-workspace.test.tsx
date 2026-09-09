@@ -65,6 +65,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   sessionStorage.clear();
+  localStorage.clear();
 });
 
 describe("ArticleWorkspace", () => {
@@ -89,6 +90,10 @@ describe("ArticleWorkspace", () => {
     expect(screen.getByRole("link", { name: /Edit setup/ })).toHaveAttribute(
       "href",
       `/articles/${article.id}/edit`,
+    );
+    expect(screen.getByRole("link", { name: "Interview me" })).toHaveAttribute(
+      "href",
+      `/articles/${article.id}/writer-interview`,
     );
   });
 

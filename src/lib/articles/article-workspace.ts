@@ -10,6 +10,10 @@ import {
   type AgencyArticleStatus,
 } from "@/lib/dashboard/agency-dashboard";
 import { toAgencyArticleSummary } from "@/lib/dashboard/agency-view-model";
+import {
+  writerInterviewSummary,
+  type WriterInterviewMaterial,
+} from "./writer-interview-storage";
 
 export type WorkspaceResources = {
   hasBrief: boolean;
@@ -48,11 +52,18 @@ export type ArticleWorkspaceViewModel = {
     unavailableLabel?: string;
   };
   sourceSummary: string;
+  writerInterview: {
+    state: "not_started" | "in_progress" | "completed";
+    progress: number;
+    responses: number;
+    href: string;
+  };
 };
 
 function interviewReadiness(
   metadata: ArticleSetupMetadata | null,
   invitation: InterviewInvitation | null,
+  writerMaterial: WriterInterviewMaterial | null,
 ): WorkspaceReadiness {
   if (metadata?.interviewMethod === "notes") {
     return {
@@ -93,11 +104,23 @@ function interviewReadiness(
     };
   }
   if (metadata?.interviewMethod === "self") {
+    const writer = writerInterviewSummary(writerMaterial);
+    if (writer.state === "completed") {
+      return {
+        id: "interviews",
+        label: "Writer interview",
+        detail: `${writer.responses} writer responses are saved and ready for source review.`,
+        state: "complete",
+      };
+    }
     return {
       id: "interviews",
       label: "Writer interview",
-      detail: "The writer interview is ready to begin.",
-      state: "ready",
+      detail:
+        writer.state === "in_progress"
+          ? `${writer.responses} responses saved. Continue the whole-article interview.`
+          : "The whole-article writer interview is ready to begin.",
+      state: writer.state === "in_progress" ? "waiting" : "ready",
     };
   }
   return {
@@ -155,7 +178,22 @@ function participants(
   metadata: ArticleSetupMetadata | null,
   currentWriter: string,
   invitation: InterviewInvitation | null,
+  writerMaterial: WriterInterviewMaterial | null,
 ): WorkspaceParticipant[] {
+  const writer = writerInterviewSummary(writerMaterial);
+  const writerParticipant: WorkspaceParticipant | null =
+    writer.state !== "not_started" || metadata?.interviewMethod === "self"
+      ? {
+          name: currentWriter,
+          role: "Writer · Whole article",
+          state:
+            writer.state === "completed"
+              ? "Complete"
+              : writer.state === "in_progress"
+                ? `${writer.progress}% complete`
+                : "Ready to interview",
+        }
+      : null;
   if (metadata?.interviewMethod === "client") {
     return [
       {
@@ -165,14 +203,13 @@ function participants(
           ? interviewInvitationLabel(invitation)
           : "Link not created",
       },
+      ...(writerParticipant ? [writerParticipant] : []),
     ];
   }
   if (metadata?.interviewMethod === "self") {
-    return [
-      { name: currentWriter, role: "Writer", state: "Ready to interview" },
-    ];
+    return writerParticipant ? [writerParticipant] : [];
   }
-  return [];
+  return writerParticipant ? [writerParticipant] : [];
 }
 
 function nextAction(
@@ -180,6 +217,7 @@ function nextAction(
   metadata: ArticleSetupMetadata | null,
   resources: WorkspaceResources,
   invitation: InterviewInvitation | null,
+  writerMaterial: WriterInterviewMaterial | null,
 ): ArticleWorkspaceViewModel["nextAction"] {
   const encodedId = encodeURIComponent(articleId);
   if (resources.hasDraft) {
@@ -233,11 +271,22 @@ function nextAction(
     };
   }
   if (metadata?.interviewMethod === "self") {
+    const writer = writerInterviewSummary(writerMaterial);
+    if (writer.state === "completed") {
+      return {
+        title: "Build the article brief",
+        description:
+          "Your writer-supplied material is saved. Continue with the brief while source review is prepared next.",
+        href: `/articles/new/brief?articleId=${encodedId}`,
+      };
+    }
     return {
-      title: "Start your interview",
+      title:
+        writer.state === "in_progress"
+          ? "Continue your interview"
+          : "Start your interview",
       description: "Answer guided questions before Inkwell builds the brief.",
-      href: null,
-      unavailableLabel: "Writer interviews are coming next",
+      href: `/articles/${encodedId}/writer-interview`,
     };
   }
   return {
@@ -253,11 +302,12 @@ export function toArticleWorkspaceViewModel(
   metadata: ArticleSetupMetadata | null,
   resources: WorkspaceResources,
   invitation: InterviewInvitation | null = null,
+  writerMaterial: WriterInterviewMaterial | null = null,
   now = new Date(),
 ): ArticleWorkspaceViewModel {
   const agencyArticle = toAgencyArticleSummary(article, currentWriter, now);
   const readiness = [
-    interviewReadiness(metadata, invitation),
+    interviewReadiness(metadata, invitation, writerMaterial),
     ...resourceReadiness(resources),
   ];
   const completedStages =
@@ -284,8 +334,23 @@ export function toArticleWorkspaceViewModel(
     progress: Math.round((completedStages / 7) * 100),
     progressLabel: `${completedStages} of 7 stages complete`,
     readiness,
-    participants: participants(metadata, currentWriter, invitation),
-    nextAction: nextAction(article.id, metadata, resources, invitation),
+    participants: participants(
+      metadata,
+      currentWriter,
+      invitation,
+      writerMaterial,
+    ),
+    nextAction: nextAction(
+      article.id,
+      metadata,
+      resources,
+      invitation,
+      writerMaterial,
+    ),
     sourceSummary: `${article.notes.length.toLocaleString()} characters of setup context and source material`,
+    writerInterview: {
+      ...writerInterviewSummary(writerMaterial),
+      href: `/articles/${encodeURIComponent(article.id)}/writer-interview`,
+    },
   };
 }

@@ -10,6 +10,10 @@ import { loadArticleSetupMetadata } from "@/lib/articles/article-setup-storage";
 import { loadInterviewInvitation } from "@/lib/articles/client-interview-storage";
 import type { ArticleWorkspaceViewModel } from "@/lib/articles/article-workspace";
 import { toArticleWorkspaceViewModel } from "@/lib/articles/article-workspace";
+import {
+  loadWriterInterviewMaterial,
+  WRITER_INTERVIEW_UPDATED_EVENT,
+} from "@/lib/articles/writer-interview-storage";
 
 type WorkspaceLoadState =
   | { type: "loading" }
@@ -43,6 +47,7 @@ async function loadWorkspace(articleId: string, currentWriter: string) {
     loadArticleSetupMetadata(articleId),
     { hasBrief, hasOutline, hasDraft },
     loadInterviewInvitation(articleId),
+    loadWriterInterviewMaterial(articleId),
   );
 }
 
@@ -73,6 +78,21 @@ export function useArticleWorkspace(articleId: string, currentWriter: string) {
       active = false;
     };
   }, [articleId, currentWriter, retryKey]);
+
+  useEffect(() => {
+    function refresh(event: Event) {
+      const detail = (event as CustomEvent<{ articleId?: string }>).detail;
+      if (!detail?.articleId || detail.articleId === articleId) {
+        setRetryKey((value) => value + 1);
+      }
+    }
+    window.addEventListener(WRITER_INTERVIEW_UPDATED_EVENT, refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener(WRITER_INTERVIEW_UPDATED_EVENT, refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, [articleId]);
 
   return {
     state,

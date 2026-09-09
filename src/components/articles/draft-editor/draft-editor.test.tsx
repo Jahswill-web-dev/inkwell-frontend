@@ -852,7 +852,9 @@ describe("DraftEditor", () => {
       name: "Writing assistant",
     });
     await userEvent.click(
-      within(assistant).getByRole("radio", { name: /Write with me/ }),
+      within(assistant).getByRole("radio", {
+        name: /Interview me about this section/,
+      }),
     );
     expect(
       within(assistant).getByRole("textbox", { name: /Add a direction/ }),
@@ -980,7 +982,9 @@ describe("DraftEditor", () => {
       name: "Writing assistant",
     });
     await userEvent.click(
-      within(assistant).getByRole("radio", { name: /Write with me/ }),
+      within(assistant).getByRole("radio", {
+        name: /Interview me about this section/,
+      }),
     );
     await userEvent.click(
       within(assistant).getByRole("button", {
@@ -1027,7 +1031,9 @@ describe("DraftEditor", () => {
       name: "Writing assistant",
     });
     await userEvent.click(
-      within(assistant).getByRole("radio", { name: /Write with me/ }),
+      within(assistant).getByRole("radio", {
+        name: /Interview me about this section/,
+      }),
     );
     await userEvent.click(
       within(assistant).getByRole("button", {
@@ -1065,7 +1071,9 @@ describe("DraftEditor", () => {
       name: "Writing assistant",
     });
     await userEvent.click(
-      within(assistant).getByRole("radio", { name: /Write with me/ }),
+      within(assistant).getByRole("radio", {
+        name: /Interview me about this section/,
+      }),
     );
     await userEvent.click(
       within(assistant).getByRole("button", {
@@ -1096,7 +1104,9 @@ describe("DraftEditor", () => {
       name: "Writing assistant",
     });
     await userEvent.click(
-      within(assistant).getByRole("radio", { name: /Write with me/ }),
+      within(assistant).getByRole("radio", {
+        name: /Interview me about this section/,
+      }),
     );
     await userEvent.click(
       within(assistant).getByRole("button", {
@@ -1135,7 +1145,9 @@ describe("DraftEditor", () => {
       name: "Writing assistant",
     });
     await userEvent.click(
-      within(assistant).getByRole("radio", { name: /Write with me/ }),
+      within(assistant).getByRole("radio", {
+        name: /Interview me about this section/,
+      }),
     );
     await userEvent.click(
       within(assistant).getByRole("button", {
@@ -1206,7 +1218,9 @@ describe("DraftEditor", () => {
       name: "Writing assistant",
     });
     await userEvent.click(
-      within(assistant).getByRole("radio", { name: /Write with me/ }),
+      within(assistant).getByRole("radio", {
+        name: /Interview me about this section/,
+      }),
     );
     await userEvent.click(
       within(assistant).getByRole("button", {

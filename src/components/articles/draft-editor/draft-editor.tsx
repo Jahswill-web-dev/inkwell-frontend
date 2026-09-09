@@ -238,8 +238,9 @@ const startModeCopy: Record<
 > = {
   plan: { title: "Help me plan", subtitle: "Create 3–5 talking points" },
   guided: {
-    title: "Write with me",
-    subtitle: "Answer a few questions, then build the section together",
+    title: "Interview me about this section",
+    subtitle:
+      "A section-specific interview that only helps build the selected section",
   },
   draft: {
     title: "Draft this section",
@@ -1664,7 +1665,7 @@ export function DraftEditor({
         {renderAssistantSectionContext()}
         <p className={styles.guidedGoal}>{activeSection.goal}</p>
         <div className={styles.guidedHeader}>
-          <span>Write with me</span>
+          <span>Section-specific interview</span>
           <button onClick={() => void exitGuidedSession()} type="button">
             Exit <X size={19} aria-hidden />
           </button>
@@ -1913,7 +1914,7 @@ export function DraftEditor({
           onChange={(event) => setAssistantDirection(event.target.value)}
           placeholder={
             assistantStartMode === "guided"
-              ? "Not used for Write with me"
+              ? "Not used for the section interview"
               : "Use a practical example from software development"
           }
           value={assistantDirection}

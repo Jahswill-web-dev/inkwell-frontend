@@ -100,7 +100,15 @@
   gap: 6px;
 }
 
-.editLink {
+.headerActions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.editLink,
+.interviewLink {
   display: inline-flex;
   min-height: 41px;
   flex: 0 0 auto;
@@ -113,6 +121,12 @@
   font-size: 0.81rem;
   font-weight: 650;
   text-decoration: none;
+}
+
+.interviewLink {
+  border-color: var(--color-ink-crimson);
+  background: var(--color-ink-crimson);
+  color: white;
 }
 
 .tabs {
@@ -212,6 +226,11 @@
 
   .editLink {
     width: fit-content;
+  }
+
+  .headerActions {
+    width: 100%;
+    flex-wrap: wrap;
   }
 
   .tabs {

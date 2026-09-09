@@ -7,7 +7,6 @@ import {
   Copy,
   Eye,
   LinkSimple,
-  LockKey,
   PaperPlaneTilt,
   Prohibit,
   X,
@@ -225,13 +224,6 @@ export function ClientInterviewManager({
             concise progress here while their answers remain private.
           </span>
         </div>
-        <div className={styles.privacyNote}>
-          <LockKey size={20} aria-hidden />
-          <span>
-            The guest link only exposes the interview welcome and questions—not
-            your workspace, brief, or draft.
-          </span>
-        </div>
       </section>
 
       {!invitation ? (
@@ -423,14 +415,6 @@ export function ClientInterviewManager({
           )}
         </section>
       )}
-
-      <aside className={styles.mockNote}>
-        <strong>Frontend milestone</strong>
-        <span>
-          Invitation state is stored in this browser session. Secure tokens,
-          delivery, and live guest activity will connect to the backend later.
-        </span>
-      </aside>
 
       {previewOpen && invitation ? (
         <PreviewDialog

@@ -5,8 +5,7 @@
 }
 
 .intro,
-.card,
-.mockNote {
+.card {
   border: 1px solid #ddd8d1;
   border-radius: 9px;
   background: #fffefa;
@@ -50,23 +49,6 @@
   color: #596781;
   font-size: 0.84rem;
   line-height: 1.5;
-}
-
-.privacyNote {
-  display: flex;
-  max-width: 340px;
-  flex: 0 0 auto;
-  gap: 10px;
-  padding: 12px 14px;
-  border-radius: 7px;
-  background: #eef2f8;
-  color: #344666;
-  font-size: 0.74rem;
-  line-height: 1.45;
-}
-
-.privacyNote svg {
-  flex: 0 0 auto;
 }
 
 .card {
@@ -308,20 +290,6 @@
   font-size: 0.72rem;
 }
 
-.mockNote {
-  display: flex;
-  gap: 12px;
-  padding: 14px 17px;
-  color: #647087;
-  font-size: 0.73rem;
-  line-height: 1.45;
-}
-
-.mockNote strong {
-  flex: 0 0 auto;
-  color: #334563;
-}
-
 .backdrop {
   position: fixed;
   z-index: 100;
@@ -421,10 +389,6 @@
     padding: 19px;
   }
 
-  .privacyNote {
-    max-width: none;
-  }
-
   .card {
     padding: 19px;
   }
@@ -439,8 +403,7 @@
   }
 
   .formActions,
-  .inactiveActions,
-  .mockNote {
+  .inactiveActions {
     align-items: flex-start;
     flex-direction: column;
   }

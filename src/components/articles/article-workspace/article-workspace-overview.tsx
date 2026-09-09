@@ -80,6 +80,19 @@ export function ArticleWorkspaceOverview({
             <span>{workspace.sourceSummary}</span>
             <p>{workspace.article.notes}</p>
           </div>
+          {workspace.writerInterview.responses > 0 ? (
+            <div className={styles.sourceCard} data-source="writer">
+              <strong>Writer-supplied material</strong>
+              <span>
+                Whole-article interview · {workspace.writerInterview.responses}{" "}
+                responses saved
+              </span>
+              <p>
+                Kept separate from client interview answers and from
+                section-specific interviews in the draft editor.
+              </p>
+            </div>
+          ) : null}
         </section>
       </div>
 

@@ -164,6 +164,10 @@
   background: #f9f7f2;
 }
 
+.sourceCard[data-source="writer"] {
+  border-left: 3px solid var(--color-ink-crimson);
+}
+
 .sourceCard p {
   display: -webkit-box;
   overflow: hidden;

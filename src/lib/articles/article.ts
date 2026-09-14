@@ -8,6 +8,26 @@ export const articleGoals = [
   "entertain_with_a_compelling_story",
 ] as const;
 
+export const articleStatuses = [
+  "setup",
+  "waiting_for_client",
+  "interview_in_progress",
+  "ready_to_draft",
+  "drafting",
+  "in_review",
+  "ready_to_publish",
+  "published",
+] as const;
+export const contentTypes = [
+  "blog_post",
+  "thought_leadership",
+  "case_study",
+  "guide",
+  "landing_page",
+] as const;
+export const targetLengths = ["short", "standard", "long"] as const;
+export const interviewMethods = ["client", "self", "notes"] as const;
+
 export const articleGoalSchema = z.enum(articleGoals);
 export type ArticleGoal = z.infer<typeof articleGoalSchema>;
 
@@ -35,6 +55,19 @@ export const articleInputSchema = z.object({
     })
     .min(1, "Target audience is required."),
   article_goal: articleGoalSchema,
+  client_id: z.string().uuid().nullable().optional(),
+  assignee_id: z.string().uuid().nullable().optional(),
+  content_type: z.enum(contentTypes).optional(),
+  due_date: z.string().date().nullable().optional(),
+  target_length: z.enum(targetLengths).optional(),
+  interview_method: z.enum(interviewMethods).optional(),
+  interviewee_name: z.string().trim().max(120).optional(),
+  interview_instructions: z.string().trim().max(1_000).optional(),
+  main_angle: z.string().trim().max(1_000).optional(),
+  key_message: z.string().trim().max(1_000).optional(),
+  call_to_action: z.string().trim().max(500).optional(),
+  tone: z.string().trim().max(500).optional(),
+  seo_keyword: z.string().trim().max(200).optional(),
 });
 
 export const articlePatchSchema = articleInputSchema.partial().superRefine(
@@ -51,6 +84,31 @@ export const articlePatchSchema = articleInputSchema.partial().superRefine(
 export const articleSchema = articleInputSchema.extend({
   id: z.string().uuid(),
   user_id: z.string().uuid(),
+  workspace_id: z.string().uuid().nullable().default(null),
+  client_id: z.string().uuid().nullable().default(null),
+  client: z
+    .object({ id: z.string().uuid(), name: z.string() })
+    .nullable()
+    .default(null),
+  assignee_id: z.string().uuid().nullable().default(null),
+  assignee: z
+    .object({ id: z.string().uuid(), username: z.string() })
+    .nullable()
+    .default(null),
+  status: z.enum(articleStatuses).default("setup"),
+  content_type: z.enum(contentTypes).default("blog_post"),
+  due_date: z.string().date().nullable().default(null),
+  target_length: z.enum(targetLengths).default("standard"),
+  interview_method: z.enum(interviewMethods).default("notes"),
+  interviewee_name: z.string().default(""),
+  interview_instructions: z.string().default(""),
+  main_angle: z.string().default(""),
+  key_message: z.string().default(""),
+  call_to_action: z.string().default(""),
+  tone: z.string().default(""),
+  seo_keyword: z.string().default(""),
+  draft_readiness: z.boolean().default(false),
+  published_at: z.string().datetime({ offset: true }).nullable().default(null),
   created_at: z.string().datetime({ offset: true }),
   updated_at: z.string().datetime({ offset: true }),
 });

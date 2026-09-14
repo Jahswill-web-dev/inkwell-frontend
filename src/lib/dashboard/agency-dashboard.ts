@@ -13,7 +13,7 @@ export const agencyArticleStatuses = [
 
 export type AgencyArticleStatus = (typeof agencyArticleStatuses)[number];
 
-export type AgencyArticleSummary = Article & {
+export type AgencyArticleSummary = Omit<Article, "assignee"> & {
   clientName: string;
   status: AgencyArticleStatus;
   assignee: string;

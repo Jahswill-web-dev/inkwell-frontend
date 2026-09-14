@@ -8,6 +8,7 @@ export const interviewProgressStates = [
 ] as const;
 
 export const interviewInvitationSchema = z.object({
+  id: z.string().uuid().optional(),
   articleId: z.string().min(1),
   articleTitle: z.string().trim().min(1).max(200).optional(),
   clientName: z.string().trim().min(1).max(120).optional(),
@@ -16,14 +17,17 @@ export const interviewInvitationSchema = z.object({
   participantEmail: z.string().trim().email().max(254),
   token: z.string().min(20).max(200),
   status: z.enum(["active", "revoked"]),
-  createdAt: z.string().datetime(),
-  expiresAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime({ offset: true }),
+  expiresAt: z.string().datetime({ offset: true }).nullable(),
   progressState: z.enum(interviewProgressStates),
   questionsAnswered: z.number().int().min(0),
   estimatedQuestions: z.number().int().min(1),
-  openedAt: z.string().datetime().nullable(),
-  completedAt: z.string().datetime().nullable(),
-  generation: z.number().int().min(1),
+  openedAt: z.string().datetime({ offset: true }).nullable(),
+  completedAt: z.string().datetime({ offset: true }).nullable(),
+  updatedAt: z.string().datetime({ offset: true }).optional(),
+  // Retained only to read browser-only invitations created before the API
+  // integration. New invitations are always persisted by the backend.
+  generation: z.number().int().min(1).optional(),
 });
 
 export type InterviewInvitation = z.infer<typeof interviewInvitationSchema>;

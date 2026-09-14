@@ -1,4 +1,5 @@
 import { articleGoalLabels, articleGoals } from "@/lib/articles/article";
+import type { AgencyClient } from "@/lib/agency/agency";
 import {
   contentTypeLabels,
   contentTypes,
@@ -19,6 +20,14 @@ type StepProps = {
   ) => void;
 };
 
+type ClientStepProps = StepProps & {
+  assigneeName: string;
+  clients: readonly AgencyClient[];
+  clientsError: string;
+  isLoadingClients: boolean;
+  onRetryClients: () => void;
+};
+
 type FieldProps = {
   children: React.ReactNode;
   error?: string;
@@ -37,22 +46,70 @@ function Field({ children, error, hint, label }: FieldProps) {
   );
 }
 
-export function ClientArticleStep({ values, errors, update }: StepProps) {
+export function ClientArticleStep({
+  values,
+  errors,
+  update,
+  assigneeName,
+  clients,
+  clientsError,
+  isLoadingClients,
+  onRetryClients,
+}: ClientStepProps) {
+  const chooseClient = (clientId: string) => {
+    if (!clientId) {
+      update("clientId", "");
+      update("clientName", "");
+      return;
+    }
+    const selected = clients.find((client) => client.id === clientId);
+    update("clientId", clientId);
+    if (selected) update("clientName", selected.name);
+  };
+
   return (
     <div className={styles.grid}>
       <Field
         label="Client *"
+        hint="Select a saved client or create one for this workspace."
+      >
+        <select
+          autoFocus
+          disabled={isLoadingClients}
+          value={values.clientId}
+          onChange={(event) => chooseClient(event.target.value)}
+        >
+          <option value="">Create a new client</option>
+          {clients.map((client) => (
+            <option key={client.id} value={client.id}>
+              {client.name}
+            </option>
+          ))}
+        </select>
+      </Field>
+      {clientsError ? (
+        <div role="alert">
+          <small className={styles.error}>{clientsError}</small>{" "}
+          <button type="button" onClick={onRetryClients}>
+            Try again
+          </button>
+        </div>
+      ) : null}
+      {!values.clientId ? (
+      <Field
+        label="New client name *"
         error={errors.clientName}
         hint="Use the company or brand name."
       >
         <input
-          autoFocus
           aria-invalid={Boolean(errors.clientName)}
+          maxLength={120}
           value={values.clientName}
           onChange={(event) => update("clientName", event.target.value)}
           placeholder="Northstar Labs"
         />
       </Field>
+      ) : null}
       <Field label="Working title or topic *" error={errors.workingTitle}>
         <input
           aria-invalid={Boolean(errors.workingTitle)}
@@ -104,6 +161,21 @@ export function ClientArticleStep({ values, errors, update }: StepProps) {
             </option>
           ))}
         </select>
+      </Field>
+      <Field
+        label="Due date"
+        error={errors.dueDate}
+        hint="Optional. You can leave this unscheduled."
+      >
+        <input
+          aria-invalid={Boolean(errors.dueDate)}
+          type="date"
+          value={values.dueDate}
+          onChange={(event) => update("dueDate", event.target.value)}
+        />
+      </Field>
+      <Field label="Assignee" hint="Team assignment will be added later.">
+        <input value={assigneeName} readOnly />
       </Field>
     </div>
   );

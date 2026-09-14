@@ -35,6 +35,10 @@ export function ArticleSetupReview({ values }: { values: ArticleSetupValues }) {
             <dt>Goal</dt>
             <dd>{articleGoalLabels[values.articleGoal]}</dd>
           </div>
+          <div>
+            <dt>Due date</dt>
+            <dd>{values.dueDate || "No due date"}</dd>
+          </div>
         </dl>
       </section>
       <section>

@@ -26,7 +26,6 @@ import {
   type WriterInterviewMaterial,
 } from "@/lib/articles/writer-interview-storage";
 import { getArticle } from "@/lib/articles/client";
-import { loadArticleSetupMetadata } from "@/lib/articles/article-setup-storage";
 import styles from "./client-interview.module.css";
 
 function subscribeToConnectivity(callback: () => void) {
@@ -63,9 +62,7 @@ export function WriterInterviewScreen({
         setContext({
           type: "ready",
           articleTitle: article.working_title,
-          clientName:
-            loadArticleSetupMetadata(articleId)?.clientName ??
-            "Article workspace",
+          clientName: article.client?.name ?? "Unassigned client",
         });
       })
       .catch(() => {

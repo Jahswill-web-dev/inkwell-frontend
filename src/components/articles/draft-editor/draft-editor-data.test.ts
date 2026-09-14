@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { articleSchema } from "@/lib/articles/article";
 import {
   countDraftWords,
   createDefaultDraft,
@@ -46,7 +47,7 @@ describe("draft editor data", () => {
   it("maps an API article and draft into editor state and back", () => {
     const fixture = createDefaultDraft();
     const articleId = "be5579e3-24fd-4272-a35f-f74740c3887e";
-    const article = {
+    const article = articleSchema.parse({
       id: articleId,
       user_id: "46a42280-6ad8-4bb6-a29c-1604adbf0c31",
       notes: "Notes",
@@ -55,7 +56,7 @@ describe("draft editor data", () => {
       article_goal: "inform_and_inspire" as const,
       created_at: "2026-08-12T12:00:00Z",
       updated_at: "2026-08-12T12:00:00Z",
-    };
+    });
     const draft = {
       id: "30000000-0000-4000-8000-000000000000",
       article_id: articleId,

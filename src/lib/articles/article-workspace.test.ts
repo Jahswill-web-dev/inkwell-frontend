@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Article } from "./article";
+import { articleSchema, type Article } from "./article";
 import type { ArticleSetupMetadata } from "./article-setup";
 import { toArticleWorkspaceViewModel } from "./article-workspace";
 import { createWriterInterviewMaterial } from "./writer-interview-storage";
@@ -9,7 +9,7 @@ import {
   submitClientInterviewAnswer,
 } from "./client-interview-session";
 
-const article: Article = {
+const article: Article = articleSchema.parse({
   id: "be5579e3-24fd-4272-a35f-f74740c3887e",
   user_id: "46a42280-6ad8-4bb6-a29c-1604adbf0c31",
   notes: "Useful source notes",
@@ -18,7 +18,7 @@ const article: Article = {
   article_goal: "inform_and_inspire",
   created_at: "2026-08-12T12:00:00Z",
   updated_at: "2026-08-12T12:00:00Z",
-};
+});
 
 const metadata: ArticleSetupMetadata = {
   clientName: "Northstar Labs",

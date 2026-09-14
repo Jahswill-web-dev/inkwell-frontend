@@ -1,11 +1,40 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createInterviewInvitation } from "@/lib/articles/client-interview-invitation";
-import { saveInterviewInvitation } from "@/lib/articles/client-interview-storage";
+import {
+  createClientInterviewSession,
+  completeClientInterview,
+} from "@/lib/articles/client-interview-session";
+import { InterviewInvitationRequestError } from "@/lib/articles/client-interview-api";
 import { ClientInterview } from "./client-interview";
 
 const token = "a".repeat(48);
+const { getGuestMock, updateGuestMock } = vi.hoisted(() => ({
+  getGuestMock: vi.fn(),
+  updateGuestMock: vi.fn(),
+}));
+const { startVoiceMock, stopVoiceMock } = vi.hoisted(() => ({
+  startVoiceMock: vi.fn(),
+  stopVoiceMock: vi.fn(),
+}));
+
+vi.mock("@/lib/articles/client-interview-api", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("@/lib/articles/client-interview-api")
+  >()),
+  getGuestInterview: getGuestMock,
+  updateGuestInterview: updateGuestMock,
+}));
+
+vi.mock("./use-realtime-interview", () => ({
+  useRealtimeInterview: () => ({
+    error: null,
+    start: startVoiceMock,
+    status: "idle",
+    stop: stopVoiceMock,
+  }),
+}));
 
 function seedInvitation(
   overrides: Partial<ReturnType<typeof createInterviewInvitation>> = {},
@@ -27,13 +56,31 @@ function seedInvitation(
     ),
     ...overrides,
   };
-  saveInterviewInvitation(invitation);
+  let session =
+    invitation.progressState === "completed"
+      ? completeClientInterview(createClientInterviewSession(token))
+      : createClientInterviewSession(token);
+  getGuestMock.mockResolvedValue({ invitation, session });
+  updateGuestMock.mockImplementation(async (_token, nextSession) => {
+    session = nextSession;
+    return { invitation, session };
+  });
   return invitation;
 }
 
+beforeEach(() => {
+  vi.clearAllMocks();
+  getGuestMock.mockRejectedValue(
+    new InterviewInvitationRequestError(
+      404,
+      "invitation_not_found",
+      "Not found",
+    ),
+  );
+});
+
 afterEach(() => {
   cleanup();
-  sessionStorage.clear();
 });
 
 describe("ClientInterview", () => {
@@ -46,7 +93,7 @@ describe("ClientInterview", () => {
     ).toBeVisible();
   });
 
-  it("welcomes the participant and supports save and resume", async () => {
+  it("welcomes the participant and starts the voice connection", async () => {
     seedInvitation();
     render(<ClientInterview token={token} />);
     expect(
@@ -56,57 +103,16 @@ describe("ClientInterview", () => {
     ).toBeVisible();
     expect(screen.getByText(/About 5–10 minutes/)).toBeVisible();
     await userEvent.click(
-      screen.getByRole("button", { name: /Start interview/ }),
+      screen.getByRole("button", { name: /Start voice interview/ }),
     );
-    expect(
-      screen.getByRole("heading", { name: /most important idea/ }),
-    ).toBeVisible();
-
-    fireEvent.change(screen.getByLabelText("Your answer"), {
-      target: { value: "A short unfinished answer" },
-    });
-    await userEvent.click(
-      screen.getByRole("button", { name: "Save for later" }),
-    );
-    expect(
-      screen.getByRole("heading", { name: "Your progress is saved" }),
-    ).toBeVisible();
-    await userEvent.click(
-      screen.getByRole("button", { name: /Continue interview/ }),
-    );
-    expect(screen.getByLabelText("Your answer")).toHaveValue(
-      "A short unfinished answer",
-    );
+    expect(startVoiceMock).toHaveBeenCalledOnce();
   });
 
-  it("asks a follow-up and completes early after enough detail", async () => {
+  it("tells the participant that microphone access is needed", async () => {
     seedInvitation();
     render(<ClientInterview token={token} />);
-    await userEvent.click(
-      await screen.findByRole("button", { name: /Start interview/ }),
-    );
-    fireEvent.change(screen.getByLabelText("Your answer"), {
-      target: { value: "A short answer" },
-    });
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(screen.getByText("A quick follow-up")).toBeVisible();
-
-    const detailed = Array.from(
-      { length: 55 },
-      (_, index) => "detail" + index,
-    ).join(" ");
-    for (let index = 0; index < 3; index += 1) {
-      fireEvent.change(screen.getByLabelText("Your answer"), {
-        target: { value: detailed },
-      });
-      await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-      if (screen.queryByRole("heading", { name: /Thank you/ })) break;
-    }
     expect(
-      screen.getByRole("heading", { name: "Thank you, Avery Chen" }),
-    ).toBeVisible();
-    expect(
-      screen.getByRole("button", { name: "Add one final detail" }),
+      await screen.findByText(/allow microphone access/i),
     ).toBeVisible();
   });
 
@@ -122,7 +128,13 @@ describe("ClientInterview", () => {
       "This interview link has expired",
     ],
   ])("shows the %s state", async (_state, overrides, heading) => {
-    seedInvitation(overrides);
+    getGuestMock.mockRejectedValue(
+      new InterviewInvitationRequestError(
+        "status" in overrides && overrides.status === "revoked" ? 403 : 410,
+        "invitation_unavailable",
+        "Unavailable",
+      ),
+    );
     render(<ClientInterview token={token} />);
     expect(await screen.findByRole("heading", { name: heading })).toBeVisible();
   });

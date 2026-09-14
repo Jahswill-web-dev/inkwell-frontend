@@ -7,6 +7,18 @@ const firstArticle = {
   working_title: "The Power of Intentional Thinking",
   target_audience: ["Writers"],
   article_goal: "inform_and_inspire",
+  status: "waiting_for_client",
+  due_date: "2026-09-13",
+  client_id: "1ca4ce18-a546-4c06-bfe6-a0dcd2234430",
+  client: {
+    id: "1ca4ce18-a546-4c06-bfe6-a0dcd2234430",
+    name: "Northstar Labs",
+  },
+  assignee_id: "46a42280-6ad8-4bb6-a29c-1604adbf0c31",
+  assignee: {
+    id: "46a42280-6ad8-4bb6-a29c-1604adbf0c31",
+    username: "writer_01",
+  },
   created_at: "2026-08-12T12:00:00Z",
   updated_at: "2026-08-12T12:00:00Z",
 };
@@ -16,6 +28,13 @@ const secondArticle = {
   id: "36dc2b27-f474-4d43-b8cc-c122ef782cd6",
   working_title: "A Practical Editorial System",
   target_audience: ["Agency teams"],
+  status: "ready_to_draft",
+  due_date: "2026-09-11",
+  client_id: "4298404a-07f8-4b3c-a57b-af427204ff02",
+  client: {
+    id: "4298404a-07f8-4b3c-a57b-af427204ff02",
+    name: "Field Notes Studio",
+  },
 };
 
 test("renders the responsive agency dashboard without browser errors or overflow", async ({

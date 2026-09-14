@@ -10,9 +10,20 @@ const article = {
   created_at: "2026-08-12T12:00:00Z",
   updated_at: "2026-08-12T12:00:00Z",
 };
+const workspaceClient = {
+  id: "8d9dd792-78d8-4c9a-84bb-67d84c78b62a",
+  workspace_id: "675bd099-ae1f-4246-b91e-a49b8077f65c",
+  name: "Northstar Labs",
+  website: null,
+  industry: null,
+  brand_profile: null,
+  created_at: "2026-09-10T12:00:00Z",
+  updated_at: "2026-09-10T12:00:00Z",
+};
 
 async function completeEditorialSetup(page: import("@playwright/test").Page) {
-  await page.getByLabel(/Client */).fill("Northstar Labs");
+  await expect(page.getByRole("combobox", { name: "Client *" })).toBeEnabled();
+  await page.getByLabel("New client name *").fill("Northstar Labs");
   await page.getByLabel(/Working title or topic/).fill(article.working_title);
   await page.getByLabel(/Target audience/).fill("Independent content teams");
   await page
@@ -26,6 +37,24 @@ async function completeEditorialSetup(page: import("@playwright/test").Page) {
     .getByLabel(/Key message/)
     .fill("A focused interview produces stronger source material.");
   await page.getByRole("button", { name: /Continue/ }).click();
+}
+
+async function mockClients(page: import("@playwright/test").Page) {
+  await page.route("**/api/clients**", async (route) => {
+    if (route.request().method() === "POST") {
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify(workspaceClient),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ items: [], total: 0, offset: 0, limit: 100 }),
+    });
+  });
 }
 
 async function mockEmptyWorkspaceResources(
@@ -50,12 +79,25 @@ async function mockEmptyWorkspaceResources(
 test("creates a client article and prepares its interview handoff", async ({
   page,
 }) => {
+  await mockClients(page);
   await page.route("**/api/articles**", async (route) => {
     if (route.request().method() === "POST") {
+      const input = route.request().postDataJSON();
       await route.fulfill({
         status: 201,
         contentType: "application/json",
-        body: JSON.stringify(article),
+        body: JSON.stringify({
+          ...article,
+          ...input,
+          workspace_id: workspaceClient.workspace_id,
+          client_id: workspaceClient.id,
+          client: { id: workspaceClient.id, name: workspaceClient.name },
+          assignee_id: article.user_id,
+          assignee: { id: article.user_id, username: "writer_01" },
+          status: "setup",
+          draft_readiness: false,
+          published_at: null,
+        }),
       });
     } else await route.continue();
   });
@@ -63,7 +105,28 @@ test("creates a client article and prepares its interview handoff", async ({
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify(article),
+      body: JSON.stringify({
+        ...article,
+        workspace_id: workspaceClient.workspace_id,
+        client_id: workspaceClient.id,
+        client: { id: workspaceClient.id, name: workspaceClient.name },
+        assignee_id: article.user_id,
+        assignee: { id: article.user_id, username: "writer_01" },
+        status: "setup",
+        content_type: "thought_leadership",
+        due_date: null,
+        target_length: "standard",
+        interview_method: "client",
+        interviewee_name: "Avery Chen",
+        interview_instructions: "",
+        main_angle: "Expert insight makes B2B content more credible.",
+        key_message: "A focused interview produces stronger source material.",
+        call_to_action: "",
+        tone: "",
+        seo_keyword: "",
+        draft_readiness: false,
+        published_at: null,
+      }),
     });
   });
   await mockEmptyWorkspaceResources(page);
@@ -86,7 +149,7 @@ test("creates a client article and prepares its interview handoff", async ({
     page.getByRole("heading", { name: article.working_title }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Create the client interview link" }),
+    page.getByRole("heading", { name: "Create a private interview link" }),
   ).toBeVisible();
   await expect(page.getByRole("link", { name: /Edit setup/ })).toHaveAttribute(
     "href",
@@ -97,6 +160,7 @@ test("creates a client article and prepares its interview handoff", async ({
 test("creates an article from existing material and continues to the brief", async ({
   page,
 }) => {
+  await mockClients(page);
   await page.route("**/api/articles**", async (route) => {
     await route.fulfill({
       status: 201,

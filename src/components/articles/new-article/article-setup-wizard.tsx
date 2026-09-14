@@ -10,7 +10,6 @@ import {
   emptyArticleSetup,
   nextArticlePath,
   toArticleInputFromSetup,
-  toArticleSetupMetadata,
   validateArticleSetupStep,
   type ArticleSetupErrors,
   type ArticleSetupField,
@@ -21,9 +20,14 @@ import {
   clearArticleSetupDraft,
   loadArticleSetupDraft,
   saveArticleSetupDraft,
-  saveArticleSetupMetadata,
 } from "@/lib/articles/article-setup-storage";
-import { ArticleRequestError, createArticle } from "@/lib/articles/client";
+import {
+  ArticleRequestError,
+  createArticle,
+  createClient as createAgencyClient,
+  listClients,
+} from "@/lib/articles/client";
+import type { AgencyClient } from "@/lib/agency/agency";
 import type { AuthIdentity } from "@/lib/auth/identity";
 import {
   ClientArticleStep,
@@ -78,10 +82,39 @@ export function ArticleSetupWizard({ identity }: { identity: AuthIdentity }) {
   const [errors, setErrors] = useState<ArticleSetupErrors>({});
   const [requestError, setRequestError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [clients, setClients] = useState<AgencyClient[]>([]);
+  const [clientsError, setClientsError] = useState("");
+  const [isLoadingClients, setIsLoadingClients] = useState(true);
+  const [clientRetryKey, setClientRetryKey] = useState(0);
 
   useEffect(() => {
     saveArticleSetupDraft(values);
   }, [values]);
+
+  useEffect(() => {
+    let active = true;
+    listClients()
+      .then((items) => {
+        if (active) setClients(items);
+      })
+      .catch(() => {
+        if (active) {
+          setClientsError("Saved clients couldn’t be loaded. You can retry or create a new one.");
+        }
+      })
+      .finally(() => {
+        if (active) setIsLoadingClients(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [clientRetryKey]);
+
+  const retryClients = () => {
+    setIsLoadingClients(true);
+    setClientsError("");
+    setClientRetryKey((value) => value + 1);
+  };
 
   const update = <K extends ArticleSetupField>(
     field: K,
@@ -134,8 +167,20 @@ export function ArticleSetupWizard({ identity }: { identity: AuthIdentity }) {
     setIsSubmitting(true);
     setRequestError("");
     try {
-      const created = await createArticle(toArticleInputFromSetup(parsed.data));
-      saveArticleSetupMetadata(created.id, toArticleSetupMetadata(parsed.data));
+      let clientId = parsed.data.clientId;
+      if (!clientId) {
+        const client = await createAgencyClient({ name: parsed.data.clientName });
+        clientId = client.id;
+        setClients((current) =>
+          current.some((item) => item.id === client.id)
+            ? current
+            : [...current, client],
+        );
+        setValues((current) => ({ ...current, clientId }));
+      }
+      const created = await createArticle(
+        toArticleInputFromSetup({ ...parsed.data, clientId }),
+      );
       clearArticleSetupDraft();
       router.push(nextArticlePath(created.id, parsed.data.interviewMethod));
     } catch (error) {
@@ -215,6 +260,11 @@ export function ArticleSetupWizard({ identity }: { identity: AuthIdentity }) {
                 values={values}
                 errors={errors}
                 update={update}
+                assigneeName={identity.username}
+                clients={clients}
+                clientsError={clientsError}
+                isLoadingClients={isLoadingClients}
+                onRetryClients={retryClients}
               />
             ) : null}
             {step === 2 ? (

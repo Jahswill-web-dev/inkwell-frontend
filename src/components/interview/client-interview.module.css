@@ -137,6 +137,98 @@
   font-size: 0.7rem;
 }
 
+.voiceInterview {
+  display: grid;
+  width: min(100% - 40px, 620px);
+  justify-items: center;
+  margin: 0 auto;
+  padding: clamp(70px, 12vh, 125px) 0 60px;
+  text-align: center;
+}
+
+.voicePulse,
+.voicePulseConnected {
+  display: grid;
+  width: 104px;
+  height: 104px;
+  place-items: center;
+  margin-bottom: 27px;
+  border-radius: 50%;
+  background: #f7e8ec;
+  color: var(--color-ink-crimson);
+}
+
+.voicePulse svg {
+  animation: voiceSpin 1.1s linear infinite;
+}
+
+.voicePulseConnected {
+  animation: voiceGlow 1.8s ease-in-out infinite;
+  background: #e8f4ed;
+  color: #267247;
+}
+
+.voiceInterview h1 {
+  max-width: 570px;
+  margin: 13px 0 0;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: clamp(2.25rem, 6vw, 3.45rem);
+  font-weight: 560;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+}
+
+.voiceInterview > p {
+  max-width: 520px;
+  margin: 20px 0 0;
+  color: #56647c;
+  font-size: 0.93rem;
+  line-height: 1.7;
+}
+
+.voicePrivacy {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 27px;
+  padding: 10px 13px;
+  border: 1px solid #dedad4;
+  border-radius: 7px;
+  background: #fffefa;
+  color: #465672;
+  font-size: 0.76rem;
+}
+
+.endVoiceButton {
+  display: inline-flex;
+  min-height: 45px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 29px;
+  padding: 0 18px;
+  border: 1px solid #c9ccd3;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-ink-navy);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@keyframes voiceSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes voiceGlow {
+  50% {
+    box-shadow: 0 0 0 14px rgb(38 114 71 / 9%);
+  }
+}
+
 .conversation {
   padding: 46px 0 70px;
 }

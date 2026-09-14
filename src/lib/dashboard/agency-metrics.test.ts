@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { articleSchema } from "@/lib/articles/article";
 import type { AgencyArticleSummary } from "./agency-dashboard";
 import {
   calculateAgencyMetrics,
@@ -6,14 +7,16 @@ import {
 } from "./agency-metrics";
 
 const base: AgencyArticleSummary = {
-  id: "8f433dde-499e-4a76-8378-ad356f088c30",
-  user_id: "46a42280-6ad8-4bb6-a29c-1604adbf0c31",
-  notes: "Notes",
-  working_title: "Editorial systems",
-  target_audience: ["Marketers"],
-  article_goal: "inform_and_inspire",
-  created_at: "2026-09-01T12:00:00Z",
-  updated_at: "2026-09-02T12:00:00Z",
+  ...articleSchema.parse({
+    id: "8f433dde-499e-4a76-8378-ad356f088c30",
+    user_id: "46a42280-6ad8-4bb6-a29c-1604adbf0c31",
+    notes: "Notes",
+    working_title: "Editorial systems",
+    target_audience: ["Marketers"],
+    article_goal: "inform_and_inspire",
+    created_at: "2026-09-01T12:00:00Z",
+    updated_at: "2026-09-02T12:00:00Z",
+  }),
   clientName: "Northstar Labs",
   status: "waiting_for_client",
   assignee: "Nina",

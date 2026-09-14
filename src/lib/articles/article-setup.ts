@@ -2,16 +2,14 @@ import { z } from "zod";
 import {
   articleGoalSchema,
   articleInputSchema,
+  contentTypes,
+  interviewMethods,
+  targetLengths,
+  type Article,
   type ArticleInput,
 } from "./article";
 
-export const contentTypes = [
-  "blog_post",
-  "thought_leadership",
-  "case_study",
-  "guide",
-  "landing_page",
-] as const;
+export { contentTypes, interviewMethods, targetLengths };
 
 export const contentTypeLabels: Record<(typeof contentTypes)[number], string> =
   {
@@ -22,7 +20,6 @@ export const contentTypeLabels: Record<(typeof contentTypes)[number], string> =
     landing_page: "Landing page",
   };
 
-export const targetLengths = ["short", "standard", "long"] as const;
 export const targetLengthLabels: Record<
   (typeof targetLengths)[number],
   string
@@ -32,14 +29,14 @@ export const targetLengthLabels: Record<
   long: "Long-form · 1,800–2,500 words",
 };
 
-export const interviewMethods = ["client", "self", "notes"] as const;
-
 const required = (label: string, maximum: number) =>
   z.string().trim().min(1, `${label} is required.`).max(maximum);
 
 export const articleSetupSchema = z
   .object({
     clientName: required("Client", 120),
+    clientId: z.union([z.string().uuid(), z.literal("")]),
+    dueDate: z.union([z.string().date(), z.literal("")]),
     workingTitle: required("Working title", 200),
     contentType: z.enum(contentTypes),
     targetAudience: required("Target audience", 500),
@@ -80,6 +77,8 @@ export type ArticleSetupStep = 1 | 2 | 3 | 4;
 
 export const emptyArticleSetup: ArticleSetupValues = {
   clientName: "",
+  clientId: "",
+  dueDate: "",
   workingTitle: "",
   contentType: "blog_post",
   targetAudience: "",
@@ -102,6 +101,8 @@ export const fieldsByStep: Record<
 > = {
   1: [
     "clientName",
+    "clientId",
+    "dueDate",
     "workingTitle",
     "contentType",
     "targetAudience",
@@ -161,6 +162,18 @@ export function toArticleInputFromSetup(values: ArticleSetup): ArticleInput {
     working_title: values.workingTitle,
     target_audience: [values.targetAudience],
     article_goal: values.articleGoal,
+    client_id: values.clientId || null,
+    content_type: values.contentType,
+    due_date: values.dueDate || null,
+    target_length: values.targetLength,
+    interview_method: values.interviewMethod,
+    interviewee_name: values.intervieweeName,
+    interview_instructions: values.interviewInstructions,
+    main_angle: values.mainAngle,
+    key_message: values.keyMessage,
+    call_to_action: values.callToAction,
+    tone: values.tone,
+    seo_keyword: values.seoKeyword,
   });
 }
 
@@ -196,6 +209,25 @@ export function toArticleSetupMetadata(
     intervieweeName: values.intervieweeName,
     interviewInstructions: values.interviewInstructions,
   };
+}
+
+export function articleSetupMetadataFromArticle(
+  article: Article,
+): ArticleSetupMetadata | null {
+  const result = articleSetupMetadataSchema.safeParse({
+    clientName: article.client?.name ?? "Unassigned client",
+    contentType: article.content_type,
+    mainAngle: article.main_angle,
+    keyMessage: article.key_message,
+    callToAction: article.call_to_action,
+    tone: article.tone,
+    targetLength: article.target_length,
+    seoKeyword: article.seo_keyword,
+    interviewMethod: article.interview_method,
+    intervieweeName: article.interviewee_name,
+    interviewInstructions: article.interview_instructions,
+  });
+  return result.success ? result.data : null;
 }
 
 export function nextArticlePath(

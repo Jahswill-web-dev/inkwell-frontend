@@ -1,6 +1,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { articleSchema } from "@/lib/articles/article";
 import { NewArticleForm } from "./new-article-form";
 
 const { pushMock, refreshMock, createMock, updateMock, deleteMock } =
@@ -22,7 +23,7 @@ vi.mock("@/lib/articles/client", async (importOriginal) => ({
   deleteArticle: deleteMock,
 }));
 
-const article = {
+const article = articleSchema.parse({
   id: "be5579e3-24fd-4272-a35f-f74740c3887e",
   user_id: "46a42280-6ad8-4bb6-a29c-1604adbf0c31",
   notes: "Research notes and an early idea",
@@ -31,7 +32,7 @@ const article = {
   article_goal: "educate_with_practical_guidance" as const,
   created_at: "2026-08-12T12:00:00Z",
   updated_at: "2026-08-12T12:00:00Z",
-};
+});
 
 beforeEach(() => {
   vi.clearAllMocks();

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   addFinalInterviewDetail,
   clientInterviewProgress,
+  clientInterviewSessionSchema,
   createClientInterviewSession,
   currentInterviewQuestion,
   pauseClientInterview,
@@ -60,5 +61,15 @@ describe("client interview session", () => {
     const complete = submitClientInterviewAnswer(reopened, "One final fact.");
     expect(complete.state).toBe("completed");
     expect(complete.finalDetailAdded).toBe(true);
+  });
+
+  it("accepts UTC offsets returned by the backend", () => {
+    const session = createClientInterviewSession(token);
+    expect(
+      clientInterviewSessionSchema.parse({
+        ...session,
+        updatedAt: "2026-09-11T16:01:12.571358+00:00",
+      }).updatedAt,
+    ).toBe("2026-09-11T16:01:12.571358+00:00");
   });
 });

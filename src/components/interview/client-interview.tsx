@@ -8,38 +8,37 @@ import {
   Clock,
   CloudSlash,
   LockKey,
+  Microphone,
+  PhoneDisconnect,
+  SpinnerGap,
   WarningCircle,
+  Waveform,
 } from "@phosphor-icons/react";
 import {
   addFinalInterviewDetail,
   clientInterviewProgress,
   completeClientInterview,
-  createClientInterviewSession,
   currentInterviewQuestion,
   pauseClientInterview,
   startClientInterview,
   submitClientInterviewAnswer,
   type ClientInterviewSession,
 } from "@/lib/articles/client-interview-session";
+import type { InterviewInvitation } from "@/lib/articles/client-interview-invitation";
 import {
-  loadClientInterviewSession,
-  saveClientInterviewSession,
-} from "@/lib/articles/client-interview-session-storage";
-import {
-  isInterviewInvitationExpired,
-  type InterviewInvitation,
-} from "@/lib/articles/client-interview-invitation";
-import {
-  findInterviewInvitationByToken,
-  saveInterviewInvitation,
-} from "@/lib/articles/client-interview-storage";
+  getGuestInterview,
+  InterviewInvitationRequestError,
+  updateGuestInterview,
+} from "@/lib/articles/client-interview-api";
 import styles from "./client-interview.module.css";
+import { useRealtimeInterview } from "./use-realtime-interview";
 
 type GuestContext =
   | { type: "loading" }
   | { type: "invalid" }
-  | { type: "expired"; invitation: InterviewInvitation }
-  | { type: "revoked"; invitation: InterviewInvitation }
+  | { type: "expired" }
+  | { type: "revoked" }
+  | { type: "unavailable"; message: string }
   | {
       type: "ready";
       invitation: InterviewInvitation;
@@ -57,45 +56,6 @@ function subscribeToConnectivity(callback: () => void) {
 
 function connectivitySnapshot() {
   return navigator.onLine;
-}
-
-function resolveGuestContext(token: string): GuestContext {
-  const invitation = findInterviewInvitationByToken(token);
-  if (!invitation) return { type: "invalid" };
-  if (invitation.status === "revoked") return { type: "revoked", invitation };
-  if (isInterviewInvitationExpired(invitation)) {
-    return { type: "expired", invitation };
-  }
-  const storedSession = loadClientInterviewSession(token);
-  const session =
-    storedSession ??
-    (invitation.progressState === "completed"
-      ? completeClientInterview(createClientInterviewSession(token))
-      : createClientInterviewSession(token));
-  return { type: "ready", invitation, session };
-}
-
-function updateInvitationFromSession(
-  invitation: InterviewInvitation,
-  session: ClientInterviewSession,
-  openedAt: string | null = invitation.openedAt,
-): InterviewInvitation {
-  return {
-    ...invitation,
-    progressState:
-      session.state === "completed"
-        ? "completed"
-        : session.answers.length > 0
-          ? "in_progress"
-          : openedAt
-            ? "opened"
-            : "not_opened",
-    questionsAnswered: session.answers.length,
-    estimatedQuestions: Math.max(6, session.questions.length),
-    openedAt,
-    completedAt:
-      session.state === "completed" ? new Date().toISOString() : null,
-  };
 }
 
 function StateMessage({ title, message }: { title: string; message: string }) {
@@ -118,6 +78,8 @@ export function ClientInterview({ token }: { token: string }) {
   const [context, setContext] = useState<GuestContext>({ type: "loading" });
   const [answer, setAnswer] = useState("");
   const [serviceError, setServiceError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const voice = useRealtimeInterview(token);
   const online = useSyncExternalStore(
     subscribeToConnectivity,
     connectivitySnapshot,
@@ -126,9 +88,27 @@ export function ClientInterview({ token }: { token: string }) {
 
   useEffect(() => {
     let active = true;
-    Promise.resolve().then(() => {
-      if (active) setContext(resolveGuestContext(token));
-    });
+    getGuestInterview(token)
+      .then((interview) => {
+        if (active) {
+          setContext({ type: "ready", ...interview });
+          setAnswer(interview.session.draftAnswer);
+        }
+      })
+      .catch((error) => {
+        if (!active) return;
+        if (error instanceof InterviewInvitationRequestError) {
+          if (error.status === 403) setContext({ type: "revoked" });
+          else if (error.status === 410) setContext({ type: "expired" });
+          else if (error.status === 404) setContext({ type: "invalid" });
+          else setContext({ type: "unavailable", message: error.message });
+        } else {
+          setContext({
+            type: "unavailable",
+            message: "The interview could not be loaded. Please try again.",
+          });
+        }
+      });
     return () => {
       active = false;
     };
@@ -165,62 +145,126 @@ export function ClientInterview({ token }: { token: string }) {
       />
     );
   }
+  if (context.type === "unavailable") {
+    return (
+      <StateMessage
+        title="This interview is temporarily unavailable"
+        message={context.message}
+      />
+    );
+  }
 
   const { invitation, session } = context;
   const articleTitle = invitation.articleTitle ?? "the upcoming article";
   const clientName = invitation.clientName ?? "your team";
   const writerName = invitation.writerName ?? "your writer";
 
-  function persist(nextSession: ClientInterviewSession, opened = false) {
+  function startVoiceInterview() {
+    void voice.start();
+  }
+
+  async function persist(nextSession: ClientInterviewSession) {
+    setSaving(true);
     try {
-      const openedAt =
-        invitation.openedAt ?? (opened ? new Date().toISOString() : null);
-      const nextInvitation = updateInvitationFromSession(
-        invitation,
-        nextSession,
-        openedAt,
-      );
-      saveClientInterviewSession(nextSession);
-      saveInterviewInvitation(nextInvitation);
+      const nextInterview = await updateGuestInterview(token, nextSession);
+      setAnswer(nextInterview.session.draftAnswer);
       setContext({
         type: "ready",
-        invitation: nextInvitation,
-        session: nextSession,
+        invitation: nextInterview.invitation,
+        session: nextInterview.session,
       });
       setServiceError("");
-    } catch {
-      setServiceError(
-        "Inkwell couldn’t save that just now. Your answer is still here—please try again.",
-      );
+    } catch (error) {
+      if (error instanceof InterviewInvitationRequestError) {
+        if (error.status === 403) setContext({ type: "revoked" });
+        else if (error.status === 410) setContext({ type: "expired" });
+        else setServiceError(error.message);
+      } else {
+        setServiceError(
+          "Inkwell couldn’t save that just now. Please try again.",
+        );
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
-  function begin() {
+  function beginTextInterview() {
     const nextSession = startClientInterview(session);
     setAnswer(nextSession.draftAnswer);
-    persist(nextSession, true);
+    void persist(nextSession);
   }
 
   function submitAnswer() {
-    if (!answer.trim() || !online) return;
+    if (!answer.trim() || !online || saving) return;
     const nextSession = submitClientInterviewAnswer(session, answer);
     setAnswer(nextSession.draftAnswer);
-    persist(nextSession, true);
+    void persist(nextSession);
   }
 
   function pause() {
     const nextSession = pauseClientInterview(session, answer);
-    persist(nextSession, true);
+    void persist(nextSession);
   }
 
   function finish() {
-    persist(completeClientInterview(session), true);
+    void persist(completeClientInterview(session));
   }
 
   function addFinalDetail() {
     const nextSession = addFinalInterviewDetail(session);
     setAnswer("");
-    persist(nextSession, true);
+    void persist(nextSession);
+  }
+
+  if (voice.status === "connecting" || voice.status === "connected") {
+    const isConnected = voice.status === "connected";
+
+    return (
+      <main className={styles.page}>
+        <header className={styles.publicHeader}>
+          <div className={styles.brand}>Inkwell</div>
+          <span>Private voice interview</span>
+        </header>
+        <section className={styles.voiceInterview} aria-live="polite">
+          <div
+            className={
+              isConnected ? styles.voicePulseConnected : styles.voicePulse
+            }
+          >
+            {isConnected ? (
+              <Waveform size={50} weight="fill" aria-hidden />
+            ) : (
+              <SpinnerGap size={50} aria-hidden />
+            )}
+          </div>
+          <span className={styles.clientLabel}>
+            {isConnected ? "Voice connection ready" : "Connecting securely"}
+          </span>
+          <h1>
+            {isConnected
+              ? "Your interviewer is ready"
+              : "Preparing your voice interview"}
+          </h1>
+          <p>
+            {isConnected
+              ? "Your microphone is on. Your interviewer will begin shortly."
+              : "Allow microphone access when your browser asks. This usually takes only a moment."}
+          </p>
+          <div className={styles.voicePrivacy}>
+            <Microphone size={19} aria-hidden />
+            <span>Your microphone is shared only during this interview.</span>
+          </div>
+          <button
+            className={styles.endVoiceButton}
+            onClick={voice.stop}
+            type="button"
+          >
+            <PhoneDisconnect size={18} aria-hidden /> End voice interview
+          </button>
+        </section>
+      </main>
+    );
   }
 
   if (session.state === "welcome") {
@@ -235,8 +279,8 @@ export function ClientInterview({ token }: { token: string }) {
           <h1>Share your expertise for “{articleTitle}”</h1>
           <p>
             Hi {invitation.participantName}. {writerName} invited you to help
-            shape this article. Inkwell asks one focused question at a time and
-            may finish early once it has enough useful detail.
+            shape this article. Inkwell will guide you through a natural voice
+            conversation.
           </p>
           <div className={styles.expectations}>
             <span>
@@ -249,12 +293,18 @@ export function ClientInterview({ token }: { token: string }) {
           </div>
           <button
             className={styles.primaryButton}
-            onClick={begin}
+            onClick={startVoiceInterview}
             type="button"
           >
-            Start interview <ArrowRight size={18} aria-hidden />
+            <Microphone size={18} aria-hidden /> Start voice interview
           </button>
-          <small>You can save your progress and continue later.</small>
+          {voice.error ? (
+            <div className={styles.serviceError} role="alert">
+              <WarningCircle size={19} aria-hidden />
+              <span>{voice.error}</span>
+            </div>
+          ) : null}
+          <small>You&apos;ll be asked to allow microphone access.</small>
         </section>
       </main>
     );
@@ -272,7 +322,8 @@ export function ClientInterview({ token }: { token: string }) {
           </p>
           <button
             className={styles.primaryButton}
-            onClick={begin}
+            disabled={saving}
+            onClick={beginTextInterview}
             type="button"
           >
             Continue interview <ArrowRight size={18} aria-hidden />
@@ -318,8 +369,8 @@ export function ClientInterview({ token }: { token: string }) {
       </header>
       {!online ? (
         <div className={styles.offline} role="alert">
-          <CloudSlash size={19} aria-hidden /> Connection lost. Your current
-          answer stays here until you’re back online.
+          <CloudSlash size={19} aria-hidden /> Connection lost. Reconnect before
+          saving your answer.
         </div>
       ) : null}
       <section className={styles.conversation}>
@@ -364,6 +415,7 @@ export function ClientInterview({ token }: { token: string }) {
         <div className={styles.questionActions}>
           <button
             className={styles.secondaryButton}
+            disabled={saving || !online}
             onClick={pause}
             type="button"
           >
@@ -371,7 +423,7 @@ export function ClientInterview({ token }: { token: string }) {
           </button>
           <button
             className={styles.primaryButton}
-            disabled={!answer.trim() || !online}
+            disabled={!answer.trim() || !online || saving}
             onClick={submitAnswer}
             type="button"
           >
@@ -381,6 +433,7 @@ export function ClientInterview({ token }: { token: string }) {
         {session.answers.length >= 2 ? (
           <button
             className={styles.finishButton}
+            disabled={saving || !online}
             onClick={finish}
             type="button"
           >

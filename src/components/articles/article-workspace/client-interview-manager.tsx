@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowClockwise,
   Check,
@@ -12,19 +12,18 @@ import {
   X,
 } from "@phosphor-icons/react";
 import {
-  createInterviewInvitation,
   interviewInvitationInputSchema,
   interviewInvitationLabel,
   interviewInvitationUrl,
   interviewProgressPercent,
   isInterviewInvitationExpired,
-  revokeInterviewInvitation,
   type InterviewInvitation,
 } from "@/lib/articles/client-interview-invitation";
 import {
-  loadInterviewInvitation,
-  saveInterviewInvitation,
-} from "@/lib/articles/client-interview-storage";
+  createInterviewInvitationRequest,
+  getInterviewInvitation,
+  revokeInterviewInvitationRequest,
+} from "@/lib/articles/client-interview-api";
 import type { ArticleWorkspaceViewModel } from "@/lib/articles/article-workspace";
 import styles from "./client-interview-manager.module.css";
 
@@ -112,9 +111,11 @@ export function ClientInterviewManager({
   workspace: ArticleWorkspaceViewModel;
 }) {
   const defaultParticipant = workspace.participants[0]?.name ?? "";
-  const [invitation, setInvitation] = useState(() =>
-    loadInterviewInvitation(workspace.article.id),
+  const [invitation, setInvitation] = useState<InterviewInvitation | null>(
+    null,
   );
+  const [loadingInvitation, setLoadingInvitation] = useState(true);
+  const [savingInvitation, setSavingInvitation] = useState(false);
   const [participantName, setParticipantName] = useState(
     invitation?.participantName ?? defaultParticipant,
   );
@@ -126,7 +127,38 @@ export function ClientInterviewManager({
   );
   const [errors, setErrors] = useState<FormErrors>({});
   const [copyMessage, setCopyMessage] = useState("");
+  const [serviceError, setServiceError] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    getInterviewInvitation(workspace.article.id)
+      .then((nextInvitation) => {
+        if (!active) return;
+        setInvitation(nextInvitation);
+        if (nextInvitation) {
+          setParticipantName(nextInvitation.participantName);
+          setParticipantEmail(nextInvitation.participantEmail);
+          setExpiresOn(nextInvitation.expiresAt?.slice(0, 10) ?? "");
+        }
+        setServiceError("");
+      })
+      .catch((error) => {
+        if (active) {
+          setServiceError(
+            error instanceof Error
+              ? error.message
+              : "The invitation could not be loaded.",
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setLoadingInvitation(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [workspace.article.id]);
 
   const invitationUrl = useMemo(() => {
     if (!invitation) return "";
@@ -137,12 +169,7 @@ export function ClientInterviewManager({
     return interviewInvitationUrl(invitation, origin);
   }, [invitation]);
 
-  function persist(nextInvitation: InterviewInvitation) {
-    saveInterviewInvitation(nextInvitation);
-    setInvitation(nextInvitation);
-  }
-
-  function createInvitation() {
+  async function createInvitation() {
     const result = interviewInvitationInputSchema.safeParse({
       participantName,
       participantEmail,
@@ -158,14 +185,24 @@ export function ClientInterviewManager({
       return;
     }
     setErrors({});
-    persist(
-      createInterviewInvitation(workspace.article.id, result.data, {
-        generation: (invitation?.generation ?? 0) + 1,
-        articleTitle: workspace.article.working_title,
-        clientName: workspace.clientName,
-        writerName: workspace.assignee,
-      }),
-    );
+    setSavingInvitation(true);
+    try {
+      setInvitation(
+        await createInterviewInvitationRequest(
+          workspace.article.id,
+          result.data,
+        ),
+      );
+      setServiceError("");
+    } catch (error) {
+      setServiceError(
+        error instanceof Error
+          ? error.message
+          : "The link could not be created.",
+      );
+    } finally {
+      setSavingInvitation(false);
+    }
   }
 
   async function copyLink() {
@@ -177,35 +214,55 @@ export function ClientInterviewManager({
     }
   }
 
-  function revokeLink() {
-    if (!invitation) return;
-    persist(revokeInterviewInvitation(invitation));
-    setCopyMessage("");
+  async function revokeLink() {
+    if (!invitation?.id) return;
+    setSavingInvitation(true);
+    try {
+      setInvitation(
+        await revokeInterviewInvitationRequest(
+          workspace.article.id,
+          invitation.id,
+        ),
+      );
+      setCopyMessage("");
+      setServiceError("");
+    } catch (error) {
+      setServiceError(
+        error instanceof Error
+          ? error.message
+          : "The link could not be revoked.",
+      );
+    } finally {
+      setSavingInvitation(false);
+    }
   }
 
-  function regenerateLink() {
+  async function regenerateLink() {
     if (!invitation) return;
     const reusableExpiration =
       invitation.expiresAt && !isInterviewInvitationExpired(invitation)
         ? invitation.expiresAt.slice(0, 10)
         : "";
-    persist(
-      createInterviewInvitation(
-        workspace.article.id,
-        {
+    setSavingInvitation(true);
+    try {
+      setInvitation(
+        await createInterviewInvitationRequest(workspace.article.id, {
           participantName: invitation.participantName,
           participantEmail: invitation.participantEmail,
           expiresOn: reusableExpiration,
-        },
-        {
-          generation: invitation.generation + 1,
-          articleTitle: workspace.article.working_title,
-          clientName: workspace.clientName,
-          writerName: workspace.assignee,
-        },
-      ),
-    );
-    setExpiresOn(reusableExpiration);
+        }),
+      );
+      setExpiresOn(reusableExpiration);
+      setServiceError("");
+    } catch (error) {
+      setServiceError(
+        error instanceof Error
+          ? error.message
+          : "The link could not be regenerated.",
+      );
+    } finally {
+      setSavingInvitation(false);
+    }
   }
 
   const linkIsInactive =
@@ -226,7 +283,11 @@ export function ClientInterviewManager({
         </div>
       </section>
 
-      {!invitation ? (
+      {loadingInvitation ? (
+        <section className={styles.card} aria-busy="true">
+          <p>Loading invitation…</p>
+        </section>
+      ) : !invitation ? (
         <section className={styles.card} aria-labelledby="create-link-heading">
           <header>
             <div className={styles.iconBox}>
@@ -296,12 +357,13 @@ export function ClientInterviewManager({
           <div className={styles.formActions}>
             <button
               className={styles.primaryButton}
+              disabled={savingInvitation}
               onClick={createInvitation}
               type="button"
             >
-              Create interview link
+              {savingInvitation ? "Creating link…" : "Create interview link"}
             </button>
-            <span>No email is sent during this frontend milestone.</span>
+            <span>Copy the link and send it to the participant.</span>
           </div>
         </section>
       ) : (
@@ -369,6 +431,7 @@ export function ClientInterviewManager({
               <div className={styles.actionRow}>
                 <button
                   className={styles.primaryButton}
+                  disabled={savingInvitation}
                   onClick={copyLink}
                   type="button"
                 >
@@ -391,6 +454,7 @@ export function ClientInterviewManager({
                 </button>
                 <button
                   className={styles.dangerButton}
+                  disabled={savingInvitation}
                   onClick={revokeLink}
                   type="button"
                 >
@@ -405,6 +469,7 @@ export function ClientInterviewManager({
             <div className={styles.inactiveActions}>
               <button
                 className={styles.primaryButton}
+                disabled={savingInvitation}
                 onClick={regenerateLink}
                 type="button"
               >
@@ -415,6 +480,8 @@ export function ClientInterviewManager({
           )}
         </section>
       )}
+
+      {serviceError ? <p role="alert">{serviceError}</p> : null}
 
       {previewOpen && invitation ? (
         <PreviewDialog

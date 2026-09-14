@@ -24,7 +24,7 @@ export const clientInterviewSessionSchema = z.object({
     .nullable(),
   finalDetailAdded: z.boolean(),
   draftAnswer: z.string().max(10_000),
-  updatedAt: z.string().datetime(),
+  updatedAt: z.string().datetime({ offset: true }),
 });
 
 export type ClientInterviewSession = z.infer<

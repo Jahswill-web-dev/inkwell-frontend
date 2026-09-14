@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { articleGoals, articleGoalLabels, articleInputSchema, articlePatchSchema, changedArticleFields } from "./article";
+import { articleGoals, articleGoalLabels, articleInputSchema, articlePatchSchema, articleSchema, changedArticleFields } from "./article";
 
 const valid = { notes: " Notes ", working_title: " Title ", target_audience: [" Writers ", " Editors "], article_goal: "inform_and_inspire" as const };
 
@@ -21,7 +21,7 @@ describe("article schemas", () => {
 
   it("requires a non-empty patch and computes changed fields", () => {
     expect(articlePatchSchema.safeParse({}).success).toBe(false);
-    const article = { ...articleInputSchema.parse(valid), id: "be5579e3-24fd-4272-a35f-f74740c3887e", user_id: "46a42280-6ad8-4bb6-a29c-1604adbf0c31", created_at: "2026-08-12T12:00:00Z", updated_at: "2026-08-12T12:00:00Z" };
+    const article = articleSchema.parse({ ...articleInputSchema.parse(valid), id: "be5579e3-24fd-4272-a35f-f74740c3887e", user_id: "46a42280-6ad8-4bb6-a29c-1604adbf0c31", created_at: "2026-08-12T12:00:00Z", updated_at: "2026-08-12T12:00:00Z" });
     expect(changedArticleFields(article, { notes: "Notes", workingTitle: "New title", targetAudience: ["Writers", "Editors"], articleGoal: "inform_and_inspire" })).toEqual({ working_title: "New title" });
   });
 });

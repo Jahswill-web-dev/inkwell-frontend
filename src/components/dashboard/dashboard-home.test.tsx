@@ -26,6 +26,16 @@ const articles = [
     working_title: "The Case for Slower Thinking",
     target_audience: ["Writers"],
     article_goal: "inform_and_inspire",
+    status: "waiting_for_client",
+    due_date: "2026-09-13",
+    client: {
+      id: "1ca4ce18-a546-4c06-bfe6-a0dcd2234430",
+      name: "Northstar Labs",
+    },
+    assignee: {
+      id: "46a42280-6ad8-4bb6-a29c-1604adbf0c31",
+      username: "writer_01",
+    },
     created_at: "2026-08-12T12:00:00Z",
     updated_at: "2026-08-12T12:00:00Z",
   },
@@ -36,6 +46,16 @@ const articles = [
     working_title: "Designing a Life of Meaning",
     target_audience: ["Creators"],
     article_goal: "entertain_with_a_compelling_story",
+    status: "ready_to_draft",
+    due_date: "2026-09-11",
+    client: {
+      id: "4298404a-07f8-4b3c-a57b-af427204ff02",
+      name: "Field Notes Studio",
+    },
+    assignee: {
+      id: "46a42280-6ad8-4bb6-a29c-1604adbf0c31",
+      username: "writer_01",
+    },
     created_at: "2026-08-11T12:00:00Z",
     updated_at: "2026-08-11T12:00:00Z",
   },

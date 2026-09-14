@@ -348,9 +348,8 @@ export function toArticleWorkspaceViewModel(
   invitation: InterviewInvitation | null = null,
   writerMaterial: WriterInterviewMaterial | null = null,
   sourceReview: SourceReview | null = null,
-  now = new Date(),
 ): ArticleWorkspaceViewModel {
-  const agencyArticle = toAgencyArticleSummary(article, currentWriter, now);
+  const agencyArticle = toAgencyArticleSummary(article, currentWriter);
   const hasReviewableMaterial =
     invitation?.progressState === "completed" ||
     writerInterviewSummary(writerMaterial).responses > 0;

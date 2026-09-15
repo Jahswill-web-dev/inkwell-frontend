@@ -278,7 +278,7 @@ export function ClientInterview({ token }: { token: string }) {
           </h1>
           <p>
             {isConnected
-              ? "Your microphone is on. Your interviewer will begin shortly."
+              ? "Your microphone is on. Your interviewer will introduce the conversation and ask when you’re ready to begin."
               : "Allow microphone access when your browser asks. This usually takes only a moment."}
           </p>
           <div className={styles.voicePrivacy}>

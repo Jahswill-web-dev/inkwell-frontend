@@ -9,6 +9,16 @@ export type RealtimeInterviewStatus =
   | "connected"
   | "error";
 
+export type RealtimeCompletionReason =
+  | "participant_finished"
+  | "questions_complete";
+
+type RealtimeInterviewOptions = {
+  onComplete?: (reason: RealtimeCompletionReason) => void;
+};
+
+const FINAL_AUDIO_CLOSE_DELAY_MS = 750;
+
 function waitForIceGatheringComplete(connection: RTCPeerConnection) {
   if (connection.iceGatheringState === "complete") {
     return Promise.resolve();
@@ -29,15 +39,25 @@ function waitForIceGatheringComplete(connection: RTCPeerConnection) {
   });
 }
 
-export function useRealtimeInterview(token: string) {
+export function useRealtimeInterview(
+  token: string,
+  { onComplete }: RealtimeInterviewOptions = {},
+) {
   const connectionRef = useRef<RTCPeerConnection | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const completionReasonRef = useRef<RealtimeCompletionReason | null>(null);
+  const onCompleteRef = useRef(onComplete);
 
   const [status, setStatus] = useState<RealtimeInterviewStatus>("idle");
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
   const stop = useCallback(() => {
+    completionReasonRef.current = null;
     connectionRef.current?.close();
     connectionRef.current = null;
 
@@ -93,8 +113,62 @@ export function useRealtimeInterview(token: string) {
         }
       };
 
-      // This channel will carry interview commands and transcript events next.
-      connection.createDataChannel("oai-events");
+      const events = connection.createDataChannel("oai-events");
+      events.addEventListener("message", (message) => {
+        let event: unknown;
+        try {
+          event = JSON.parse(String(message.data));
+        } catch {
+          return;
+        }
+        if (!event || typeof event !== "object") return;
+
+        const realtimeEvent = event as {
+          arguments?: string;
+          name?: string;
+          type?: string;
+        };
+        if (
+          realtimeEvent.type === "response.function_call_arguments.done" &&
+          realtimeEvent.name === "end_interview"
+        ) {
+          try {
+            const argumentsValue = JSON.parse(realtimeEvent.arguments ?? "{}") as {
+              reason?: unknown;
+            };
+            if (
+              argumentsValue.reason === "participant_finished" ||
+              argumentsValue.reason === "questions_complete"
+            ) {
+              completionReasonRef.current = argumentsValue.reason;
+            }
+          } catch {
+            // Ignore a malformed completion call and keep the interview open.
+          }
+          return;
+        }
+
+        if (
+          realtimeEvent.type === "response.done" &&
+          completionReasonRef.current !== null
+        ) {
+          const reason = completionReasonRef.current;
+          completionReasonRef.current = null;
+          window.setTimeout(() => {
+            stop();
+            onCompleteRef.current?.(reason);
+          }, FINAL_AUDIO_CLOSE_DELAY_MS);
+        }
+      });
+      events.addEventListener(
+        "open",
+        () => {
+          // Request the opening turn explicitly so the interviewer greets the
+          // participant instead of waiting for microphone input to begin.
+          events.send(JSON.stringify({ type: "response.create" }));
+        },
+        { once: true },
+      );
 
       const offer = await connection.createOffer();
       await connection.setLocalDescription(offer);

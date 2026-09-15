@@ -79,7 +79,10 @@ export function ClientInterview({ token }: { token: string }) {
   const [answer, setAnswer] = useState("");
   const [serviceError, setServiceError] = useState("");
   const [saving, setSaving] = useState(false);
-  const voice = useRealtimeInterview(token);
+  const [isCompletingVoice, setIsCompletingVoice] = useState(false);
+  const voice = useRealtimeInterview(token, {
+    onComplete: completeVoiceInterview,
+  });
   const online = useSyncExternalStore(
     subscribeToConnectivity,
     connectivitySnapshot,
@@ -211,10 +214,33 @@ export function ClientInterview({ token }: { token: string }) {
     void persist(completeClientInterview(session));
   }
 
+  function completeVoiceInterview(
+    reason: "participant_finished" | "questions_complete",
+  ) {
+    setIsCompletingVoice(true);
+    voice.stop();
+    void persist(
+      completeClientInterview(
+        session,
+        reason === "participant_finished"
+          ? "participant_finished"
+          : "question_limit",
+      ),
+    ).finally(() => setIsCompletingVoice(false));
+  }
+
   function addFinalDetail() {
     const nextSession = addFinalInterviewDetail(session);
     setAnswer("");
     void persist(nextSession);
+  }
+
+  if (isCompletingVoice) {
+    return (
+      <main className={styles.loading} aria-busy="true">
+        <span>Finishing your interview…</span>
+      </main>
+    );
   }
 
   if (voice.status === "connecting" || voice.status === "connected") {
@@ -257,7 +283,7 @@ export function ClientInterview({ token }: { token: string }) {
           </div>
           <button
             className={styles.endVoiceButton}
-            onClick={voice.stop}
+            onClick={() => completeVoiceInterview("participant_finished")}
             type="button"
           >
             <PhoneDisconnect size={18} aria-hidden /> End voice interview

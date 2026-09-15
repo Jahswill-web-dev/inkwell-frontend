@@ -157,4 +157,28 @@ describe("ClientInterview", () => {
       screen.queryByRole("button", { name: "Add one final detail" }),
     ).not.toBeInTheDocument();
   });
+
+  it("lets the participant skip an optional final detail", async () => {
+    seedInvitation({ progressState: "completed" });
+    render(<ClientInterview token={token} />);
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Add one final detail" }),
+    );
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Skip this detail" }),
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Thank you, Avery Chen" }),
+    ).toBeVisible();
+    expect(updateGuestMock).toHaveBeenLastCalledWith(
+      token,
+      expect.objectContaining({
+        state: "completed",
+        answers: [],
+        finalDetailAdded: true,
+      }),
+    );
+  });
 });

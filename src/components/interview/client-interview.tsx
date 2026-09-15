@@ -235,6 +235,10 @@ export function ClientInterview({ token }: { token: string }) {
     void persist(nextSession);
   }
 
+  function skipFinalDetail() {
+    void persist(completeClientInterview(session));
+  }
+
   if (isCompletingVoice) {
     return (
       <main className={styles.loading} aria-busy="true">
@@ -456,6 +460,16 @@ export function ClientInterview({ token }: { token: string }) {
             Continue <ArrowRight size={18} aria-hidden />
           </button>
         </div>
+        {question.kind === "final_detail" ? (
+          <button
+            className={styles.finishButton}
+            disabled={saving || !online}
+            onClick={skipFinalDetail}
+            type="button"
+          >
+            Skip this detail
+          </button>
+        ) : null}
         {session.answers.length >= 2 ? (
           <button
             className={styles.finishButton}

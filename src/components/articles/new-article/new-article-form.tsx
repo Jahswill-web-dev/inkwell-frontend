@@ -23,6 +23,7 @@ import {
   updateArticle,
 } from "@/lib/articles/client";
 import { DEFAULT_AUTH_IDENTITY, type AuthIdentity } from "@/lib/auth/identity";
+import { ArticleSetupWizard } from "./article-setup-wizard";
 import styles from "./new-article-form.module.css";
 
 type FieldName = keyof ArticleFormValues;
@@ -69,7 +70,7 @@ function apiMessage(error: unknown) {
   return "Articles are temporarily unavailable. Please try again.";
 }
 
-export function NewArticleForm({
+function ExistingArticleForm({
   identity = DEFAULT_AUTH_IDENTITY,
   article,
 }: NewArticleFormProps) {
@@ -490,4 +491,15 @@ export function NewArticleForm({
       </div>
     </main>
   );
+}
+
+export function NewArticleForm(props: NewArticleFormProps) {
+  if (!props.article) {
+    return (
+      <ArticleSetupWizard
+        identity={props.identity ?? DEFAULT_AUTH_IDENTITY}
+      />
+    );
+  }
+  return <ExistingArticleForm {...props} />;
 }

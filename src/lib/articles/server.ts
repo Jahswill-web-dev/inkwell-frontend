@@ -42,7 +42,9 @@ export function articleUpstreamError(error: unknown): NextResponse {
     const parsed = articleApiErrorSchema.safeParse(error.response?.data);
     if (
       (status === 401 ||
+        status === 403 ||
         status === 404 ||
+        status === 410 ||
         status === 409 ||
         status === 422 ||
         status === 502 ||

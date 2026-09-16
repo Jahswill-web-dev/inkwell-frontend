@@ -5,7 +5,7 @@ import { toAuthIdentity } from "@/lib/auth/identity";
 
 export const metadata: Metadata = {
   title: "New article",
-  description: "Start an Inkwell article from an idea or your existing notes.",
+  description: "Set up a client article and choose how to collect expertise.",
 };
 
 export default async function NewArticlePage() {

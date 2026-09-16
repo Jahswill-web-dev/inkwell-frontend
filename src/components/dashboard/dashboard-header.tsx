@@ -50,13 +50,13 @@ export function DashboardHeader({
       </Link>
       <label className={styles.search}>
         <span className={styles.visuallyHidden}>
-          Search articles, ideas, or templates
+          Search articles or clients
         </span>
         <MagnifyingGlass size={24} aria-hidden />
         <input
           type="search"
           value={query}
-          placeholder="Search articles, ideas, or templates..."
+          placeholder="Search articles or clients..."
           onChange={(event) => onQueryChange(event.target.value)}
         />
       </label>

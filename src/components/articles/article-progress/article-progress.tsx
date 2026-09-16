@@ -3,16 +3,42 @@ import { Check, type IconWeight } from "@phosphor-icons/react";
 import styles from "./article-progress.module.css";
 
 export type ArticleWorkflowStep =
-  "brief" | "outline" | "draft" | "review" | "export";
+  | "setup"
+  | "interviews"
+  | "sources"
+  | "brief"
+  | "outline"
+  | "draft"
+  | "review"
+  | "publish";
 
 type ProgressStep = {
   id: ArticleWorkflowStep;
   desktopLabel: string;
   mobileLabel: string;
   href?: string;
+  workspaceHref?: "article" | "interviews" | "sources";
 };
 
 const steps: readonly ProgressStep[] = [
+  {
+    id: "setup",
+    desktopLabel: "Setup",
+    mobileLabel: "Setup",
+    workspaceHref: "article",
+  },
+  {
+    id: "interviews",
+    desktopLabel: "Interviews",
+    mobileLabel: "Interview",
+    workspaceHref: "interviews",
+  },
+  {
+    id: "sources",
+    desktopLabel: "Sources",
+    mobileLabel: "Sources",
+    workspaceHref: "sources",
+  },
   {
     id: "brief",
     desktopLabel: "Brief",
@@ -37,8 +63,17 @@ const steps: readonly ProgressStep[] = [
     mobileLabel: "Review",
     href: "/articles/new/review",
   },
-  { id: "export", desktopLabel: "Export", mobileLabel: "Export" },
+  { id: "publish", desktopLabel: "Publish", mobileLabel: "Publish" },
 ];
+
+function progressHref(step: ProgressStep, articleId?: string) {
+  if (!articleId) return step.href;
+  if (step.workspaceHref === "article") return `/articles/${articleId}`;
+  if (step.workspaceHref) return `/articles/${articleId}/${step.workspaceHref}`;
+  return step.href
+    ? `${step.href}?articleId=${encodeURIComponent(articleId)}`
+    : undefined;
+}
 
 export function ArticleProgress({
   currentStep,
@@ -72,6 +107,7 @@ export function ArticleProgress({
             </>
           );
 
+          const href = progressHref(step, articleId);
           return (
             <li
               className={
@@ -79,15 +115,8 @@ export function ArticleProgress({
               }
               key={step.desktopLabel}
             >
-              {isComplete && step.href ? (
-                <Link
-                  aria-label={step.desktopLabel}
-                  href={
-                    articleId
-                      ? `${step.href}?articleId=${encodeURIComponent(articleId)}`
-                      : step.href
-                  }
-                >
+              {isComplete && href ? (
+                <Link aria-label={step.desktopLabel} href={href}>
                   {content}
                 </Link>
               ) : (

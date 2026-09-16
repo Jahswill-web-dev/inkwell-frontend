@@ -9,7 +9,7 @@ import { Sidebar } from "./sidebar";
 import { DEFAULT_AUTH_IDENTITY, type AuthIdentity } from "@/lib/auth/identity";
 
 const dashboardNavigation = [
-  { label: "Home", icon: House, href: "/dashboard" },
+  { label: "Workspace", icon: House, href: "/dashboard" },
   { label: "Articles", icon: Article, href: "/dashboard?section=articles" },
   { label: "Ideas", icon: Lightbulb, href: "/dashboard?section=ideas" },
   {

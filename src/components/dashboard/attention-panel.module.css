@@ -1,0 +1,124 @@
+.attentionPanel {
+  overflow: hidden;
+  border: 1px solid var(--color-ink-line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.attentionHeading {
+  display: flex;
+  min-height: 59px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 17px;
+  border-bottom: 1px solid var(--color-ink-line);
+  background: #fffaf4;
+}
+
+.attentionHeading > span {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #9b6300;
+}
+
+.attentionHeading h2 {
+  margin: 0;
+  color: var(--color-ink-navy);
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 1.15rem;
+  font-weight: 550;
+}
+
+.attentionHeading small {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff0d3;
+  color: #865500;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.attentionList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attentionList li {
+  display: grid;
+  padding: 17px;
+  border-bottom: 1px solid #ece9e5;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.attentionList li:last-child {
+  border-bottom: 0;
+}
+
+.attentionList li > svg {
+  margin-top: 1px;
+  color: #72927a;
+}
+
+.attentionList strong {
+  display: block;
+  overflow: hidden;
+  font-size: 0.79rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attentionList p {
+  margin: 5px 0 8px;
+  color: #63708a;
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.attentionList a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-ink-crimson);
+  font-size: 0.7rem;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.attentionEmpty {
+  display: grid;
+  min-height: 168px;
+  place-content: center;
+  justify-items: center;
+  padding: 24px;
+  color: #3a7a4d;
+  text-align: center;
+}
+
+.attentionEmpty p {
+  margin: 8px 0 1px;
+  color: var(--color-ink-navy);
+  font-weight: 750;
+}
+
+.attentionEmpty small {
+  color: #68758d;
+  font-size: 0.72rem;
+}
+
+@media (max-width: 980px) and (min-width: 801px) {
+  .attentionPanel {
+    display: none;
+  }
+}
+
+@media (max-width: 800px) {
+  .attentionPanel {
+    margin-top: 22px;
+  }
+}

@@ -20,7 +20,7 @@ describe("Navigation", () => {
       "/login",
     );
     expect(
-      screen.getAllByRole("link", { name: "Start writing free" })[0],
+      screen.getAllByRole("link", { name: "Start free" })[0],
     ).toHaveAttribute("href", "/signup");
   });
 

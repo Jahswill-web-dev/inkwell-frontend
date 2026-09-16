@@ -280,7 +280,11 @@ export function ArticleExport({
             />
             <strong>Export</strong>
           </div>
-          <ArticleProgress currentStep="export" compact articleId={articleId} />
+          <ArticleProgress
+            currentStep="publish"
+            compact
+            articleId={articleId}
+          />
         </header>
 
         <div className={styles.content}>

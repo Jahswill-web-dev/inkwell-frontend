@@ -1,0 +1,688 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import {
+  ArrowClockwise,
+  Check,
+  Copy,
+  Eye,
+  LinkSimple,
+  PaperPlaneTilt,
+  Prohibit,
+  X,
+} from "@phosphor-icons/react";
+import {
+  interviewInvitationInputSchema,
+  interviewInvitationLabel,
+  interviewInvitationUrl,
+  interviewProgressPercent,
+  isInterviewInvitationExpired,
+  type InterviewInvitation,
+} from "@/lib/articles/client-interview-invitation";
+import {
+  createInterviewInvitationRequest,
+  getInterviewTranscript,
+  getInterviewInvitation,
+  revokeInterviewInvitationRequest,
+  type InterviewTranscript,
+} from "@/lib/articles/client-interview-api";
+import type { ArticleWorkspaceViewModel } from "@/lib/articles/article-workspace";
+import styles from "./client-interview-manager.module.css";
+
+type FormErrors = Partial<
+  Record<"participantName" | "participantEmail" | "expiresOn", string>
+>;
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("en", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(value));
+}
+
+function progressDescription(invitation: InterviewInvitation) {
+  if (invitation.status === "revoked") {
+    return "This link can no longer be used. The participant was not notified.";
+  }
+  if (isInterviewInvitationExpired(invitation)) {
+    return "This link has expired. Regenerate it to invite the participant again.";
+  }
+  if (invitation.progressState === "completed") {
+    return "The interview is complete and its source material is ready for review.";
+  }
+  if (invitation.progressState === "in_progress") {
+    return `${invitation.questionsAnswered} questions answered. Inkwell is still collecting the missing context.`;
+  }
+  if (invitation.progressState === "opened") {
+    return "The participant opened the interview but has not answered a question yet.";
+  }
+  return "The participant has not opened this interview yet.";
+}
+
+function sourceLinks(sourceItemIds: string[], openTranscript: () => void) {
+  return sourceItemIds.map((itemId, index) => (
+    <a
+      href={`#transcript-turn-${encodeURIComponent(itemId)}`}
+      key={itemId}
+      onClick={openTranscript}
+    >
+      {index ? ", " : ""}Source {index + 1}
+    </a>
+  ));
+}
+
+function InterviewInsights({
+  transcript,
+}: {
+  transcript: InterviewTranscript;
+}) {
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const insights = transcript.insights;
+
+  if (transcript.insight_status === "pending") {
+    return (
+      <section className={styles.insightCard} aria-live="polite">
+        <p>Interview complete</p>
+        <h3>Preparing interview insights…</h3>
+        <span>
+          The transcript is saved. Inkwell is organizing the useful details.
+        </span>
+      </section>
+    );
+  }
+
+  if (transcript.insight_status === "failed" || !insights) {
+    return (
+      <section className={styles.insightCard} role="alert">
+        <p>Interview complete</p>
+        <h3>The transcript is ready</h3>
+        <span>
+          {transcript.generation_error ??
+            "Inkwell couldn’t prepare the insight note yet."}
+        </span>
+        <button onClick={() => setTranscriptOpen(true)} type="button">
+          View full transcript
+        </button>
+        {transcriptOpen ? (
+          <div
+            className={styles.transcript}
+            aria-label="Client interview transcript"
+          >
+            <h4>Full transcript</h4>
+            {transcript.turns.map((turn) => (
+              <article
+                id={`transcript-turn-${encodeURIComponent(turn.item_id)}`}
+                key={turn.item_id}
+              >
+                <strong>
+                  {turn.speaker === "participant" ? "Client" : "Inkwell"}
+                </strong>
+                <p>{turn.text}</p>
+              </article>
+            ))}
+          </div>
+        ) : null}
+      </section>
+    );
+  }
+
+  return (
+    <section
+      className={styles.insightCard}
+      aria-labelledby="interview-insights-title"
+    >
+      <header>
+        <div>
+          <p>Client interview insights</p>
+          <h3 id="interview-insights-title">What to carry into the article</h3>
+        </div>
+        <button
+          onClick={() => setTranscriptOpen((open) => !open)}
+          type="button"
+        >
+          {transcriptOpen ? "Hide transcript" : "View full transcript"}
+        </button>
+      </header>
+      <p className={styles.insightSummary}>{insights.summary}</p>
+      <div className={styles.insightColumns}>
+        <div>
+          <h4>Key insights</h4>
+          <ul>
+            {insights.key_insights.map((item) => (
+              <li key={item.text}>
+                <span>{item.text}</span>
+                <small>
+                  {sourceLinks(item.source_item_ids, () =>
+                    setTranscriptOpen(true),
+                  )}
+                </small>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <h4>Claims to verify</h4>
+          {insights.claims_to_verify.length ? (
+            <ul>
+              {insights.claims_to_verify.map((item) => (
+                <li key={item.text}>
+                  <span>{item.text}</span>
+                  <small>
+                    {sourceLinks(item.source_item_ids, () =>
+                      setTranscriptOpen(true),
+                    )}
+                  </small>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <span className={styles.emptyInsight}>
+              No claims flagged for verification.
+            </span>
+          )}
+        </div>
+      </div>
+      {insights.examples_and_evidence.length ? (
+        <div className={styles.evidenceList}>
+          <h4>Examples and evidence</h4>
+          {insights.examples_and_evidence.map((item) => (
+            <p key={item.text}>
+              {item.text}{" "}
+              <small>
+                {sourceLinks(item.source_item_ids, () =>
+                  setTranscriptOpen(true),
+                )}
+              </small>
+            </p>
+          ))}
+        </div>
+      ) : null}
+      {transcriptOpen ? (
+        <div
+          className={styles.transcript}
+          aria-label="Client interview transcript"
+        >
+          <h4>Full transcript</h4>
+          {transcript.turns.map((turn) => (
+            <article
+              id={`transcript-turn-${encodeURIComponent(turn.item_id)}`}
+              key={turn.item_id}
+            >
+              <strong>
+                {turn.speaker === "participant" ? "Client" : "Inkwell"}
+              </strong>
+              <p>{turn.text}</p>
+            </article>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function PreviewDialog({
+  workspace,
+  participantName,
+  onClose,
+}: {
+  workspace: ArticleWorkspaceViewModel;
+  participantName: string;
+  onClose: () => void;
+}) {
+  return (
+    <div className={styles.backdrop} role="presentation" onMouseDown={onClose}>
+      <section
+        aria-labelledby="interview-preview-title"
+        aria-modal="true"
+        className={styles.preview}
+        onMouseDown={(event) => event.stopPropagation()}
+        role="dialog"
+      >
+        <button
+          aria-label="Close interview preview"
+          className={styles.closeButton}
+          onClick={onClose}
+          type="button"
+        >
+          <X size={18} aria-hidden />
+        </button>
+        <span className={styles.previewMark}>I</span>
+        <p>{workspace.clientName}</p>
+        <h2 id="interview-preview-title">
+          Share your expertise for “{workspace.article.working_title}”
+        </h2>
+        <span>
+          Hi {participantName}. Inkwell will ask one focused question at a time.
+          This usually takes 5–10 minutes, and you can pause and return later.
+        </span>
+        <button disabled type="button">
+          Begin interview
+        </button>
+        <small>
+          This is a writer preview. The interactive guest experience arrives in
+          Milestone 5.
+        </small>
+      </section>
+    </div>
+  );
+}
+
+export function ClientInterviewManager({
+  workspace,
+}: {
+  workspace: ArticleWorkspaceViewModel;
+}) {
+  const defaultParticipant = workspace.participants[0]?.name ?? "";
+  const [invitation, setInvitation] = useState<InterviewInvitation | null>(
+    null,
+  );
+  const [loadingInvitation, setLoadingInvitation] = useState(true);
+  const [savingInvitation, setSavingInvitation] = useState(false);
+  const [participantName, setParticipantName] = useState(
+    invitation?.participantName ?? defaultParticipant,
+  );
+  const [participantEmail, setParticipantEmail] = useState(
+    invitation?.participantEmail ?? "",
+  );
+  const [expiresOn, setExpiresOn] = useState(
+    invitation?.expiresAt?.slice(0, 10) ?? "",
+  );
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [copyMessage, setCopyMessage] = useState("");
+  const [serviceError, setServiceError] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [transcript, setTranscript] = useState<InterviewTranscript | null>(
+    null,
+  );
+  const [transcriptError, setTranscriptError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    getInterviewInvitation(workspace.article.id)
+      .then((nextInvitation) => {
+        if (!active) return;
+        setInvitation(nextInvitation);
+        if (nextInvitation) {
+          setParticipantName(nextInvitation.participantName);
+          setParticipantEmail(nextInvitation.participantEmail);
+          setExpiresOn(nextInvitation.expiresAt?.slice(0, 10) ?? "");
+        }
+        setServiceError("");
+      })
+      .catch((error) => {
+        if (active) {
+          setServiceError(
+            error instanceof Error
+              ? error.message
+              : "The invitation could not be loaded.",
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setLoadingInvitation(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [workspace.article.id]);
+
+  useEffect(() => {
+    if (!invitation?.id || invitation.progressState !== "completed") return;
+    let active = true;
+    getInterviewTranscript(workspace.article.id, invitation.id)
+      .then((value) => {
+        if (active) {
+          setTranscript(value);
+          setTranscriptError("");
+        }
+      })
+      .catch((error) => {
+        if (active) {
+          setTranscriptError(
+            error instanceof Error
+              ? error.message
+              : "The transcript could not be loaded.",
+          );
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [invitation, workspace.article.id]);
+
+  const invitationUrl = useMemo(() => {
+    if (!invitation) return "";
+    const origin =
+      typeof window === "undefined"
+        ? "https://app.useinkwell.com"
+        : window.location.origin;
+    return interviewInvitationUrl(invitation, origin);
+  }, [invitation]);
+
+  async function createInvitation() {
+    const result = interviewInvitationInputSchema.safeParse({
+      participantName,
+      participantEmail,
+      expiresOn,
+    });
+    if (!result.success) {
+      const nextErrors: FormErrors = {};
+      result.error.issues.forEach((issue) => {
+        const field = issue.path[0] as keyof FormErrors;
+        if (!nextErrors[field]) nextErrors[field] = issue.message;
+      });
+      setErrors(nextErrors);
+      return;
+    }
+    setErrors({});
+    setSavingInvitation(true);
+    try {
+      setInvitation(
+        await createInterviewInvitationRequest(
+          workspace.article.id,
+          result.data,
+        ),
+      );
+      setServiceError("");
+    } catch (error) {
+      setServiceError(
+        error instanceof Error
+          ? error.message
+          : "The link could not be created.",
+      );
+    } finally {
+      setSavingInvitation(false);
+    }
+  }
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(invitationUrl);
+      setCopyMessage("Link copied");
+    } catch {
+      setCopyMessage("Could not copy the link");
+    }
+  }
+
+  async function revokeLink() {
+    if (!invitation?.id) return;
+    setSavingInvitation(true);
+    try {
+      setInvitation(
+        await revokeInterviewInvitationRequest(
+          workspace.article.id,
+          invitation.id,
+        ),
+      );
+      setCopyMessage("");
+      setServiceError("");
+    } catch (error) {
+      setServiceError(
+        error instanceof Error
+          ? error.message
+          : "The link could not be revoked.",
+      );
+    } finally {
+      setSavingInvitation(false);
+    }
+  }
+
+  async function regenerateLink() {
+    if (!invitation) return;
+    const reusableExpiration =
+      invitation.expiresAt && !isInterviewInvitationExpired(invitation)
+        ? invitation.expiresAt.slice(0, 10)
+        : "";
+    setSavingInvitation(true);
+    try {
+      setInvitation(
+        await createInterviewInvitationRequest(workspace.article.id, {
+          participantName: invitation.participantName,
+          participantEmail: invitation.participantEmail,
+          expiresOn: reusableExpiration,
+        }),
+      );
+      setExpiresOn(reusableExpiration);
+      setServiceError("");
+    } catch (error) {
+      setServiceError(
+        error instanceof Error
+          ? error.message
+          : "The link could not be regenerated.",
+      );
+    } finally {
+      setSavingInvitation(false);
+    }
+  }
+
+  const linkIsInactive =
+    invitation &&
+    (invitation.status === "revoked" ||
+      isInterviewInvitationExpired(invitation));
+
+  return (
+    <div className={styles.layout}>
+      <section className={styles.intro} aria-labelledby="interviews-heading">
+        <div>
+          <p>Source collection</p>
+          <h2 id="interviews-heading">Client interview</h2>
+          <span>
+            Invite one client expert to answer focused questions. You’ll see
+            concise progress here while their answers remain private.
+          </span>
+        </div>
+      </section>
+
+      {loadingInvitation ? (
+        <section className={styles.card} aria-busy="true">
+          <p>Loading invitation…</p>
+        </section>
+      ) : !invitation ? (
+        <section className={styles.card} aria-labelledby="create-link-heading">
+          <header>
+            <div className={styles.iconBox}>
+              <LinkSimple size={21} aria-hidden />
+            </div>
+            <div>
+              <p>New invitation</p>
+              <h3 id="create-link-heading">Create a private interview link</h3>
+            </div>
+          </header>
+          <div className={styles.formGrid}>
+            <label>
+              <span>Participant name</span>
+              <input
+                aria-describedby={
+                  errors.participantName ? "participant-name-error" : undefined
+                }
+                aria-invalid={Boolean(errors.participantName)}
+                onChange={(event) => setParticipantName(event.target.value)}
+                placeholder="e.g. Avery Chen"
+                value={participantName}
+              />
+              {errors.participantName ? (
+                <small id="participant-name-error">
+                  {errors.participantName}
+                </small>
+              ) : null}
+            </label>
+            <label>
+              <span>Participant email</span>
+              <input
+                aria-describedby={
+                  errors.participantEmail
+                    ? "participant-email-error"
+                    : undefined
+                }
+                aria-invalid={Boolean(errors.participantEmail)}
+                onChange={(event) => setParticipantEmail(event.target.value)}
+                placeholder="avery@client.com"
+                type="email"
+                value={participantEmail}
+              />
+              {errors.participantEmail ? (
+                <small id="participant-email-error">
+                  {errors.participantEmail}
+                </small>
+              ) : null}
+            </label>
+            <label>
+              <span>
+                Expiration date <em>Optional</em>
+              </span>
+              <input
+                aria-describedby={
+                  errors.expiresOn ? "expiration-error" : undefined
+                }
+                aria-invalid={Boolean(errors.expiresOn)}
+                onChange={(event) => setExpiresOn(event.target.value)}
+                type="date"
+                value={expiresOn}
+              />
+              {errors.expiresOn ? (
+                <small id="expiration-error">{errors.expiresOn}</small>
+              ) : null}
+            </label>
+          </div>
+          <div className={styles.formActions}>
+            <button
+              className={styles.primaryButton}
+              disabled={savingInvitation}
+              onClick={createInvitation}
+              type="button"
+            >
+              {savingInvitation ? "Creating link…" : "Create interview link"}
+            </button>
+            <span>Copy the link and send it to the participant.</span>
+          </div>
+        </section>
+      ) : (
+        <section className={styles.card} aria-labelledby="invitation-heading">
+          <header className={styles.invitationHeader}>
+            <div>
+              <p>Client expert</p>
+              <h3 id="invitation-heading">{invitation.participantName}</h3>
+              <span>{invitation.participantEmail}</span>
+            </div>
+            <strong
+              data-state={
+                linkIsInactive ? "inactive" : invitation.progressState
+              }
+            >
+              {interviewInvitationLabel(invitation)}
+            </strong>
+          </header>
+
+          <div className={styles.progressSummary}>
+            <div>
+              <span>Interview progress</span>
+              <b>{interviewProgressPercent(invitation)}%</b>
+            </div>
+            <div
+              aria-label={`${interviewProgressPercent(invitation)}% complete`}
+              className={styles.progressTrack}
+            >
+              <span
+                style={{ width: `${interviewProgressPercent(invitation)}%` }}
+              />
+            </div>
+            <p>{progressDescription(invitation)}</p>
+          </div>
+
+          <dl className={styles.invitationFacts}>
+            <div>
+              <dt>Created</dt>
+              <dd>{formatDate(invitation.createdAt)}</dd>
+            </div>
+            <div>
+              <dt>Opened</dt>
+              <dd>
+                {invitation.openedAt
+                  ? formatDate(invitation.openedAt)
+                  : "Not yet"}
+              </dd>
+            </div>
+            <div>
+              <dt>Expires</dt>
+              <dd>
+                {invitation.expiresAt
+                  ? formatDate(invitation.expiresAt)
+                  : "No expiration"}
+              </dd>
+            </div>
+          </dl>
+
+          {!linkIsInactive ? (
+            <>
+              <label className={styles.linkField}>
+                <span>Client interview link</span>
+                <input readOnly value={invitationUrl} />
+              </label>
+              <div className={styles.actionRow}>
+                <button
+                  className={styles.primaryButton}
+                  disabled={savingInvitation}
+                  onClick={copyLink}
+                  type="button"
+                >
+                  {copyMessage === "Link copied" ? (
+                    <Check size={17} aria-hidden />
+                  ) : (
+                    <Copy size={17} aria-hidden />
+                  )}
+                  Copy link
+                </button>
+                <button onClick={() => setPreviewOpen(true)} type="button">
+                  <Eye size={17} aria-hidden /> Preview experience
+                </button>
+                <button
+                  disabled
+                  title="Email reminders are planned for a later milestone"
+                  type="button"
+                >
+                  <PaperPlaneTilt size={17} aria-hidden /> Send reminder
+                </button>
+                <button
+                  className={styles.dangerButton}
+                  disabled={savingInvitation}
+                  onClick={revokeLink}
+                  type="button"
+                >
+                  <Prohibit size={17} aria-hidden /> Revoke link
+                </button>
+              </div>
+              <p aria-live="polite" className={styles.copyMessage}>
+                {copyMessage}
+              </p>
+            </>
+          ) : (
+            <div className={styles.inactiveActions}>
+              <button
+                className={styles.primaryButton}
+                disabled={savingInvitation}
+                onClick={regenerateLink}
+                type="button"
+              >
+                <ArrowClockwise size={17} aria-hidden /> Regenerate link
+              </button>
+              <span>A new token will replace the inactive link.</span>
+            </div>
+          )}
+        </section>
+      )}
+
+      {serviceError ? <p role="alert">{serviceError}</p> : null}
+      {transcript ? <InterviewInsights transcript={transcript} /> : null}
+      {transcriptError ? <p role="alert">{transcriptError}</p> : null}
+
+      {previewOpen && invitation ? (
+        <PreviewDialog
+          onClose={() => setPreviewOpen(false)}
+          participantName={invitation.participantName}
+          workspace={workspace}
+        />
+      ) : null}
+    </div>
+  );
+}

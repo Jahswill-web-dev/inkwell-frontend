@@ -65,7 +65,7 @@ export function Navigation() {
             Sign in
           </a>
           <a className={primaryButtonClass} href="/signup">
-            Start writing free
+            Start free
           </a>
         </nav>
 
@@ -113,7 +113,7 @@ export function Navigation() {
           href="/signup"
           onClick={closeMenu}
         >
-          Start writing free
+          Start free
         </a>
       </nav>
     </header>

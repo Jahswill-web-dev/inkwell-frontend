@@ -5,11 +5,11 @@ test("renders the product promise and route destinations", async ({ page }) => {
 
   await expect(
     page.getByRole("heading", {
-      name: /turn your idea into a publish-ready article/i,
+      name: /turn client expertise into content writers can use/i,
     }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "Start writing free" }).first(),
+    page.getByRole("link", { name: "Build a client article" }).first(),
   ).toHaveAttribute("href", "/signup");
   await expect(
     page.getByRole("link", { name: "Sign in" }).first(),
@@ -60,7 +60,7 @@ test("uses responsive product artwork without horizontal overflow", async ({
   await page.goto("/");
 
   const visibleHeroImages = await page
-    .getByAltText(/Inkwell editor helping a writer/i)
+    .getByAltText(/Inkwell agency article setup screen/i)
     .evaluateAll(
       (images) =>
         images.filter((image) => (image as HTMLElement).offsetParent !== null)

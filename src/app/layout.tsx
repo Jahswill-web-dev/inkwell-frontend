@@ -17,24 +17,24 @@ const newsreader = Newsreader({
 
 export const metadata: Metadata = {
   title: {
-    default: "Inkwell — From idea to publish-ready article",
+    default: "Inkwell — Client expertise, ready for your content team",
     template: "%s | Inkwell",
   },
   description:
-    "Plan every section, write alongside AI, and finish thoughtful articles faster without losing your voice.",
+    "Give content agencies an AI-led client interview, structured source material, and a writer-ready path from article setup to publish-ready copy.",
   keywords: [
-    "AI writing assistant",
-    "article writing",
-    "blog writing",
-    "content outline",
+    "content agency software",
+    "client interview",
+    "editorial workflow",
+    "AI content writing",
   ],
   icons: {
     icon: "/images/inkwell-icon.png",
   },
   openGraph: {
-    title: "Inkwell — From idea to publish-ready article",
+    title: "Inkwell — Client expertise, ready for your content team",
     description:
-      "A guided AI writing workspace that keeps your ideas, structure, and voice connected.",
+      "A guided agency workspace for turning client expertise into stronger content.",
     type: "website",
   },
 };

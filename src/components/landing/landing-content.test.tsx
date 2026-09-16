@@ -12,17 +12,17 @@ describe("landing page content", () => {
 
     expect(
       screen.getByRole("heading", {
-        name: /turn your idea into a publish-ready article/i,
+        name: /turn client expertise into content writers can use/i,
       }),
     ).toBeVisible();
     expect(
-      screen.getByRole("link", { name: "Start writing free" }),
+      screen.getByRole("link", { name: "Build a client article" }),
     ).toHaveAttribute("href", "/signup");
     expect(
-      screen.getByRole("link", { name: "See how it works" }),
+      screen.getByRole("link", { name: "See the client flow" }),
     ).toHaveAttribute("href", "#how-it-works");
     expect(
-      screen.getAllByAltText(/Inkwell editor helping a writer/i),
+      screen.getAllByAltText(/Inkwell agency article setup screen/i),
     ).toHaveLength(1);
   });
 
@@ -30,23 +30,33 @@ describe("landing page content", () => {
     render(<WritingWorkflow />);
     const list = screen.getByRole("list");
 
-    expect(within(list).getAllByRole("listitem")).toHaveLength(6);
-    expect(within(list).getByText("Idea")).toBeVisible();
-    expect(within(list).getByText("Export")).toBeVisible();
+    expect(within(list).getAllByRole("listitem")).toHaveLength(5);
+    expect(within(list).getByText("Set the foundation")).toBeVisible();
+    expect(within(list).getByText("Send the link")).toBeVisible();
+    expect(within(list).getByText("Hand off to writers")).toBeVisible();
   });
 
-  it("renders the three focused product features", () => {
+  it("renders the agency-focused product features", () => {
     render(<ProductFeatures />);
 
     expect(
-      screen.getByRole("heading", { name: "Give every section a purpose" }),
-    ).toBeVisible();
-    expect(
-      screen.getByRole("heading", { name: "Write with AI, not beneath it" }),
+      screen.getByRole("heading", {
+        name: "Set the angle before the interview starts",
+      }),
     ).toBeVisible();
     expect(
       screen.getByRole("heading", {
-        name: "Feedback that reads beyond grammar",
+        name: "Let clients share what they know—on their own time",
+      }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("heading", {
+        name: "Send a private interview link, not another form",
+      }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("heading", {
+        name: "Give writers a source of truth—not a messy transcript",
       }),
     ).toBeVisible();
   });

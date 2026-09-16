@@ -1,0 +1,130 @@
+.filters {
+  margin-bottom: 18px;
+}
+
+.filterFields {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.filterFields label {
+  display: grid;
+  min-width: 148px;
+  gap: 6px;
+  color: #53617b;
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.filterFields select {
+  height: 39px;
+  padding: 0 31px 0 11px;
+  border: 1px solid #d8d7d5;
+  border-radius: 5px;
+  background: #fff;
+  color: var(--color-ink-navy);
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.clearFilters {
+  display: inline-flex;
+  height: 39px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-crimson);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mobileFilterBar {
+  display: none;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 1180px) {
+  .filterFields label {
+    min-width: 126px;
+  }
+}
+
+@media (max-width: 800px) {
+  .mobileFilterBar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .mobileSearch {
+    display: flex;
+    height: 43px;
+    align-items: center;
+    gap: 8px;
+    padding: 0 11px;
+    border: 1px solid #d8d7d5;
+    border-radius: 5px;
+    background: #fff;
+    color: #657189;
+  }
+
+  .mobileSearch input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--color-ink-navy);
+    font: inherit;
+    font-size: 0.76rem;
+  }
+
+  .mobileFilterBar button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 12px;
+    border: 1px solid #d8d7d5;
+    border-radius: 5px;
+    background: #fff;
+    color: var(--color-ink-navy);
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .filterFields {
+    display: none;
+    padding: 13px;
+    border: 1px solid var(--color-ink-line);
+    border-top: 0;
+    border-radius: 0 0 6px 6px;
+    background: #fff;
+    grid-template-columns: 1fr;
+  }
+
+  .filterFieldsOpen {
+    display: grid;
+  }
+
+  .filterFields label {
+    min-width: 0;
+  }
+
+  .clearFilters {
+    justify-self: start;
+  }
+}

@@ -43,6 +43,17 @@ import {
   type ReplaceSectionInterviewAnswersInput,
   type SectionInterview,
 } from "./interview";
+import {
+  agencyClientInputSchema,
+  agencyClientListSchema,
+  agencyClientPatchSchema,
+  agencyClientSchema,
+  workspaceSchema,
+  type AgencyClient,
+  type AgencyClientInput,
+  type AgencyClientPatch,
+  type Workspace,
+} from "@/lib/agency/agency";
 
 export class ArticleRequestError extends Error {
   constructor(
@@ -103,6 +114,47 @@ export function listArticles(offset = 0, limit = 20): Promise<ArticleList> {
   });
   return articleRequest(`/api/articles?${query}`, {}, (value) =>
     articleListSchema.parse(value),
+  );
+}
+
+export function listClients(): Promise<AgencyClient[]> {
+  return articleRequest(
+    "/api/clients?offset=0&limit=100",
+    {},
+    (value) => agencyClientListSchema.parse(value).items,
+  );
+}
+
+export function createClient(input: AgencyClientInput): Promise<AgencyClient> {
+  const body = agencyClientInputSchema.parse(input);
+  return articleRequest(
+    "/api/clients",
+    { method: "POST", body: JSON.stringify(body) },
+    (value) => agencyClientSchema.parse(value),
+  );
+}
+
+export function getClient(clientId: string): Promise<AgencyClient> {
+  return articleRequest(`/api/clients/${clientId}`, {}, (value) =>
+    agencyClientSchema.parse(value),
+  );
+}
+
+export function updateClient(
+  clientId: string,
+  input: AgencyClientPatch,
+): Promise<AgencyClient> {
+  const body = agencyClientPatchSchema.parse(input);
+  return articleRequest(
+    `/api/clients/${clientId}`,
+    { method: "PATCH", body: JSON.stringify(body) },
+    (value) => agencyClientSchema.parse(value),
+  );
+}
+
+export function getCurrentWorkspace(): Promise<Workspace> {
+  return articleRequest("/api/workspaces/current", {}, (value) =>
+    workspaceSchema.parse(value),
   );
 }
 

@@ -27,6 +27,10 @@ export function ProductFeature({ feature }: ProductFeatureProps) {
         <ResponsiveProductImage
           desktopSrc={feature.desktopImage}
           mobileSrc={feature.mobileImage}
+          desktopWidth={feature.imageWidth}
+          desktopHeight={feature.imageHeight}
+          mobileWidth={feature.imageWidth}
+          mobileHeight={feature.imageHeight}
           alt={feature.imageAlt}
           sizes="(max-width: 720px) calc(100vw - 32px), 720px"
         />

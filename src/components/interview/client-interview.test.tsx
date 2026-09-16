@@ -30,6 +30,7 @@ vi.mock("@/lib/articles/client-interview-api", async (importOriginal) => ({
 vi.mock("./use-realtime-interview", () => ({
   useRealtimeInterview: () => ({
     error: null,
+    flushTranscript: vi.fn().mockResolvedValue(undefined),
     start: startVoiceMock,
     status: "idle",
     stop: stopVoiceMock,
@@ -111,9 +112,7 @@ describe("ClientInterview", () => {
   it("tells the participant that microphone access is needed", async () => {
     seedInvitation();
     render(<ClientInterview token={token} />);
-    expect(
-      await screen.findByText(/allow microphone access/i),
-    ).toBeVisible();
+    expect(await screen.findByText(/allow microphone access/i)).toBeVisible();
   });
 
   it.each([

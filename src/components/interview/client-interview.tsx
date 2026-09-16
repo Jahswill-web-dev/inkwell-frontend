@@ -28,6 +28,8 @@ import type { InterviewInvitation } from "@/lib/articles/client-interview-invita
 import {
   getGuestInterview,
   InterviewInvitationRequestError,
+  finalizeInterviewTranscript,
+  recordInterviewTranscriptTurn,
   updateGuestInterview,
 } from "@/lib/articles/client-interview-api";
 import styles from "./client-interview.module.css";
@@ -82,6 +84,8 @@ export function ClientInterview({ token }: { token: string }) {
   const [isCompletingVoice, setIsCompletingVoice] = useState(false);
   const voice = useRealtimeInterview(token, {
     onComplete: completeVoiceInterview,
+    onTranscriptTurn: (turn) =>
+      recordInterviewTranscriptTurn(token, turn).then(() => undefined),
   });
   const online = useSyncExternalStore(
     subscribeToConnectivity,
@@ -214,19 +218,27 @@ export function ClientInterview({ token }: { token: string }) {
     void persist(completeClientInterview(session));
   }
 
-  function completeVoiceInterview(
+  async function completeVoiceInterview(
     reason: "participant_finished" | "questions_complete",
   ) {
     setIsCompletingVoice(true);
-    voice.stop();
-    void persist(
-      completeClientInterview(
-        session,
-        reason === "participant_finished"
-          ? "participant_finished"
-          : "question_limit",
-      ),
-    ).finally(() => setIsCompletingVoice(false));
+    try {
+      await voice.flushTranscript();
+      voice.stop();
+      await finalizeInterviewTranscript(token);
+    } catch {
+      // The voice interview is still complete if the optional insight note needs a retry.
+    } finally {
+      await persist(
+        completeClientInterview(
+          session,
+          reason === "participant_finished"
+            ? "participant_finished"
+            : "question_limit",
+        ),
+      );
+      setIsCompletingVoice(false);
+    }
   }
 
   function addFinalDetail() {

@@ -6,6 +6,10 @@ type ResponsiveProductImageProps = {
   alt: string;
   priority?: boolean;
   sizes?: string;
+  desktopWidth?: number;
+  desktopHeight?: number;
+  mobileWidth?: number;
+  mobileHeight?: number;
 };
 
 export function ResponsiveProductImage({
@@ -14,6 +18,10 @@ export function ResponsiveProductImage({
   alt,
   priority = false,
   sizes = "(max-width: 720px) calc(100vw - 32px), 1100px",
+  desktopWidth = 1487,
+  desktopHeight = 1058,
+  mobileWidth = 852,
+  mobileHeight = 1846,
 }: ResponsiveProductImageProps) {
   const sharedProps = {
     alt,
@@ -23,15 +31,15 @@ export function ResponsiveProductImage({
   const { props: desktopImage } = getImageProps({
     ...sharedProps,
     src: desktopSrc,
-    width: 1487,
-    height: 1058,
+    width: desktopWidth,
+    height: desktopHeight,
     sizes,
   });
   const { props: mobileImage } = getImageProps({
     ...sharedProps,
     src: mobileSrc,
-    width: 852,
-    height: 1846,
+    width: mobileWidth,
+    height: mobileHeight,
     sizes: "calc(100vw - 32px)",
   });
 

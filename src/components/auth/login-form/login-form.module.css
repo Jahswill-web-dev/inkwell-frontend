@@ -1,3 +1,19 @@
+.googleUnavailable {
+  margin-top: 37px;
+}
+
+.googleUnavailable > button {
+  margin-top: 0;
+}
+
+.googleUnavailable p {
+  margin: 9px 0 0;
+  color: #5c6986;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
 .optionsRow {
   display: flex;
   align-items: center;
@@ -20,6 +36,10 @@
 }
 
 @media (max-width: 800px) {
+  .googleUnavailable {
+    margin-top: 18px;
+  }
+
   .optionsRow {
     gap: 16px;
   }

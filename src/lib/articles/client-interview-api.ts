@@ -98,6 +98,54 @@ const realtimeCallResponseSchema = z
   })
   .strict();
 
+const transcriptTurnSchema = z
+  .object({
+    itemId: z.string().min(1).max(200),
+    speaker: z.enum(["participant", "interviewer"]),
+    text: z.string().trim().min(1).max(10_000),
+  })
+  .strict();
+
+export type InterviewTranscriptTurn = z.infer<typeof transcriptTurnSchema>;
+
+const interviewInsightsSchema = z
+  .object({
+    summary: z.string(),
+    key_insights: z.array(
+      z.object({ text: z.string(), source_item_ids: z.array(z.string()) }),
+    ),
+    examples_and_evidence: z.array(
+      z.object({ text: z.string(), source_item_ids: z.array(z.string()) }),
+    ),
+    claims_to_verify: z.array(
+      z.object({ text: z.string(), source_item_ids: z.array(z.string()) }),
+    ),
+    open_questions: z.array(z.string()),
+  })
+  .strict();
+
+const interviewTranscriptSchema = z
+  .object({
+    id: z.string().uuid(),
+    invitation_id: z.string().uuid(),
+    turns: z.array(
+      z
+        .object({
+          item_id: z.string(),
+          speaker: z.enum(["participant", "interviewer"]),
+          text: z.string(),
+        })
+        .strict(),
+    ),
+    insight_status: z.enum(["pending", "ready", "failed"]),
+    insights: interviewInsightsSchema.nullable(),
+    model_id: z.string().nullable(),
+    generation_error: z.string().nullable(),
+  })
+  .strict();
+
+export type InterviewTranscript = z.infer<typeof interviewTranscriptSchema>;
+
 function toInvitation(value: unknown): InterviewInvitation {
   const invitation = backendInvitationSchema.parse(value);
   return interviewInvitationSchema.parse({
@@ -263,5 +311,49 @@ export function createRealtimeInterviewCall(token: string, sdp: string) {
       body: JSON.stringify({ sdp }),
     },
     (payload) => realtimeCallResponseSchema.parse(payload),
+  );
+}
+
+export function recordInterviewTranscriptTurn(
+  token: string,
+  turn: InterviewTranscriptTurn,
+) {
+  const value = transcriptTurnSchema.parse(turn);
+  return request(
+    `/api/interviews/${encodeURIComponent(token)}/transcript`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        turns: [
+          {
+            item_id: value.itemId,
+            speaker: value.speaker,
+            text: value.text,
+          },
+        ],
+      }),
+    },
+    (payload) =>
+      z.object({ id: z.string().uuid() }).passthrough().parse(payload),
+  );
+}
+
+export function finalizeInterviewTranscript(token: string) {
+  return request(
+    `/api/interviews/${encodeURIComponent(token)}/transcript/finalize`,
+    { method: "POST" },
+    (payload) =>
+      z.object({ id: z.string().uuid() }).passthrough().parse(payload),
+  );
+}
+
+export function getInterviewTranscript(
+  articleId: string,
+  invitationId: string,
+) {
+  return request(
+    `/api/articles/${encodeURIComponent(articleId)}/invitations/${encodeURIComponent(invitationId)}/transcript`,
+    {},
+    (payload) => interviewTranscriptSchema.parse(payload),
   );
 }

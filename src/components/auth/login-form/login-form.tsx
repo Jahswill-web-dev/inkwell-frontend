@@ -91,7 +91,6 @@ export function LoginForm({
   const router = useRouter();
   const [errors, setErrors] = useState<LoginErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [notice, setNotice] = useState("");
   const [submitError, setSubmitError] = useState("");
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -101,7 +100,6 @@ export function LoginForm({
     const result = readLogin(event.currentTarget);
     const nextErrors = validationErrors(result);
     setErrors(nextErrors);
-    setNotice("");
     setSubmitError("");
     if (!result.success) return;
 
@@ -128,10 +126,14 @@ export function LoginForm({
         <p>Sign in to continue writing.</p>
       </header>
 
-      <GoogleAuthButton
-        className={authStyles.googleAction}
-        onClick={() => setNotice("Google sign-in will be available soon.")}
-      />
+      <div className={styles.googleUnavailable}>
+        <GoogleAuthButton
+          className={authStyles.googleAction}
+          disabled
+          label="Google sign-in is coming soon"
+        />
+        <p>Google sign-in isn’t available yet. Use your email and password.</p>
+      </div>
       <AuthDivider />
 
       <form className={authStyles.authForm} noValidate onSubmit={handleSubmit}>
@@ -179,12 +181,6 @@ export function LoginForm({
           {submitError}
         </p>
       ) : null}
-      {notice ? (
-        <p className={authStyles.formNotice} role="status">
-          {notice}
-        </p>
-      ) : null}
-
       <p className={authStyles.accountPrompt}>
         New to Inkwell? <Link href="/signup">Create an account</Link>
       </p>

@@ -290,6 +290,173 @@
   font-size: 0.72rem;
 }
 
+.insightCard {
+  padding: 24px;
+  border: 1px solid #cfd8e8;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #f6f8fd, #fffefa 64%);
+}
+
+.insightCard > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.insightCard > header p,
+.insightCard > p:first-child {
+  margin: 0 0 5px;
+  color: #68758d;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.insightCard h3,
+.insightCard h4 {
+  margin: 0;
+  color: var(--color-ink-navy);
+}
+
+.insightCard h3 {
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 1.35rem;
+}
+
+.insightCard h4 {
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.insightCard > header button,
+.insightCard > button {
+  min-height: 36px;
+  padding: 0 11px;
+  border: 1px solid #c7cbd3;
+  border-radius: 5px;
+  background: white;
+  color: var(--color-ink-navy);
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.insightCard > span {
+  display: block;
+  margin-top: 9px;
+  color: #596781;
+  font-size: 0.82rem;
+}
+
+.insightCard > button {
+  margin-top: 16px;
+}
+
+.insightSummary {
+  max-width: 850px;
+  margin: 16px 0 0;
+  color: #344666;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.insightColumns {
+  display: grid;
+  gap: 16px;
+  margin-top: 19px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.insightColumns > div,
+.evidenceList {
+  padding: 15px;
+  border: 1px solid #e1e4eb;
+  border-radius: 7px;
+  background: rgb(255 255 255 / 72%);
+}
+
+.insightColumns ul {
+  display: grid;
+  gap: 11px;
+  margin: 12px 0 0;
+  padding-left: 17px;
+}
+
+.insightColumns li {
+  color: #3b4c68;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.insightColumns li small,
+.evidenceList small {
+  display: block;
+  margin-top: 3px;
+  color: #68758d;
+  font-size: 0.68rem;
+}
+
+.insightCard a {
+  color: var(--color-ink-crimson);
+  font-weight: 650;
+}
+
+.emptyInsight {
+  display: block;
+  margin-top: 12px;
+  color: #647087;
+  font-size: 0.78rem;
+}
+
+.evidenceList {
+  margin-top: 16px;
+}
+
+.evidenceList p {
+  margin: 10px 0 0;
+  color: #3b4c68;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.transcript {
+  display: grid;
+  gap: 10px;
+  max-height: 480px;
+  overflow: auto;
+  margin-top: 18px;
+  padding-top: 17px;
+  border-top: 1px solid #dce1e9;
+}
+
+.transcript article {
+  padding: 12px 14px;
+  border-radius: 7px;
+  background: white;
+}
+
+.transcript article:target {
+  outline: 2px solid #d9b2bc;
+}
+
+.transcript article strong {
+  color: var(--color-ink-crimson);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.transcript article p {
+  margin: 5px 0 0;
+  color: #344666;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
 .backdrop {
   position: fixed;
   z-index: 100;
@@ -416,6 +583,15 @@
     padding: 0 0 10px;
     border-right: 0;
     border-bottom: 1px solid #e5e1db;
+  }
+
+  .insightCard > header,
+  .insightColumns {
+    display: grid;
+  }
+
+  .insightColumns {
+    grid-template-columns: 1fr;
   }
 
   .actionRow {

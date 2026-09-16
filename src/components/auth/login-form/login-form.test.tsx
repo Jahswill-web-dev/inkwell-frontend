@@ -45,6 +45,19 @@ async function fillLogin() {
 }
 
 describe("LoginForm", () => {
+  it("clearly marks Google sign-in as unavailable", () => {
+    render(<LoginForm />);
+
+    expect(
+      screen.getByRole("button", { name: "Google sign-in is coming soon" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByText(
+        "Google sign-in isn’t available yet. Use your email and password.",
+      ),
+    ).toBeVisible();
+  });
+
   it("shows useful validation for invalid details", async () => {
     render(<LoginForm />);
     await userEvent.click(screen.getByRole("button", { name: "Sign in" }));

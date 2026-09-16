@@ -2,22 +2,20 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createRealtimeInterviewCall } from "@/lib/articles/client-interview-api";
+import type { InterviewTranscriptTurn } from "@/lib/articles/client-interview-api";
 
 export type RealtimeInterviewStatus =
-  | "idle"
-  | "connecting"
-  | "connected"
-  | "error";
+  "idle" | "connecting" | "connected" | "error";
 
 export type RealtimeCompletionReason =
-  | "participant_finished"
-  | "questions_complete";
+  "participant_finished" | "questions_complete";
 
 type RealtimeInterviewOptions = {
   onComplete?: (reason: RealtimeCompletionReason) => void;
+  onTranscriptTurn?: (turn: InterviewTranscriptTurn) => Promise<void>;
 };
 
-const FINAL_AUDIO_CLOSE_DELAY_MS = 750;
+const FINAL_AUDIO_CLOSE_DELAY_MS = 2_000;
 
 function waitForIceGatheringComplete(connection: RTCPeerConnection) {
   if (connection.iceGatheringState === "complete") {
@@ -41,13 +39,16 @@ function waitForIceGatheringComplete(connection: RTCPeerConnection) {
 
 export function useRealtimeInterview(
   token: string,
-  { onComplete }: RealtimeInterviewOptions = {},
+  { onComplete, onTranscriptTurn }: RealtimeInterviewOptions = {},
 ) {
   const connectionRef = useRef<RTCPeerConnection | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const completionReasonRef = useRef<RealtimeCompletionReason | null>(null);
   const onCompleteRef = useRef(onComplete);
+  const onTranscriptTurnRef = useRef(onTranscriptTurn);
+  const pendingTranscriptSavesRef = useRef<Promise<void>[]>([]);
+  const seenTranscriptItemsRef = useRef(new Set<string>());
 
   const [status, setStatus] = useState<RealtimeInterviewStatus>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -55,9 +56,14 @@ export function useRealtimeInterview(
   useEffect(() => {
     onCompleteRef.current = onComplete;
   }, [onComplete]);
+  useEffect(() => {
+    onTranscriptTurnRef.current = onTranscriptTurn;
+  }, [onTranscriptTurn]);
 
   const stop = useCallback(() => {
     completionReasonRef.current = null;
+    pendingTranscriptSavesRef.current = [];
+    seenTranscriptItemsRef.current.clear();
     connectionRef.current?.close();
     connectionRef.current = null;
 
@@ -71,6 +77,10 @@ export function useRealtimeInterview(
     }
 
     setStatus("idle");
+  }, []);
+
+  const flushTranscript = useCallback(async () => {
+    await Promise.all(pendingTranscriptSavesRef.current);
   }, []);
 
   const start = useCallback(async () => {
@@ -125,15 +135,44 @@ export function useRealtimeInterview(
 
         const realtimeEvent = event as {
           arguments?: string;
+          item_id?: string;
           name?: string;
+          transcript?: string;
           type?: string;
         };
+        const isParticipantTranscript =
+          realtimeEvent.type ===
+          "conversation.item.input_audio_transcription.completed";
+        const isInterviewerTranscript =
+          realtimeEvent.type === "response.output_audio_transcript.done";
+        if (
+          (isParticipantTranscript || isInterviewerTranscript) &&
+          realtimeEvent.item_id &&
+          realtimeEvent.transcript?.trim()
+        ) {
+          const itemId = realtimeEvent.item_id;
+          if (!seenTranscriptItemsRef.current.has(itemId)) {
+            seenTranscriptItemsRef.current.add(itemId);
+            const save = onTranscriptTurnRef.current?.({
+              itemId,
+              speaker: isParticipantTranscript ? "participant" : "interviewer",
+              text: realtimeEvent.transcript,
+            });
+            if (save)
+              pendingTranscriptSavesRef.current.push(
+                save.catch(() => undefined),
+              );
+          }
+          return;
+        }
         if (
           realtimeEvent.type === "response.function_call_arguments.done" &&
           realtimeEvent.name === "end_interview"
         ) {
           try {
-            const argumentsValue = JSON.parse(realtimeEvent.arguments ?? "{}") as {
+            const argumentsValue = JSON.parse(
+              realtimeEvent.arguments ?? "{}",
+            ) as {
               reason?: unknown;
             };
             if (
@@ -154,10 +193,12 @@ export function useRealtimeInterview(
         ) {
           const reason = completionReasonRef.current;
           completionReasonRef.current = null;
-          window.setTimeout(() => {
-            stop();
-            onCompleteRef.current?.(reason);
-          }, FINAL_AUDIO_CLOSE_DELAY_MS);
+          void Promise.all(pendingTranscriptSavesRef.current).then(() =>
+            window.setTimeout(() => {
+              stop();
+              onCompleteRef.current?.(reason);
+            }, FINAL_AUDIO_CLOSE_DELAY_MS),
+          );
         }
       });
       events.addEventListener(
@@ -206,6 +247,7 @@ export function useRealtimeInterview(
 
   return {
     error,
+    flushTranscript,
     start,
     status,
     stop,

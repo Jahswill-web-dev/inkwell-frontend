@@ -2,12 +2,32 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useRealtimeInterview } from "./use-realtime-interview";
 
-const { createCallMock } = vi.hoisted(() => ({
-  createCallMock: vi.fn().mockResolvedValue({ sdp: "answer" }),
+const { associateSessionMock, createCallMock, elevenOptions, endSessionMock, startSessionMock } =
+  vi.hoisted(() => ({
+  associateSessionMock: vi.fn().mockResolvedValue(undefined),
+  createCallMock: vi.fn().mockResolvedValue({
+    transport: "openai_webrtc",
+    session_id: "11111111-1111-4111-8111-111111111111",
+    sdp: "answer",
+  }),
+  elevenOptions: { current: undefined as Record<string, unknown> | undefined },
+  endSessionMock: vi.fn(),
+  startSessionMock: vi.fn(),
 }));
 
 vi.mock("@/lib/articles/client-interview-api", () => ({
-  createRealtimeInterviewCall: createCallMock,
+  associateVoiceInterviewSession: associateSessionMock,
+  createVoiceInterviewSession: createCallMock,
+}));
+
+vi.mock("@elevenlabs/react", () => ({
+  useConversation: (options: Record<string, unknown>) => {
+    elevenOptions.current = options;
+    return {
+      startSession: startSessionMock,
+      endSession: endSessionMock,
+    };
+  },
 }));
 
 class MockDataChannel extends EventTarget {
@@ -44,6 +64,10 @@ class MockPeerConnection {
 beforeEach(() => {
   localStorage.clear();
   createCallMock.mockClear();
+  associateSessionMock.mockClear();
+  startSessionMock.mockClear();
+  endSessionMock.mockClear();
+  elevenOptions.current = undefined;
   vi.stubGlobal("RTCPeerConnection", MockPeerConnection);
   vi.stubGlobal(
     "Audio",
@@ -75,7 +99,9 @@ describe("Live interview events", () => {
   it("saves Live transcript fragments without item IDs when the interview ends", async () => {
     const save = vi.fn().mockResolvedValue(undefined);
     const { result } = renderHook(() =>
-      useRealtimeInterview("test-token", { onTranscriptTurn: save }),
+      useRealtimeInterview("test-token", "openai_webrtc", {
+        onTranscriptTurn: save,
+      }),
     );
     act(() => result.current.start());
     await waitFor(() => expect(createCallMock).toHaveBeenCalledOnce());
@@ -107,13 +133,15 @@ describe("Live interview events", () => {
       itemId: "fragment-1",
       speaker: "participant",
       text: "First answer",
+      provider: "openai_live",
+      voiceSessionId: "11111111-1111-4111-8111-111111111111",
     });
   });
 
   it("completes after a delegated end_interview call without another event", async () => {
     const onComplete = vi.fn();
     const { result } = renderHook(() =>
-      useRealtimeInterview("test-token", { onComplete }),
+      useRealtimeInterview("test-token", "openai_webrtc", { onComplete }),
     );
     act(() => result.current.start());
     await waitFor(() => expect(createCallMock).toHaveBeenCalledOnce());
@@ -134,5 +162,49 @@ describe("Live interview events", () => {
       vi.advanceTimersByTime(2_000);
     });
     expect(onComplete).toHaveBeenCalledWith("questions_complete");
+  });
+
+  it("normalizes final ElevenLabs messages into the shared transcript contract", async () => {
+    createCallMock.mockResolvedValueOnce({
+      transport: "elevenlabs_webrtc",
+      session_id: "22222222-2222-4222-8222-222222222222",
+      conversation_token: "temporary-token",
+      dynamic_variables: { participant_name: "Taylor" },
+    });
+    const save = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() =>
+      useRealtimeInterview("test-token", "elevenlabs_webrtc", {
+        onTranscriptTurn: save,
+      }),
+    );
+
+    act(() => result.current.start());
+    await waitFor(() => expect(startSessionMock).toHaveBeenCalledOnce());
+    act(() => {
+      const options = elevenOptions.current as {
+        onConnect: (value: { conversationId: string }) => void;
+        onMessage: (value: {
+          event_id: number;
+          message: string;
+          role: "user" | "agent";
+        }) => void;
+      };
+      options.onConnect({ conversationId: "conv-test" });
+      options.onMessage({ event_id: 7, message: "A useful answer", role: "user" });
+    });
+    await act(async () => result.current.flushTranscript());
+
+    expect(save).toHaveBeenCalledWith({
+      itemId: "elevenlabs:conv-test:7",
+      speaker: "participant",
+      text: "A useful answer",
+      provider: "elevenlabs",
+      voiceSessionId: "22222222-2222-4222-8222-222222222222",
+    });
+    expect(associateSessionMock).toHaveBeenCalledWith(
+      "test-token",
+      "22222222-2222-4222-8222-222222222222",
+      "conv-test",
+    );
   });
 });

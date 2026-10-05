@@ -89,8 +89,13 @@ const guestInterviewResponseSchema = z
   .object({
     invitation: backendInvitationSchema,
     session: backendSessionSchema,
+    voice_transport: z.enum(["openai_webrtc", "elevenlabs_webrtc"]),
   })
   .strict();
+
+export type VoiceTransport = z.infer<
+  typeof guestInterviewResponseSchema
+>["voice_transport"];
 
 const realtimeCallResponseSchema = z
   .object({
@@ -98,11 +103,38 @@ const realtimeCallResponseSchema = z
   })
   .strict();
 
+const voiceSessionResponseSchema = z.discriminatedUnion("transport", [
+  z
+    .object({
+      transport: z.literal("openai_webrtc"),
+      session_id: z.string().uuid(),
+      sdp: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      transport: z.literal("elevenlabs_webrtc"),
+      session_id: z.string().uuid(),
+      conversation_token: z.string().min(1),
+      conversation_id: z.string().min(1).nullish(),
+      dynamic_variables: z.record(
+        z.string(),
+        z.union([z.string(), z.number(), z.boolean()]),
+      ),
+    })
+    .strict(),
+]);
+
+export type VoiceSessionResponse = z.infer<typeof voiceSessionResponseSchema>;
+
 const transcriptTurnSchema = z
   .object({
     itemId: z.string().min(1).max(200),
     speaker: z.enum(["participant", "interviewer"]),
     text: z.string().trim().min(1).max(10_000),
+    provider: z.enum(["openai_live", "elevenlabs"]).optional(),
+    voiceSessionId: z.string().uuid().optional(),
+    occurredAtMs: z.number().int().nonnegative().optional(),
   })
   .strict();
 
@@ -134,6 +166,9 @@ const interviewTranscriptSchema = z
           item_id: z.string(),
           speaker: z.enum(["participant", "interviewer"]),
           text: z.string(),
+          provider: z.enum(["openai_live", "elevenlabs"]).nullable().optional(),
+          voice_session_id: z.string().uuid().nullable().optional(),
+          occurred_at_ms: z.number().int().nonnegative().nullable().optional(),
         })
         .strict(),
     ),
@@ -197,6 +232,7 @@ function toGuestInterview(value: unknown) {
   return {
     invitation: toInvitation(response.invitation),
     session: toSession(response.session),
+    voiceTransport: response.voice_transport,
   };
 }
 
@@ -289,6 +325,32 @@ export function createRealtimeInterviewCall(token: string, sdp: string) {
   );
 }
 
+export function createVoiceInterviewSession(token: string, sdp?: string) {
+  return request(
+    `/api/interviews/${encodeURIComponent(token)}/voice/session`,
+    {
+      method: "POST",
+      body: JSON.stringify(sdp ? { sdp } : {}),
+    },
+    (payload) => voiceSessionResponseSchema.parse(payload),
+  );
+}
+
+export function associateVoiceInterviewSession(
+  token: string,
+  sessionId: string,
+  externalSessionId: string,
+) {
+  return request(
+    `/api/interviews/${encodeURIComponent(token)}/voice/sessions/${encodeURIComponent(sessionId)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ external_session_id: externalSessionId }),
+    },
+    () => undefined,
+  );
+}
+
 export function recordInterviewTranscriptTurn(
   token: string,
   turn: InterviewTranscriptTurn,
@@ -304,6 +366,13 @@ export function recordInterviewTranscriptTurn(
             item_id: value.itemId,
             speaker: value.speaker,
             text: value.text,
+            ...(value.provider ? { provider: value.provider } : {}),
+            ...(value.voiceSessionId
+              ? { voice_session_id: value.voiceSessionId }
+              : {}),
+            ...(value.occurredAtMs !== undefined
+              ? { occurred_at_ms: value.occurredAtMs }
+              : {}),
           },
         ],
       }),

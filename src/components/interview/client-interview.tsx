@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ConversationProvider } from "@elevenlabs/react";
 import {
   CheckCircle,
   Clock,
@@ -30,6 +31,7 @@ type GuestContext =
   | {
       type: "ready";
       invitation: InterviewInvitation;
+      voiceTransport: "openai_webrtc" | "elevenlabs_webrtc";
     };
 
 function StateMessage({ title, message }: { title: string; message: string }) {
@@ -48,13 +50,15 @@ function StateMessage({ title, message }: { title: string; message: string }) {
   );
 }
 
-export function ClientInterview({ token }: { token: string }) {
+function ClientInterviewContent({ token }: { token: string }) {
   const [context, setContext] = useState<GuestContext>({ type: "loading" });
   const [serviceError, setServiceError] = useState("");
   const [canRetryCompletion, setCanRetryCompletion] = useState(false);
   const [isCompletingVoice, setIsCompletingVoice] = useState(false);
   const [voiceCompleted, setVoiceCompleted] = useState(false);
-  const voice = useRealtimeInterview(token, {
+  const voiceTransport =
+    context.type === "ready" ? context.voiceTransport : "openai_webrtc";
+  const voice = useRealtimeInterview(token, voiceTransport, {
     onComplete: () => void completeVoiceInterview("ai_end_interview_tool"),
     onTranscriptTurn: (turn) =>
       recordInterviewTranscriptTurn(token, turn).then(() => undefined),
@@ -65,7 +69,11 @@ export function ClientInterview({ token }: { token: string }) {
     getGuestInterview(token)
       .then((interview) => {
         if (active) {
-          setContext({ type: "ready", invitation: interview.invitation });
+          setContext({
+            type: "ready",
+            invitation: interview.invitation,
+            voiceTransport: interview.voiceTransport,
+          });
         }
       })
       .catch((error) => {
@@ -343,5 +351,13 @@ export function ClientInterview({ token }: { token: string }) {
         <small>You&apos;ll be asked to allow microphone access.</small>
       </section>
     </main>
+  );
+}
+
+export function ClientInterview({ token }: { token: string }) {
+  return (
+    <ConversationProvider>
+      <ClientInterviewContent token={token} />
+    </ConversationProvider>
   );
 }

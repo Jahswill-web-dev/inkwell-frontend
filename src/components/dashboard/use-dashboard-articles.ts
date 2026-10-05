@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Article } from "@/lib/articles/article";
-import { ArticleRequestError, listArticles } from "@/lib/articles/client";
+import { ArticleRequestError, deleteArticle, listArticles } from "@/lib/articles/client";
 
 const PAGE_SIZE = 20;
 
@@ -65,6 +65,12 @@ export function useDashboardArticles() {
     }
   }, [articles.length]);
 
+  const removeArticle = useCallback(async (articleId: string) => {
+    await deleteArticle(articleId);
+    setArticles((current) => current.filter((article) => article.id !== articleId));
+    setTotal((current) => Math.max(0, current - 1));
+  }, []);
+
   return {
     articles,
     total,
@@ -73,5 +79,6 @@ export function useDashboardArticles() {
     loadError,
     retryInitialLoad,
     loadMore,
+    removeArticle,
   };
 }

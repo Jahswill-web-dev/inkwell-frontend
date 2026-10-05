@@ -4,8 +4,8 @@ import { toAuthIdentity } from "@/lib/auth/identity";
 import { requireUser } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
-  title: "Source review",
-  description: "Review and approve interview material before generation.",
+  title: "Interview notes",
+  description: "Review the completed client interview transcript and notes.",
 };
 
 export default async function ArticleSourcesPage({

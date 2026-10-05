@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ArticleRequestError } from "@/lib/articles/client";
@@ -6,33 +6,46 @@ import { createInterviewInvitation } from "@/lib/articles/client-interview-invit
 import { DEFAULT_AUTH_IDENTITY } from "@/lib/auth/identity";
 import { ArticleWorkspace } from "./article-workspace";
 
-const { articleMock, briefMock, outlineMock, draftMock } = vi.hoisted(() => ({
+const { articleMock, briefMock, deleteMock, draftMock, outlineMock } = vi.hoisted(() => ({
   articleMock: vi.fn(),
   briefMock: vi.fn(),
+  deleteMock: vi.fn(),
   outlineMock: vi.fn(),
   draftMock: vi.fn(),
 }));
-const { getInvitationMock, createInvitationMock, revokeInvitationMock } =
+const { pushMock, refreshMock } = vi.hoisted(() => ({
+  pushMock: vi.fn(),
+  refreshMock: vi.fn(),
+}));
+const {
+  getInvitationMock,
+  getTranscriptMock,
+  createInvitationMock,
+  revokeInvitationMock,
+} =
   vi.hoisted(() => ({
     getInvitationMock: vi.fn(),
+    getTranscriptMock: vi.fn(),
     createInvitationMock: vi.fn(),
     revokeInvitationMock: vi.fn(),
   }));
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  useRouter: () => ({ push: pushMock, refresh: refreshMock }),
 }));
 
 vi.mock("@/lib/articles/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/articles/client")>()),
   getArticle: articleMock,
   getArticleBrief: briefMock,
+  deleteArticle: deleteMock,
   getArticleOutline: outlineMock,
   getArticleDraft: draftMock,
 }));
 
 vi.mock("@/lib/articles/client-interview-api", () => ({
   getInterviewInvitation: getInvitationMock,
+  getInterviewTranscript: getTranscriptMock,
   createInterviewInvitationRequest: createInvitationMock,
   revokeInterviewInvitationRequest: revokeInvitationMock,
 }));
@@ -94,6 +107,7 @@ beforeEach(() => {
   outlineMock.mockImplementation(missing);
   draftMock.mockImplementation(missing);
   getInvitationMock.mockResolvedValue(null);
+  getTranscriptMock.mockResolvedValue(null);
   createInvitationMock.mockImplementation(async (_articleId, input) =>
     invitationFor(input),
   );
@@ -105,6 +119,7 @@ beforeEach(() => {
     }),
     status: "revoked" as const,
   }));
+  deleteMock.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -142,20 +157,47 @@ describe("ArticleWorkspace", () => {
     );
   });
 
-  it("uses persisted pipeline resources to recommend the next stage", async () => {
-    briefMock.mockResolvedValue({});
-    outlineMock.mockResolvedValue({});
+  it("does not probe legacy pipeline resources", async () => {
     render(
       <ArticleWorkspace
         articleId={article.id}
         identity={DEFAULT_AUTH_IDENTITY}
       />,
     );
-    const action = await screen.findByRole("link", { name: /Continue/ });
-    expect(action).toHaveAttribute(
-      "href",
-      `/articles/new/draft?articleId=${article.id}`,
+    await screen.findByRole("heading", { name: article.working_title });
+    expect(briefMock).not.toHaveBeenCalled();
+    expect(outlineMock).not.toHaveBeenCalled();
+    expect(draftMock).not.toHaveBeenCalled();
+    expect(screen.queryByRole("link", { name: "Brief" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Outline" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Draft" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Review" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Publish" })).not.toBeInTheDocument();
+  });
+
+  it("confirms workspace deletion before returning to the dashboard", async () => {
+    render(
+      <ArticleWorkspace
+        articleId={article.id}
+        identity={DEFAULT_AUTH_IDENTITY}
+      />,
     );
+    await screen.findByRole("heading", { name: article.working_title });
+
+    await userEvent.click(screen.getByRole("button", { name: "Delete article" }));
+    const dialog = screen.getByRole("dialog", { name: "Delete this article?" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(deleteMock).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Delete article" }));
+    await userEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Delete article",
+      }),
+    );
+    await waitFor(() => expect(deleteMock).toHaveBeenCalledWith(article.id));
+    expect(pushMock).toHaveBeenCalledWith("/dashboard?section=articles");
+    expect(refreshMock).toHaveBeenCalled();
   });
 
   it("creates, copies, previews, revokes, and regenerates a client link", async () => {

@@ -141,6 +141,8 @@ const interviewTranscriptSchema = z
     insights: interviewInsightsSchema.nullable(),
     model_id: z.string().nullable(),
     generation_error: z.string().nullable(),
+    created_at: z.string().datetime({ offset: true }),
+    updated_at: z.string().datetime({ offset: true }),
   })
   .strict();
 
@@ -195,23 +197,6 @@ function toGuestInterview(value: unknown) {
   return {
     invitation: toInvitation(response.invitation),
     session: toSession(response.session),
-  };
-}
-
-function toBackendSession(session: ClientInterviewSession) {
-  return {
-    state: session.state,
-    questions: session.questions,
-    current_question_index: session.currentQuestionIndex,
-    answers: session.answers.map((answer) => ({
-      question_id: answer.questionId,
-      question: answer.question,
-      answer: answer.answer,
-      answered_at: answer.answeredAt,
-    })),
-    completion_reason: session.completionReason,
-    final_detail_added: session.finalDetailAdded,
-    draft_answer: session.draftAnswer,
   };
 }
 
@@ -293,16 +278,6 @@ export function getGuestInterview(token: string) {
   );
 }
 
-export function updateGuestInterview(
-  token: string,
-  session: ClientInterviewSession,
-) {
-  return request(
-    `/api/interviews/${encodeURIComponent(token)}`,
-    { method: "PATCH", body: JSON.stringify(toBackendSession(session)) },
-    toGuestInterview,
-  );
-}
 export function createRealtimeInterviewCall(token: string, sdp: string) {
   return request(
     `/api/interviews/${encodeURIComponent(token)}/realtime`,

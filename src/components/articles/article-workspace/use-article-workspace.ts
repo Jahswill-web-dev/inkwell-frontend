@@ -1,11 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  ArticleRequestError,
-  getArticle,
-  getArticleBrief,
-  getArticleDraft,
-  getArticleOutline,
-} from "@/lib/articles/client";
+import { ArticleRequestError, getArticle } from "@/lib/articles/client";
 import { articleSetupMetadataFromArticle } from "@/lib/articles/article-setup";
 import { loadInterviewInvitation } from "@/lib/articles/client-interview-storage";
 import type { ArticleWorkspaceViewModel } from "@/lib/articles/article-workspace";
@@ -26,30 +20,13 @@ type WorkspaceLoadState =
   | { type: "unauthorized" }
   | { type: "error" };
 
-async function exists(request: Promise<unknown>) {
-  try {
-    await request;
-    return true;
-  } catch (error) {
-    if (error instanceof ArticleRequestError && error.status === 404) {
-      return false;
-    }
-    throw error;
-  }
-}
-
 async function loadWorkspace(articleId: string, currentWriter: string) {
   const article = await getArticle(articleId);
-  const [hasBrief, hasOutline, hasDraft] = await Promise.all([
-    exists(getArticleBrief(articleId)),
-    exists(getArticleOutline(articleId)),
-    exists(getArticleDraft(articleId)),
-  ]);
   return toArticleWorkspaceViewModel(
     article,
     currentWriter,
     articleSetupMetadataFromArticle(article),
-    { hasBrief, hasOutline, hasDraft },
+    { hasBrief: false, hasOutline: false, hasDraft: false },
     loadInterviewInvitation(articleId),
     loadWriterInterviewMaterial(articleId),
     loadSourceReview(articleId),

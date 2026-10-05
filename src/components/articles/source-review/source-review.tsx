@@ -257,9 +257,9 @@ export function SourceReview({
           </span>
         </div>
         {review.status === "approved" ? (
-          <Link href={`/articles/new/brief?articleId=${workspace.article.id}`}>
-            Continue to brief
-          </Link>
+          <span>
+            Content generation is not available in this workspace yet.
+          </span>
         ) : (
           <button
             disabled={includedCount === 0}

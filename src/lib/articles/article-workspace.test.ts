@@ -115,13 +115,14 @@ describe("article workspace view model", () => {
     expect(view.nextAction.href).toBe(`/articles/${article.id}/sources`);
   });
 
-  it("derives the next available stage from persisted resources", () => {
+  it("keeps legacy production stages unavailable in the current workspace", () => {
     const view = toArticleWorkspaceViewModel(article, "writer", null, {
       hasBrief: true,
       hasOutline: true,
       hasDraft: false,
     });
-    expect(view.nextAction.href).toContain("/draft?articleId=");
+    expect(view.nextAction.href).toBeNull();
+    expect(view.nextAction.title).toContain("unavailable");
     expect(view.readiness.find((item) => item.id === "outline")?.state).toBe(
       "complete",
     );

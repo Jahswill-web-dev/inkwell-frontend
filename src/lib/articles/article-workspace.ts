@@ -256,33 +256,22 @@ function nextAction(
   sourceReview: SourceReview | null,
 ): ArticleWorkspaceViewModel["nextAction"] {
   const encodedId = encodeURIComponent(articleId);
-  if (resources.hasDraft) {
+  if (resources.hasDraft || resources.hasOutline || resources.hasBrief) {
     return {
-      title: "Continue editing the draft",
-      description: "Review the current draft and keep shaping the article.",
-      href: `/articles/new/draft?articleId=${encodedId}`,
-    };
-  }
-  if (resources.hasOutline) {
-    return {
-      title: "Start the draft",
-      description: "Use the approved outline to begin writing.",
-      href: `/articles/new/draft?articleId=${encodedId}`,
-    };
-  }
-  if (resources.hasBrief) {
-    return {
-      title: "Build the outline",
-      description: "Turn the article brief into an editable structure.",
-      href: `/articles/new/outline?articleId=${encodedId}`,
+      title: "Content production is unavailable",
+      description:
+        "The previous brief, outline, and drafting workflow is not part of this workspace.",
+      href: null,
+      unavailableLabel: "Coming soon",
     };
   }
   if (sourceReview?.status === "approved") {
     return {
-      title: "Build the article brief",
+      title: "Source material approved",
       description:
-        "Use the approved source material to create the working brief.",
-      href: `/articles/new/brief?articleId=${encodedId}`,
+        "Content generation is not available in this workspace yet.",
+      href: null,
+      unavailableLabel: "Coming soon",
     };
   }
   if (metadata?.interviewMethod === "client") {
@@ -334,9 +323,11 @@ function nextAction(
     };
   }
   return {
-    title: "Build the article brief",
-    description: "Turn the setup and source material into a working brief.",
-    href: `/articles/new/brief?articleId=${encodedId}`,
+    title: "Content production is unavailable",
+    description:
+      "The previous brief, outline, and drafting workflow is not part of this workspace.",
+    href: null,
+    unavailableLabel: "Coming soon",
   };
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ArticleDeleteDialog } from "@/components/articles/article-delete-dialog";
 import { ArticlePipeline } from "./article-pipeline";
 import { AttentionPanel } from "./attention-panel";
 import { DashboardFilters } from "./dashboard-filters";
@@ -31,6 +32,7 @@ import {
 } from "@/lib/dashboard/agency-metrics";
 import { toAgencyArticleSummaries } from "@/lib/dashboard/agency-view-model";
 import { DEFAULT_AUTH_IDENTITY, type AuthIdentity } from "@/lib/auth/identity";
+import { ArticleRequestError } from "@/lib/articles/client";
 import styles from "./dashboard.module.css";
 
 export function DashboardHome({
@@ -42,6 +44,10 @@ export function DashboardHome({
     defaultDashboardFilters,
   );
   const [notice, setNotice] = useState("");
+  const [articlePendingDeletion, setArticlePendingDeletion] =
+    useState<ReturnType<typeof toAgencyArticleSummaries>[number] | null>(null);
+  const [deleteError, setDeleteError] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
   const {
     articles,
     total,
@@ -50,6 +56,7 @@ export function DashboardHome({
     loadError,
     loadMore,
     retryInitialLoad,
+    removeArticle,
   } = useDashboardArticles();
 
   const agencyArticles = useMemo(
@@ -79,6 +86,25 @@ export function DashboardHome({
     filters.dueDate !== "all";
 
   const resetFilters = () => setFilters(defaultDashboardFilters);
+
+  const confirmDelete = async () => {
+    if (!articlePendingDeletion) return;
+    setIsDeleting(true);
+    setDeleteError("");
+    try {
+      await removeArticle(articlePendingDeletion.id);
+      setNotice(`Deleted “${articlePendingDeletion.working_title}”.`);
+      setArticlePendingDeletion(null);
+    } catch (error) {
+      setDeleteError(
+        error instanceof ArticleRequestError
+          ? error.message
+          : "We couldn’t delete this article. Please try again.",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <main className={styles.dashboard}>
@@ -131,6 +157,13 @@ export function DashboardHome({
                   isLoadingMore={isLoadingMore}
                   loadError={loadError}
                   onLoadMore={() => void loadMore()}
+                  onDelete={(article) => {
+                    setDeleteError("");
+                    setArticlePendingDeletion(article);
+                  }}
+                  pendingDeletionId={
+                    isDeleting ? articlePendingDeletion?.id : undefined
+                  }
                   onRetry={() => void loadMore()}
                 />
               ) : null}
@@ -142,6 +175,18 @@ export function DashboardHome({
       <MobileNav
         onNavigate={(label) => setNotice(`${label} view will open next.`)}
       />
+      {articlePendingDeletion ? (
+        <ArticleDeleteDialog
+          articleTitle={articlePendingDeletion.working_title}
+          error={deleteError}
+          isDeleting={isDeleting}
+          onCancel={() => {
+            setDeleteError("");
+            setArticlePendingDeletion(null);
+          }}
+          onConfirm={() => void confirmDelete()}
+        />
+      ) : null}
     </main>
   );
 }

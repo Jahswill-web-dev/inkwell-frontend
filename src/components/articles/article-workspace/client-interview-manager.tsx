@@ -23,6 +23,7 @@ import {
   createInterviewInvitationRequest,
   getInterviewTranscript,
   getInterviewInvitation,
+  InterviewInvitationRequestError,
   revokeInterviewInvitationRequest,
   type InterviewTranscript,
 } from "@/lib/articles/client-interview-api";
@@ -74,8 +75,10 @@ function sourceLinks(sourceItemIds: string[], openTranscript: () => void) {
 
 function InterviewInsights({
   transcript,
+  interviewComplete,
 }: {
   transcript: InterviewTranscript;
+  interviewComplete: boolean;
 }) {
   const [transcriptOpen, setTranscriptOpen] = useState(false);
   const insights = transcript.insights;
@@ -83,10 +86,18 @@ function InterviewInsights({
   if (transcript.insight_status === "pending") {
     return (
       <section className={styles.insightCard} aria-live="polite">
-        <p>Interview complete</p>
-        <h3>Preparing interview insights…</h3>
+        <p>
+          {interviewComplete ? "Interview complete" : "Interview in progress"}
+        </p>
+        <h3>
+          {interviewComplete
+            ? "Preparing interview insights…"
+            : "Transcript saved so far"}
+        </h3>
         <span>
-          The transcript is saved. Inkwell is organizing the useful details.
+          {interviewComplete
+            ? "The transcript is saved. Inkwell is organizing the useful details."
+            : "Structured notes will be prepared after the interview ends."}
         </span>
       </section>
     );
@@ -328,7 +339,7 @@ export function ClientInterviewManager({
   }, [workspace.article.id]);
 
   useEffect(() => {
-    if (!invitation?.id || invitation.progressState !== "completed") return;
+    if (!invitation?.id) return;
     let active = true;
     getInterviewTranscript(workspace.article.id, invitation.id)
       .then((value) => {
@@ -339,6 +350,15 @@ export function ClientInterviewManager({
       })
       .catch((error) => {
         if (active) {
+          if (
+            invitation.progressState !== "completed" &&
+            error instanceof InterviewInvitationRequestError &&
+            error.status === 404
+          ) {
+            setTranscript(null);
+            setTranscriptError("");
+            return;
+          }
           setTranscriptError(
             error instanceof Error
               ? error.message
@@ -673,7 +693,12 @@ export function ClientInterviewManager({
       )}
 
       {serviceError ? <p role="alert">{serviceError}</p> : null}
-      {transcript ? <InterviewInsights transcript={transcript} /> : null}
+      {transcript ? (
+        <InterviewInsights
+          transcript={transcript}
+          interviewComplete={invitation?.progressState === "completed"}
+        />
+      ) : null}
       {transcriptError ? <p role="alert">{transcriptError}</p> : null}
 
       {previewOpen && invitation ? (

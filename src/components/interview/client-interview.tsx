@@ -1,12 +1,9 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import {
-  ArrowLeft,
-  ArrowRight,
   CheckCircle,
   Clock,
-  CloudSlash,
   LockKey,
   Microphone,
   PhoneDisconnect,
@@ -14,23 +11,12 @@ import {
   WarningCircle,
   Waveform,
 } from "@phosphor-icons/react";
-import {
-  addFinalInterviewDetail,
-  clientInterviewProgress,
-  completeClientInterview,
-  currentInterviewQuestion,
-  pauseClientInterview,
-  startClientInterview,
-  submitClientInterviewAnswer,
-  type ClientInterviewSession,
-} from "@/lib/articles/client-interview-session";
 import type { InterviewInvitation } from "@/lib/articles/client-interview-invitation";
 import {
   getGuestInterview,
   InterviewInvitationRequestError,
   finalizeInterviewTranscript,
   recordInterviewTranscriptTurn,
-  updateGuestInterview,
 } from "@/lib/articles/client-interview-api";
 import styles from "./client-interview.module.css";
 import { useRealtimeInterview } from "./use-realtime-interview";
@@ -44,21 +30,7 @@ type GuestContext =
   | {
       type: "ready";
       invitation: InterviewInvitation;
-      session: ClientInterviewSession;
     };
-
-function subscribeToConnectivity(callback: () => void) {
-  window.addEventListener("online", callback);
-  window.addEventListener("offline", callback);
-  return () => {
-    window.removeEventListener("online", callback);
-    window.removeEventListener("offline", callback);
-  };
-}
-
-function connectivitySnapshot() {
-  return navigator.onLine;
-}
 
 function StateMessage({ title, message }: { title: string; message: string }) {
   return (
@@ -78,28 +50,22 @@ function StateMessage({ title, message }: { title: string; message: string }) {
 
 export function ClientInterview({ token }: { token: string }) {
   const [context, setContext] = useState<GuestContext>({ type: "loading" });
-  const [answer, setAnswer] = useState("");
   const [serviceError, setServiceError] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [canRetryCompletion, setCanRetryCompletion] = useState(false);
   const [isCompletingVoice, setIsCompletingVoice] = useState(false);
+  const [voiceCompleted, setVoiceCompleted] = useState(false);
   const voice = useRealtimeInterview(token, {
-    onComplete: completeVoiceInterview,
+    onComplete: () => void completeVoiceInterview("ai_end_interview_tool"),
     onTranscriptTurn: (turn) =>
       recordInterviewTranscriptTurn(token, turn).then(() => undefined),
   });
-  const online = useSyncExternalStore(
-    subscribeToConnectivity,
-    connectivitySnapshot,
-    () => true,
-  );
 
   useEffect(() => {
     let active = true;
     getGuestInterview(token)
       .then((interview) => {
         if (active) {
-          setContext({ type: "ready", ...interview });
-          setAnswer(interview.session.draftAnswer);
+          setContext({ type: "ready", invitation: interview.invitation });
         }
       })
       .catch((error) => {
@@ -161,94 +127,73 @@ export function ClientInterview({ token }: { token: string }) {
     );
   }
 
-  const { invitation, session } = context;
+  const { invitation } = context;
   const articleTitle = invitation.articleTitle ?? "the upcoming article";
   const clientName = invitation.clientName ?? "your team";
   const writerName = invitation.writerName ?? "your writer";
 
   function startVoiceInterview() {
+    setCanRetryCompletion(false);
+    setServiceError("");
     void voice.start();
   }
 
-  async function persist(nextSession: ClientInterviewSession) {
-    setSaving(true);
-    try {
-      const nextInterview = await updateGuestInterview(token, nextSession);
-      setAnswer(nextInterview.session.draftAnswer);
-      setContext({
-        type: "ready",
-        invitation: nextInterview.invitation,
-        session: nextInterview.session,
-      });
-      setServiceError("");
-    } catch (error) {
-      if (error instanceof InterviewInvitationRequestError) {
-        if (error.status === 403) setContext({ type: "revoked" });
-        else if (error.status === 410) setContext({ type: "expired" });
-        else setServiceError(error.message);
-      } else {
-        setServiceError(
-          "Inkwell couldn’t save that just now. Please try again.",
-        );
-      }
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function beginTextInterview() {
-    const nextSession = startClientInterview(session);
-    setAnswer(nextSession.draftAnswer);
-    void persist(nextSession);
-  }
-
-  function submitAnswer() {
-    if (!answer.trim() || !online || saving) return;
-    const nextSession = submitClientInterviewAnswer(session, answer);
-    setAnswer(nextSession.draftAnswer);
-    void persist(nextSession);
-  }
-
-  function pause() {
-    const nextSession = pauseClientInterview(session, answer);
-    void persist(nextSession);
-  }
-
-  function finish() {
-    void persist(completeClientInterview(session));
-  }
-
   async function completeVoiceInterview(
-    reason: "participant_finished" | "questions_complete",
+    source: "ai_end_interview_tool" | "manual_end_button",
   ) {
+    let stage: "stop" | "flush_transcript" | "finalize" = "stop";
     setIsCompletingVoice(true);
+    console.info("[Inkwell voice]", {
+      event: "interview_completion_started",
+      source,
+      at: new Date().toISOString(),
+    });
     try {
+      voice.stop(source);
+      // stop() moves any not-yet-settled transcript fragments into the durable
+      // outbox. Drain that outbox before asking the backend to finalize.
+      stage = "flush_transcript";
       await voice.flushTranscript();
-      voice.stop();
+      stage = "finalize";
       await finalizeInterviewTranscript(token);
-    } catch {
-      // The voice interview is still complete if the optional insight note needs a retry.
-    } finally {
-      await persist(
-        completeClientInterview(
-          session,
-          reason === "participant_finished"
-            ? "participant_finished"
-            : "question_limit",
+      setVoiceCompleted(true);
+      setCanRetryCompletion(false);
+      setServiceError("");
+      console.info("[Inkwell voice]", {
+        event: "transcript_finalize_succeeded",
+        source,
+        at: new Date().toISOString(),
+      });
+    } catch (error) {
+      const diagnostic = {
+        event: "transcript_finalize_failed",
+        source,
+        stage,
+        status:
+          error instanceof InterviewInvitationRequestError
+            ? error.status
+            : null,
+        code:
+          error instanceof InterviewInvitationRequestError ? error.code : null,
+        errorName: error instanceof Error ? error.name : typeof error,
+        errorMessage: error instanceof Error ? error.message : null,
+        at: new Date().toISOString(),
+      };
+      console.error(`[Inkwell voice] ${JSON.stringify(diagnostic)}`);
+      setCanRetryCompletion(
+        !(
+          error instanceof InterviewInvitationRequestError &&
+          error.code === "transcript_empty"
         ),
       );
+      setServiceError(
+        error instanceof InterviewInvitationRequestError
+          ? error.message
+          : "We couldn’t finish the interview. Please try again.",
+      );
+    } finally {
       setIsCompletingVoice(false);
     }
-  }
-
-  function addFinalDetail() {
-    const nextSession = addFinalInterviewDetail(session);
-    setAnswer("");
-    void persist(nextSession);
-  }
-
-  function skipFinalDetail() {
-    void persist(completeClientInterview(session));
   }
 
   if (isCompletingVoice) {
@@ -259,8 +204,13 @@ export function ClientInterview({ token }: { token: string }) {
     );
   }
 
-  if (voice.status === "connecting" || voice.status === "connected") {
+  if (
+    voice.status === "connecting" ||
+    voice.status === "connected" ||
+    voice.status === "reconnecting"
+  ) {
     const isConnected = voice.status === "connected";
+    const isReconnecting = voice.status === "reconnecting";
 
     return (
       <main className={styles.page}>
@@ -281,25 +231,38 @@ export function ClientInterview({ token }: { token: string }) {
             )}
           </div>
           <span className={styles.clientLabel}>
-            {isConnected ? "Voice connection ready" : "Connecting securely"}
+            {isConnected
+              ? "Voice connection ready"
+              : isReconnecting
+                ? "Restoring your interview"
+                : "Connecting securely"}
           </span>
           <h1>
             {isConnected
               ? "Your interviewer is ready"
-              : "Preparing your voice interview"}
+              : isReconnecting
+                ? "Reconnecting your voice interview"
+                : "Preparing your voice interview"}
           </h1>
           <p>
             {isConnected
               ? "Your microphone is on. Your interviewer will introduce the conversation and ask when you’re ready to begin."
-              : "Allow microphone access when your browser asks. This usually takes only a moment."}
+              : isReconnecting
+                ? "Your conversation is saved. We’re securely restoring the call from where it left off."
+                : "Allow microphone access when your browser asks. This usually takes only a moment."}
           </p>
+          {isReconnecting && voice.error ? (
+            <p className={styles.voiceReconnectMessage} role="status">
+              {voice.error}
+            </p>
+          ) : null}
           <div className={styles.voicePrivacy}>
             <Microphone size={19} aria-hidden />
             <span>Your microphone is shared only during this interview.</span>
           </div>
           <button
             className={styles.endVoiceButton}
-            onClick={() => completeVoiceInterview("participant_finished")}
+            onClick={() => void completeVoiceInterview("manual_end_button")}
             type="button"
           >
             <PhoneDisconnect size={18} aria-hidden /> End voice interview
@@ -309,73 +272,7 @@ export function ClientInterview({ token }: { token: string }) {
     );
   }
 
-  if (session.state === "welcome") {
-    return (
-      <main className={styles.page}>
-        <header className={styles.publicHeader}>
-          <div className={styles.brand}>Inkwell</div>
-          <span>Private client interview</span>
-        </header>
-        <section className={styles.welcome}>
-          <span className={styles.clientLabel}>{clientName}</span>
-          <h1>Share your expertise for “{articleTitle}”</h1>
-          <p>
-            Hi {invitation.participantName}. {writerName} invited you to help
-            shape this article. Inkwell will guide you through a natural voice
-            conversation.
-          </p>
-          <div className={styles.expectations}>
-            <span>
-              <Clock size={20} aria-hidden /> About 5–10 minutes
-            </span>
-            <span>
-              <LockKey size={20} aria-hidden /> Your answers go only to the
-              writer
-            </span>
-          </div>
-          <button
-            className={styles.primaryButton}
-            onClick={startVoiceInterview}
-            type="button"
-          >
-            <Microphone size={18} aria-hidden /> Start voice interview
-          </button>
-          {voice.error ? (
-            <div className={styles.serviceError} role="alert">
-              <WarningCircle size={19} aria-hidden />
-              <span>{voice.error}</span>
-            </div>
-          ) : null}
-          <small>You&apos;ll be asked to allow microphone access.</small>
-        </section>
-      </main>
-    );
-  }
-
-  if (session.state === "paused") {
-    return (
-      <main className={styles.statePage}>
-        <div className={styles.brand}>Inkwell</div>
-        <section className={styles.stateCard}>
-          <CheckCircle size={36} aria-hidden />
-          <h1>Your progress is saved</h1>
-          <p>
-            Return whenever you’re ready. You’ll continue from this question.
-          </p>
-          <button
-            className={styles.primaryButton}
-            disabled={saving}
-            onClick={beginTextInterview}
-            type="button"
-          >
-            Continue interview <ArrowRight size={18} aria-hidden />
-          </button>
-        </section>
-      </main>
-    );
-  }
-
-  if (session.state === "completed") {
+  if (voiceCompleted || invitation.progressState === "completed") {
     return (
       <main className={styles.statePage}>
         <div className={styles.brand}>Inkwell</div>
@@ -384,114 +281,66 @@ export function ClientInterview({ token }: { token: string }) {
           <span>Interview complete</span>
           <h1>Thank you, {invitation.participantName}</h1>
           <p>
-            Your responses have been saved for {writerName}. They’ll review the
-            material before using it in “{articleTitle}”.
+            Your voice interview has been saved for {writerName}. They’ll review
+            the material before using it in “{articleTitle}”.
           </p>
-          {!session.finalDetailAdded ? (
-            <button onClick={addFinalDetail} type="button">
-              Add one final detail
-            </button>
-          ) : null}
         </section>
       </main>
     );
   }
 
-  const question = currentInterviewQuestion(session);
-  if (!question) return null;
-  const progress = clientInterviewProgress(session);
-
   return (
     <main className={styles.page}>
       <header className={styles.publicHeader}>
         <div className={styles.brand}>Inkwell</div>
-        <button onClick={pause} type="button">
-          Save and continue later
-        </button>
+        <span>Private client interview</span>
       </header>
-      {!online ? (
-        <div className={styles.offline} role="alert">
-          <CloudSlash size={19} aria-hidden /> Connection lost. Reconnect before
-          saving your answer.
-        </div>
-      ) : null}
-      <section className={styles.conversation}>
-        <div className={styles.progressHeader}>
-          <span>{progress}% complete</span>
-          <span>{session.answers.length} responses saved</span>
-        </div>
-        <div
-          className={styles.progressTrack}
-          aria-label={`${progress}% complete`}
-        >
-          <span style={{ width: `${progress}%` }} />
-        </div>
-        <p className={styles.eyebrow}>
-          {question.kind === "follow_up"
-            ? "A quick follow-up"
-            : "Your perspective"}
+      <section className={styles.welcome}>
+        <span className={styles.clientLabel}>{clientName}</span>
+        <h1>Share your expertise for “{articleTitle}”</h1>
+        <p>
+          Hi {invitation.participantName}. {writerName} invited you to help
+          shape this article. Inkwell will guide you through a natural voice
+          conversation.
         </p>
-        <h1>{question.text}</h1>
-        <label className={styles.answerField}>
-          <span>Your answer</span>
-          <textarea
-            aria-label="Your answer"
-            autoFocus
-            maxLength={10_000}
-            onChange={(event) => setAnswer(event.target.value)}
-            placeholder="Write naturally—specific examples and details are especially helpful."
-            rows={7}
-            value={answer}
-          />
-          <small>{answer.length.toLocaleString()} / 10,000</small>
-        </label>
+        <div className={styles.expectations}>
+          <span>
+            <Clock size={20} aria-hidden /> About 5–10 minutes
+          </span>
+          <span>
+            <LockKey size={20} aria-hidden /> Your answers go only to the writer
+          </span>
+        </div>
+        <button
+          className={styles.primaryButton}
+          onClick={startVoiceInterview}
+          type="button"
+        >
+          <Microphone size={18} aria-hidden />{" "}
+          {voice.error ? "Reconnect voice interview" : "Start voice interview"}
+        </button>
+        {canRetryCompletion ? (
+          <button
+            className={styles.primaryButton}
+            onClick={() => void completeVoiceInterview("manual_end_button")}
+            type="button"
+          >
+            Try finishing the saved interview again
+          </button>
+        ) : null}
+        {voice.error ? (
+          <div className={styles.serviceError} role="alert">
+            <WarningCircle size={19} aria-hidden />
+            <span>{voice.error}</span>
+          </div>
+        ) : null}
         {serviceError ? (
           <div className={styles.serviceError} role="alert">
             <WarningCircle size={19} aria-hidden />
             <span>{serviceError}</span>
-            <button onClick={submitAnswer} type="button">
-              Try again
-            </button>
           </div>
         ) : null}
-        <div className={styles.questionActions}>
-          <button
-            className={styles.secondaryButton}
-            disabled={saving || !online}
-            onClick={pause}
-            type="button"
-          >
-            <ArrowLeft size={17} aria-hidden /> Save for later
-          </button>
-          <button
-            className={styles.primaryButton}
-            disabled={!answer.trim() || !online || saving}
-            onClick={submitAnswer}
-            type="button"
-          >
-            Continue <ArrowRight size={18} aria-hidden />
-          </button>
-        </div>
-        {question.kind === "final_detail" ? (
-          <button
-            className={styles.finishButton}
-            disabled={saving || !online}
-            onClick={skipFinalDetail}
-            type="button"
-          >
-            Skip this detail
-          </button>
-        ) : null}
-        {session.answers.length >= 2 ? (
-          <button
-            className={styles.finishButton}
-            disabled={saving || !online}
-            onClick={finish}
-            type="button"
-          >
-            I’ve shared everything important
-          </button>
-        ) : null}
+        <small>You&apos;ll be asked to allow microphone access.</small>
       </section>
     </main>
   );

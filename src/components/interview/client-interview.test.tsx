@@ -1,18 +1,13 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createInterviewInvitation } from "@/lib/articles/client-interview-invitation";
-import {
-  createClientInterviewSession,
-  completeClientInterview,
-} from "@/lib/articles/client-interview-session";
 import { InterviewInvitationRequestError } from "@/lib/articles/client-interview-api";
 import { ClientInterview } from "./client-interview";
 
 const token = "a".repeat(48);
-const { getGuestMock, updateGuestMock } = vi.hoisted(() => ({
+const { getGuestMock } = vi.hoisted(() => ({
   getGuestMock: vi.fn(),
-  updateGuestMock: vi.fn(),
 }));
 const { startVoiceMock, stopVoiceMock } = vi.hoisted(() => ({
   startVoiceMock: vi.fn(),
@@ -24,7 +19,6 @@ vi.mock("@/lib/articles/client-interview-api", async (importOriginal) => ({
     typeof import("@/lib/articles/client-interview-api")
   >()),
   getGuestInterview: getGuestMock,
-  updateGuestInterview: updateGuestMock,
 }));
 
 vi.mock("./use-realtime-interview", () => ({
@@ -57,15 +51,7 @@ function seedInvitation(
     ),
     ...overrides,
   };
-  let session =
-    invitation.progressState === "completed"
-      ? completeClientInterview(createClientInterviewSession(token))
-      : createClientInterviewSession(token);
-  getGuestMock.mockResolvedValue({ invitation, session });
-  updateGuestMock.mockImplementation(async (_token, nextSession) => {
-    session = nextSession;
-    return { invitation, session };
-  });
+  getGuestMock.mockResolvedValue({ invitation });
   return invitation;
 }
 
@@ -138,46 +124,14 @@ describe("ClientInterview", () => {
     expect(await screen.findByRole("heading", { name: heading })).toBeVisible();
   });
 
-  it("allows one final detail on an already completed interview", async () => {
+  it("shows a completed voice interview without typed-answer controls", async () => {
     seedInvitation({ progressState: "completed" });
     render(<ClientInterview token={token} />);
-    await userEvent.click(
-      await screen.findByRole("button", { name: "Add one final detail" }),
-    );
-    expect(screen.getByRole("heading", { name: /final detail/ })).toBeVisible();
-    fireEvent.change(screen.getByLabelText("Your answer"), {
-      target: { value: "One last customer result." },
-    });
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(
-      screen.getByRole("heading", { name: "Thank you, Avery Chen" }),
-    ).toBeVisible();
-    expect(
-      screen.queryByRole("button", { name: "Add one final detail" }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("lets the participant skip an optional final detail", async () => {
-    seedInvitation({ progressState: "completed" });
-    render(<ClientInterview token={token} />);
-    await userEvent.click(
-      await screen.findByRole("button", { name: "Add one final detail" }),
-    );
-
-    await userEvent.click(
-      screen.getByRole("button", { name: "Skip this detail" }),
-    );
-
     expect(
       await screen.findByRole("heading", { name: "Thank you, Avery Chen" }),
     ).toBeVisible();
-    expect(updateGuestMock).toHaveBeenLastCalledWith(
-      token,
-      expect.objectContaining({
-        state: "completed",
-        answers: [],
-        finalDetailAdded: true,
-      }),
-    );
+    expect(
+      screen.queryByLabelText("Your answer"),
+    ).not.toBeInTheDocument();
   });
 });

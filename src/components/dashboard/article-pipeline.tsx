@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight } from "@phosphor-icons/react";
+import { ArrowRight, Trash } from "@phosphor-icons/react";
 import {
   agencyStatusActions,
   agencyStatusLabels,
@@ -19,6 +19,8 @@ type ArticlePipelineProps = {
   isLoadingMore: boolean;
   loadError: string;
   onLoadMore: () => void;
+  onDelete: (article: AgencyArticleSummary) => void;
+  pendingDeletionId?: string;
   onRetry: () => void;
 };
 
@@ -32,6 +34,8 @@ export function ArticlePipeline({
   isLoadingMore,
   loadError,
   onLoadMore,
+  onDelete,
+  pendingDeletionId,
   onRetry,
 }: ArticlePipelineProps) {
   return (
@@ -86,14 +90,25 @@ export function ArticlePipeline({
                 </td>
                 <td>{formatLastActivity(article.lastActivity)}</td>
                 <td>
-                  <Link
-                    className={styles.rowAction}
-                    href={articleHref(article.id)}
-                    aria-label={`${agencyStatusActions[article.status]}: ${article.working_title}`}
-                  >
-                    {agencyStatusActions[article.status]}
-                    <ArrowRight size={15} aria-hidden />
-                  </Link>
+                  <div className={styles.rowActions}>
+                    <Link
+                      className={styles.rowAction}
+                      href={articleHref(article.id)}
+                      aria-label={`${agencyStatusActions[article.status]}: ${article.working_title}`}
+                    >
+                      {agencyStatusActions[article.status]}
+                      <ArrowRight size={15} aria-hidden />
+                    </Link>
+                    <button
+                      aria-label={`Delete ${article.working_title}`}
+                      className={styles.deleteAction}
+                      disabled={pendingDeletionId === article.id}
+                      onClick={() => onDelete(article)}
+                      type="button"
+                    >
+                      <Trash aria-hidden size={14} /> Delete
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -103,7 +118,12 @@ export function ArticlePipeline({
 
       <ol className={styles.mobilePipelineList}>
         {articles.map((article) => (
-          <MobileArticleCard article={article} key={article.id} />
+          <MobileArticleCard
+            article={article}
+            key={article.id}
+            onDelete={() => onDelete(article)}
+            pendingDeletion={pendingDeletionId === article.id}
+          />
         ))}
       </ol>
 

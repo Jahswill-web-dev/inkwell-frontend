@@ -86,6 +86,11 @@ describe("InterviewNotes", () => {
       screen.getByText("Manual handoffs slow the onboarding team."),
     ).toBeVisible();
     expect(screen.getByText("Manual handoffs create delays.")).toBeVisible();
+    expect(screen.getAllByText("1 source").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Examples and evidence")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Our onboarding team loses time to manual handoffs."),
+    ).not.toBeInTheDocument();
     expect(getInterviewTranscriptMock).toHaveBeenCalledWith(
       workspace.article.id,
       transcript.invitation_id,
@@ -102,6 +107,8 @@ describe("InterviewNotes", () => {
   });
 
   it("keeps the saved transcript visible while insights are pending", async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
     getInterviewInvitationMock.mockResolvedValue({
       id: transcript.invitation_id,
       participantName: "Avery Chen",
@@ -119,8 +126,19 @@ describe("InterviewNotes", () => {
       await screen.findByText("Preparing structured notes…"),
     ).toBeVisible();
     expect(
+      screen.getByRole("button", { name: /View transcript/ }),
+    ).toBeVisible();
+    expect(
+      screen.queryByText("Our onboarding team loses time to manual handoffs."),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /View transcript/ }));
+    expect(
       screen.getByText("Our onboarding team loses time to manual handoffs."),
     ).toBeVisible();
+    expect(scrollIntoView).toHaveBeenCalledWith({
+      behavior: "smooth",
+      block: "start",
+    });
   });
 
   it("loads saved turns even when finalization has not completed", async () => {
@@ -139,8 +157,8 @@ describe("InterviewNotes", () => {
 
     expect(await screen.findByText("Interview not finished")).toBeVisible();
     expect(
-      screen.getByText("Our onboarding team loses time to manual handoffs."),
-    ).toBeVisible();
+      screen.queryByText("Our onboarding team loses time to manual handoffs."),
+    ).not.toBeInTheDocument();
     expect(getInterviewTranscriptMock).toHaveBeenCalledWith(
       workspace.article.id,
       transcript.invitation_id,

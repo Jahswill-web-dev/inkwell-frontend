@@ -1,18 +1,26 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ArticleRequestError } from "@/lib/articles/client";
+import { InterviewInvitationRequestError } from "@/lib/articles/client-interview-api";
 import { createInterviewInvitation } from "@/lib/articles/client-interview-invitation";
 import { DEFAULT_AUTH_IDENTITY } from "@/lib/auth/identity";
 import { ArticleWorkspace } from "./article-workspace";
 
-const { articleMock, briefMock, deleteMock, draftMock, outlineMock } = vi.hoisted(() => ({
-  articleMock: vi.fn(),
-  briefMock: vi.fn(),
-  deleteMock: vi.fn(),
-  outlineMock: vi.fn(),
-  draftMock: vi.fn(),
-}));
+const { articleMock, briefMock, deleteMock, draftMock, outlineMock } =
+  vi.hoisted(() => ({
+    articleMock: vi.fn(),
+    briefMock: vi.fn(),
+    deleteMock: vi.fn(),
+    outlineMock: vi.fn(),
+    draftMock: vi.fn(),
+  }));
 const { pushMock, refreshMock } = vi.hoisted(() => ({
   pushMock: vi.fn(),
   refreshMock: vi.fn(),
@@ -22,13 +30,12 @@ const {
   getTranscriptMock,
   createInvitationMock,
   revokeInvitationMock,
-} =
-  vi.hoisted(() => ({
-    getInvitationMock: vi.fn(),
-    getTranscriptMock: vi.fn(),
-    createInvitationMock: vi.fn(),
-    revokeInvitationMock: vi.fn(),
-  }));
+} = vi.hoisted(() => ({
+  getInvitationMock: vi.fn(),
+  getTranscriptMock: vi.fn(),
+  createInvitationMock: vi.fn(),
+  revokeInvitationMock: vi.fn(),
+}));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock, refresh: refreshMock }),
@@ -43,7 +50,10 @@ vi.mock("@/lib/articles/client", async (importOriginal) => ({
   getArticleDraft: draftMock,
 }));
 
-vi.mock("@/lib/articles/client-interview-api", () => ({
+vi.mock("@/lib/articles/client-interview-api", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("@/lib/articles/client-interview-api")
+  >()),
   getInterviewInvitation: getInvitationMock,
   getInterviewTranscript: getTranscriptMock,
   createInterviewInvitationRequest: createInvitationMock,
@@ -129,7 +139,7 @@ afterEach(() => {
 });
 
 describe("ArticleWorkspace", () => {
-  it("loads the article, setup metadata, and recommended next action", async () => {
+  it("loads the article and setup metadata without the unfinished recommendation", async () => {
     render(
       <ArticleWorkspace
         articleId={article.id}
@@ -144,9 +154,33 @@ describe("ArticleWorkspace", () => {
     ).toBeVisible();
     expect(screen.getAllByText("Northstar Labs").length).toBeGreaterThan(0);
     expect(
-      screen.getByRole("heading", { name: "Create the client interview link" }),
+      screen.queryByRole("heading", {
+        name: "Create the client interview link",
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Recommended next action"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Collected context" }),
     ).toBeVisible();
+    expect(screen.getByText("Useful client context")).toBeVisible();
     expect(screen.getByText("Avery Chen")).toBeVisible();
+    const workflow = screen
+      .getByRole("heading", { name: "Article readiness" })
+      .closest("section");
+    expect(workflow).not.toBeNull();
+    expect(within(workflow!).getByText("Article setup")).toBeVisible();
+    expect(within(workflow!).getByText("Client interview")).toBeVisible();
+    expect(within(workflow!).getByText("Interview notes")).toBeVisible();
+    expect(within(workflow!).getByText("1 of 3 stages complete")).toBeVisible();
+    expect(
+      within(workflow!).queryByText("Source review"),
+    ).not.toBeInTheDocument();
+    expect(within(workflow!).queryByText("Brief")).not.toBeInTheDocument();
+    expect(within(workflow!).queryByText("Outline")).not.toBeInTheDocument();
+    expect(within(workflow!).queryByText("Draft")).not.toBeInTheDocument();
+    expect(within(workflow!).queryByText(/8 stages/)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Edit setup/ })).toHaveAttribute(
       "href",
       `/articles/${article.id}/edit`,
@@ -168,11 +202,88 @@ describe("ArticleWorkspace", () => {
     expect(briefMock).not.toHaveBeenCalled();
     expect(outlineMock).not.toHaveBeenCalled();
     expect(draftMock).not.toHaveBeenCalled();
-    expect(screen.queryByRole("link", { name: "Brief" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Outline" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Draft" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Review" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Publish" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Brief" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Outline" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Draft" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Review" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Publish" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("uses server transcript status for completed client interview notes", async () => {
+    getInvitationMock.mockResolvedValue({
+      ...invitationFor({
+        participantName: "Avery Chen",
+        participantEmail: "avery@client.com",
+        expiresOn: "",
+      }),
+      progressState: "completed",
+      questionsAnswered: 8,
+      completedAt: "2026-09-08T12:09:00.000Z",
+    });
+    getTranscriptMock.mockResolvedValue({ insight_status: "ready" });
+
+    render(
+      <ArticleWorkspace
+        articleId={article.id}
+        identity={DEFAULT_AUTH_IDENTITY}
+      />,
+    );
+
+    expect(
+      await screen.findByText(
+        "Structured interview notes are ready to review.",
+      ),
+    ).toBeVisible();
+    expect(screen.getByText("3 of 3 stages complete")).toBeVisible();
+    expect(screen.getByLabelText("100% complete")).toBeVisible();
+  });
+
+  it("keeps the overview usable when transcript status is unavailable", async () => {
+    getInvitationMock.mockResolvedValue({
+      ...invitationFor({
+        participantName: "Avery Chen",
+        participantEmail: "avery@client.com",
+        expiresOn: "",
+      }),
+      progressState: "completed",
+      questionsAnswered: 8,
+      completedAt: "2026-09-08T12:09:00.000Z",
+    });
+    getTranscriptMock.mockRejectedValue(
+      new InterviewInvitationRequestError(
+        503,
+        "interview_unavailable",
+        "Unavailable",
+      ),
+    );
+
+    render(
+      <ArticleWorkspace
+        articleId={article.id}
+        identity={DEFAULT_AUTH_IDENTITY}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Expert-led content" }),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        "The interview is saved, but the notes status is unavailable.",
+      ),
+    ).toBeVisible();
+    expect(screen.getByText("Needs attention")).toBeVisible();
+    expect(screen.getByText("2 of 3 stages complete")).toBeVisible();
   });
 
   it("confirms workspace deletion before returning to the dashboard", async () => {
@@ -184,12 +295,18 @@ describe("ArticleWorkspace", () => {
     );
     await screen.findByRole("heading", { name: article.working_title });
 
-    await userEvent.click(screen.getByRole("button", { name: "Delete article" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Delete article" }),
+    );
     const dialog = screen.getByRole("dialog", { name: "Delete this article?" });
-    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Cancel" }),
+    );
     expect(deleteMock).not.toHaveBeenCalled();
 
-    await userEvent.click(screen.getByRole("button", { name: "Delete article" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Delete article" }),
+    );
     await userEvent.click(
       within(screen.getByRole("dialog")).getByRole("button", {
         name: "Delete article",
@@ -219,6 +336,14 @@ describe("ArticleWorkspace", () => {
         name: "Create a private interview link",
       }),
     ).toBeVisible();
+    expect(screen.getByText("Client expert")).toBeVisible();
+    expect(
+      screen.queryByRole("heading", { name: "Add your own expertise" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Source collection")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Client interview insights"),
+    ).not.toBeInTheDocument();
     await userEvent.type(
       screen.getByLabelText("Participant email"),
       "avery@client.com",
@@ -252,6 +377,7 @@ describe("ArticleWorkspace", () => {
     expect(screen.getByLabelText("Client interview link")).not.toHaveValue(
       firstLink,
     );
+    expect(getTranscriptMock).not.toHaveBeenCalled();
   });
 
   it("shows summarized in-progress state from persisted invitation data", async () => {

@@ -21,11 +21,8 @@ import {
 } from "@/lib/articles/client-interview-invitation";
 import {
   createInterviewInvitationRequest,
-  getInterviewTranscript,
   getInterviewInvitation,
-  InterviewInvitationRequestError,
   revokeInterviewInvitationRequest,
-  type InterviewTranscript,
 } from "@/lib/articles/client-interview-api";
 import type { ArticleWorkspaceViewModel } from "@/lib/articles/article-workspace";
 import styles from "./client-interview-manager.module.css";
@@ -59,177 +56,6 @@ function progressDescription(invitation: InterviewInvitation) {
     return "The participant opened the interview but has not answered a question yet.";
   }
   return "The participant has not opened this interview yet.";
-}
-
-function sourceLinks(sourceItemIds: string[], openTranscript: () => void) {
-  return sourceItemIds.map((itemId, index) => (
-    <a
-      href={`#transcript-turn-${encodeURIComponent(itemId)}`}
-      key={itemId}
-      onClick={openTranscript}
-    >
-      {index ? ", " : ""}Source {index + 1}
-    </a>
-  ));
-}
-
-function InterviewInsights({
-  transcript,
-  interviewComplete,
-}: {
-  transcript: InterviewTranscript;
-  interviewComplete: boolean;
-}) {
-  const [transcriptOpen, setTranscriptOpen] = useState(false);
-  const insights = transcript.insights;
-
-  if (transcript.insight_status === "pending") {
-    return (
-      <section className={styles.insightCard} aria-live="polite">
-        <p>
-          {interviewComplete ? "Interview complete" : "Interview in progress"}
-        </p>
-        <h3>
-          {interviewComplete
-            ? "Preparing interview insights…"
-            : "Transcript saved so far"}
-        </h3>
-        <span>
-          {interviewComplete
-            ? "The transcript is saved. Inkwell is organizing the useful details."
-            : "Structured notes will be prepared after the interview ends."}
-        </span>
-      </section>
-    );
-  }
-
-  if (transcript.insight_status === "failed" || !insights) {
-    return (
-      <section className={styles.insightCard} role="alert">
-        <p>Interview complete</p>
-        <h3>The transcript is ready</h3>
-        <span>
-          {transcript.generation_error ??
-            "Inkwell couldn’t prepare the insight note yet."}
-        </span>
-        <button onClick={() => setTranscriptOpen(true)} type="button">
-          View full transcript
-        </button>
-        {transcriptOpen ? (
-          <div
-            className={styles.transcript}
-            aria-label="Client interview transcript"
-          >
-            <h4>Full transcript</h4>
-            {transcript.turns.map((turn) => (
-              <article
-                id={`transcript-turn-${encodeURIComponent(turn.item_id)}`}
-                key={turn.item_id}
-              >
-                <strong>
-                  {turn.speaker === "participant" ? "Client" : "Inkwell"}
-                </strong>
-                <p>{turn.text}</p>
-              </article>
-            ))}
-          </div>
-        ) : null}
-      </section>
-    );
-  }
-
-  return (
-    <section
-      className={styles.insightCard}
-      aria-labelledby="interview-insights-title"
-    >
-      <header>
-        <div>
-          <p>Client interview insights</p>
-          <h3 id="interview-insights-title">What to carry into the article</h3>
-        </div>
-        <button
-          onClick={() => setTranscriptOpen((open) => !open)}
-          type="button"
-        >
-          {transcriptOpen ? "Hide transcript" : "View full transcript"}
-        </button>
-      </header>
-      <p className={styles.insightSummary}>{insights.summary}</p>
-      <div className={styles.insightColumns}>
-        <div>
-          <h4>Key insights</h4>
-          <ul>
-            {insights.key_insights.map((item) => (
-              <li key={item.text}>
-                <span>{item.text}</span>
-                <small>
-                  {sourceLinks(item.source_item_ids, () =>
-                    setTranscriptOpen(true),
-                  )}
-                </small>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div>
-          <h4>Claims to verify</h4>
-          {insights.claims_to_verify.length ? (
-            <ul>
-              {insights.claims_to_verify.map((item) => (
-                <li key={item.text}>
-                  <span>{item.text}</span>
-                  <small>
-                    {sourceLinks(item.source_item_ids, () =>
-                      setTranscriptOpen(true),
-                    )}
-                  </small>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <span className={styles.emptyInsight}>
-              No claims flagged for verification.
-            </span>
-          )}
-        </div>
-      </div>
-      {insights.examples_and_evidence.length ? (
-        <div className={styles.evidenceList}>
-          <h4>Examples and evidence</h4>
-          {insights.examples_and_evidence.map((item) => (
-            <p key={item.text}>
-              {item.text}{" "}
-              <small>
-                {sourceLinks(item.source_item_ids, () =>
-                  setTranscriptOpen(true),
-                )}
-              </small>
-            </p>
-          ))}
-        </div>
-      ) : null}
-      {transcriptOpen ? (
-        <div
-          className={styles.transcript}
-          aria-label="Client interview transcript"
-        >
-          <h4>Full transcript</h4>
-          {transcript.turns.map((turn) => (
-            <article
-              id={`transcript-turn-${encodeURIComponent(turn.item_id)}`}
-              key={turn.item_id}
-            >
-              <strong>
-                {turn.speaker === "participant" ? "Client" : "Inkwell"}
-              </strong>
-              <p>{turn.text}</p>
-            </article>
-          ))}
-        </div>
-      ) : null}
-    </section>
-  );
 }
 
 function PreviewDialog({
@@ -303,10 +129,6 @@ export function ClientInterviewManager({
   const [copyMessage, setCopyMessage] = useState("");
   const [serviceError, setServiceError] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [transcript, setTranscript] = useState<InterviewTranscript | null>(
-    null,
-  );
-  const [transcriptError, setTranscriptError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -337,39 +159,6 @@ export function ClientInterviewManager({
       active = false;
     };
   }, [workspace.article.id]);
-
-  useEffect(() => {
-    if (!invitation?.id) return;
-    let active = true;
-    getInterviewTranscript(workspace.article.id, invitation.id)
-      .then((value) => {
-        if (active) {
-          setTranscript(value);
-          setTranscriptError("");
-        }
-      })
-      .catch((error) => {
-        if (active) {
-          if (
-            invitation.progressState !== "completed" &&
-            error instanceof InterviewInvitationRequestError &&
-            error.status === 404
-          ) {
-            setTranscript(null);
-            setTranscriptError("");
-            return;
-          }
-          setTranscriptError(
-            error instanceof Error
-              ? error.message
-              : "The transcript could not be loaded.",
-          );
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, [invitation, workspace.article.id]);
 
   const invitationUrl = useMemo(() => {
     if (!invitation) return "";
@@ -483,17 +272,6 @@ export function ClientInterviewManager({
 
   return (
     <div className={styles.layout}>
-      <section className={styles.intro} aria-labelledby="interviews-heading">
-        <div>
-          <p>Source collection</p>
-          <h2 id="interviews-heading">Client interview</h2>
-          <span>
-            Invite one client expert to answer focused questions. You’ll see
-            concise progress here while their answers remain private.
-          </span>
-        </div>
-      </section>
-
       {loadingInvitation ? (
         <section className={styles.card} aria-busy="true">
           <p>Loading invitation…</p>
@@ -505,7 +283,7 @@ export function ClientInterviewManager({
               <LinkSimple size={21} aria-hidden />
             </div>
             <div>
-              <p>New invitation</p>
+              <p>Client expert</p>
               <h3 id="create-link-heading">Create a private interview link</h3>
             </div>
           </header>
@@ -693,13 +471,6 @@ export function ClientInterviewManager({
       )}
 
       {serviceError ? <p role="alert">{serviceError}</p> : null}
-      {transcript ? (
-        <InterviewInsights
-          transcript={transcript}
-          interviewComplete={invitation?.progressState === "completed"}
-        />
-      ) : null}
-      {transcriptError ? <p role="alert">{transcriptError}</p> : null}
 
       {previewOpen && invitation ? (
         <PreviewDialog

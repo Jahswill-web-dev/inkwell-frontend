@@ -23,11 +23,14 @@ export type WorkspaceResources = {
 };
 
 export type WorkspaceReadiness = {
-  id: "interviews" | "sources" | "brief" | "outline" | "draft";
+  id: "setup" | "collection" | "notes";
   label: string;
   detail: string;
-  state: "complete" | "ready" | "waiting";
+  state: "complete" | "in_progress" | "not_started" | "needs_attention";
 };
+
+export type ClientInterviewNotesState =
+  "pending" | "ready" | "failed" | "unavailable" | null;
 
 export type WorkspaceParticipant = {
   name: string;
@@ -67,53 +70,25 @@ export type ArticleWorkspaceViewModel = {
   };
 };
 
-function sourceReviewReadiness(
-  review: SourceReview | null,
-  hasReviewableMaterial: boolean,
-): WorkspaceReadiness {
-  if (review?.status === "approved") {
-    return {
-      id: "sources",
-      label: "Source review",
-      detail: `${review.items.filter((item) => item.included).length} source items approved for generation.`,
-      state: "complete",
-    };
-  }
-  if (review?.items.length || hasReviewableMaterial) {
-    return {
-      id: "sources",
-      label: "Source review",
-      detail: "Review, edit, include, or exclude collected material.",
-      state: "ready",
-    };
-  }
-  return {
-    id: "sources",
-    label: "Source review",
-    detail: "Waiting for interview material.",
-    state: "waiting",
-  };
-}
-
-function interviewReadiness(
+function collectionReadiness(
   metadata: ArticleSetupMetadata | null,
   invitation: InterviewInvitation | null,
   writerMaterial: WriterInterviewMaterial | null,
 ): WorkspaceReadiness {
   if (metadata?.interviewMethod === "notes") {
     return {
-      id: "interviews",
+      id: "collection",
       label: "Source material",
-      detail: "Existing notes were added during setup.",
+      detail: "Existing notes and source material were added during setup.",
       state: "complete",
     };
   }
   if (metadata?.interviewMethod === "client") {
     if (invitation?.progressState === "completed") {
       return {
-        id: "interviews",
+        id: "collection",
         label: "Client interview",
-        detail: "The client interview is complete and ready to review.",
+        detail: `${invitation.questionsAnswered} questions were answered in the completed interview.`,
         state: "complete",
       };
     }
@@ -122,91 +97,95 @@ function interviewReadiness(
       !isInterviewInvitationExpired(invitation)
     ) {
       return {
-        id: "interviews",
+        id: "collection",
         label: "Client interview",
         detail:
           invitation.progressState === "not_opened"
-            ? "The interview link is ready and waiting for the client."
-            : "The client has started the interview.",
-        state: "waiting",
+            ? "The client interview has not been opened yet."
+            : invitation.progressState === "opened"
+              ? "The client has opened the interview."
+              : `${invitation.questionsAnswered} of ${invitation.estimatedQuestions} questions answered.`,
+        state: "in_progress",
       };
     }
     return {
-      id: "interviews",
+      id: "collection",
       label: "Client interview",
-      detail: "The interview link still needs to be created.",
-      state: "ready",
+      detail: "No client interview has been started.",
+      state: "not_started",
     };
   }
   if (metadata?.interviewMethod === "self") {
     const writer = writerInterviewSummary(writerMaterial);
+    const responseLabel = `${writer.responses} ${writer.responses === 1 ? "response" : "responses"}`;
     if (writer.state === "completed") {
       return {
-        id: "interviews",
+        id: "collection",
         label: "Writer interview",
-        detail: `${writer.responses} writer responses are saved and ready for source review.`,
+        detail: `${responseLabel} saved from the writer interview.`,
         state: "complete",
       };
     }
     return {
-      id: "interviews",
+      id: "collection",
       label: "Writer interview",
       detail:
         writer.state === "in_progress"
-          ? `${writer.responses} responses saved. Continue the whole-article interview.`
+          ? `${responseLabel} saved. Continue the whole-article interview.`
           : "The whole-article writer interview is ready to begin.",
-      state: writer.state === "in_progress" ? "waiting" : "ready",
+      state: writer.state === "in_progress" ? "in_progress" : "not_started",
     };
   }
   return {
-    id: "interviews",
-    label: "Interview material",
-    detail: "Choose how to collect expert knowledge.",
-    state: "waiting",
+    id: "collection",
+    label: "Source material",
+    detail: "No source collection method has been selected.",
+    state: "not_started",
   };
 }
 
-function resourceReadiness(
-  resources: WorkspaceResources,
-): WorkspaceReadiness[] {
-  return [
-    {
-      id: "brief",
-      label: "Brief",
-      detail: resources.hasBrief
-        ? "The article brief is available."
-        : "Ready to generate from approved source material.",
-      state: resources.hasBrief ? "complete" : "ready",
-    },
-    {
-      id: "outline",
-      label: "Outline",
-      detail: resources.hasOutline
-        ? "The structure is available."
-        : resources.hasBrief
-          ? "Ready to build from the brief."
-          : "Waiting for the brief.",
-      state: resources.hasOutline
-        ? "complete"
-        : resources.hasBrief
-          ? "ready"
-          : "waiting",
-    },
-    {
-      id: "draft",
-      label: "Draft",
-      detail: resources.hasDraft
-        ? "A working draft is available."
-        : resources.hasOutline
-          ? "Ready to draft from the outline."
-          : "Waiting for the outline.",
-      state: resources.hasDraft
-        ? "complete"
-        : resources.hasOutline
-          ? "ready"
-          : "waiting",
-    },
-  ];
+function clientNotesReadiness(
+  invitation: InterviewInvitation | null,
+  notesState: ClientInterviewNotesState,
+): WorkspaceReadiness {
+  if (invitation?.progressState !== "completed") {
+    return {
+      id: "notes",
+      label: "Interview notes",
+      detail: "Available after the client interview is complete.",
+      state: "not_started",
+    };
+  }
+  if (notesState === "ready") {
+    return {
+      id: "notes",
+      label: "Interview notes",
+      detail: "Structured interview notes are ready to review.",
+      state: "complete",
+    };
+  }
+  if (notesState === "failed") {
+    return {
+      id: "notes",
+      label: "Interview notes",
+      detail: "The interview is saved, but its notes could not be prepared.",
+      state: "needs_attention",
+    };
+  }
+  if (notesState === "unavailable") {
+    return {
+      id: "notes",
+      label: "Interview notes",
+      detail: "The interview is saved, but the notes status is unavailable.",
+      state: "needs_attention",
+    };
+  }
+  return {
+    id: "notes",
+    label: "Interview notes",
+    detail: "Interview complete; notes are being prepared.",
+    state: "in_progress",
+  };
 }
 
 function participants(
@@ -268,8 +247,7 @@ function nextAction(
   if (sourceReview?.status === "approved") {
     return {
       title: "Source material approved",
-      description:
-        "Content generation is not available in this workspace yet.",
+      description: "Content generation is not available in this workspace yet.",
       href: null,
       unavailableLabel: "Coming soon",
     };
@@ -339,18 +317,24 @@ export function toArticleWorkspaceViewModel(
   invitation: InterviewInvitation | null = null,
   writerMaterial: WriterInterviewMaterial | null = null,
   sourceReview: SourceReview | null = null,
+  clientNotesState: ClientInterviewNotesState = null,
 ): ArticleWorkspaceViewModel {
   const agencyArticle = toAgencyArticleSummary(article, currentWriter);
-  const hasReviewableMaterial =
-    invitation?.progressState === "completed" ||
-    writerInterviewSummary(writerMaterial).responses > 0;
   const readiness = [
-    interviewReadiness(metadata, invitation, writerMaterial),
-    sourceReviewReadiness(sourceReview, hasReviewableMaterial),
-    ...resourceReadiness(resources),
+    {
+      id: "setup",
+      label: "Article setup",
+      detail: "Article details and source approach are saved.",
+      state: "complete",
+    } satisfies WorkspaceReadiness,
+    collectionReadiness(metadata, invitation, writerMaterial),
+    ...(metadata?.interviewMethod === "client"
+      ? [clientNotesReadiness(invitation, clientNotesState)]
+      : []),
   ];
-  const completedStages =
-    1 + readiness.filter((item) => item.state === "complete").length;
+  const completedStages = readiness.filter(
+    (item) => item.state === "complete",
+  ).length;
   const status = resources.hasDraft
     ? "drafting"
     : resources.hasOutline
@@ -370,8 +354,8 @@ export function toArticleWorkspaceViewModel(
     dueDate: agencyArticle.dueDate,
     status,
     statusLabel: agencyStatusLabels[status],
-    progress: Math.round((completedStages / 8) * 100),
-    progressLabel: `${completedStages} of 8 stages complete`,
+    progress: Math.round((completedStages / readiness.length) * 100),
+    progressLabel: `${completedStages} of ${readiness.length} stages complete`,
     readiness,
     participants: participants(
       metadata,

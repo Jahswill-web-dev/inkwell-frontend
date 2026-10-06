@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { articleSchema, type Article } from "./article";
 import type { ArticleSetupMetadata } from "./article-setup";
 import { toArticleWorkspaceViewModel } from "./article-workspace";
+import type { InterviewInvitation } from "./client-interview-invitation";
 import { createWriterInterviewMaterial } from "./writer-interview-storage";
 import {
   completeClientInterview,
@@ -34,8 +35,29 @@ const metadata: ArticleSetupMetadata = {
   interviewInstructions: "Ask for examples",
 };
 
+function clientInvitation(
+  update: Partial<InterviewInvitation> = {},
+): InterviewInvitation {
+  return {
+    id: "8fbc56aa-9fcd-4b28-9c44-a6904dbbd748",
+    articleId: article.id,
+    participantName: "Avery Chen",
+    participantEmail: "avery@client.com",
+    token: "a".repeat(48),
+    status: "active",
+    createdAt: "2026-09-08T12:00:00.000Z",
+    expiresAt: null,
+    progressState: "not_opened",
+    questionsAnswered: 0,
+    estimatedQuestions: 8,
+    openedAt: null,
+    completedAt: null,
+    ...update,
+  };
+}
+
 describe("article workspace view model", () => {
-  it("prioritizes the selected client interview before the brief", () => {
+  it("shows only the live client workflow before an interview starts", () => {
     const view = toArticleWorkspaceViewModel(article, "writer", metadata, {
       hasBrief: false,
       hasOutline: false,
@@ -46,85 +68,145 @@ describe("article workspace view model", () => {
       name: "Avery Chen",
       state: "Link not created",
     });
-    expect(view.nextAction.href).toBe(
-      "/articles/" + article.id + "/interviews",
-    );
-    expect(view.nextAction.title).toContain("interview link");
+    expect(view.readiness).toEqual([
+      {
+        id: "setup",
+        label: "Article setup",
+        detail: "Article details and source approach are saved.",
+        state: "complete",
+      },
+      {
+        id: "collection",
+        label: "Client interview",
+        detail: "No client interview has been started.",
+        state: "not_started",
+      },
+      {
+        id: "notes",
+        label: "Interview notes",
+        detail: "Available after the client interview is complete.",
+        state: "not_started",
+      },
+    ]);
+    expect(view.progress).toBe(33);
+    expect(view.progressLabel).toBe("1 of 3 stages complete");
   });
 
-  it("reflects completed interview progress in readiness and status", () => {
-    const view = toArticleWorkspaceViewModel(
+  it.each([
+    ["not_opened", 0, "The client interview has not been opened yet."],
+    ["opened", 0, "The client has opened the interview."],
+    ["in_progress", 3, "3 of 8 questions answered."],
+  ] as const)(
+    "reflects the %s client interview state",
+    (progressState, questionsAnswered, detail) => {
+      const view = toArticleWorkspaceViewModel(
+        article,
+        "writer",
+        metadata,
+        { hasBrief: false, hasOutline: false, hasDraft: false },
+        clientInvitation({ progressState, questionsAnswered }),
+      );
+      expect(view.readiness[1]).toMatchObject({
+        state: "in_progress",
+        detail,
+      });
+      expect(view.progressLabel).toBe("1 of 3 stages complete");
+    },
+  );
+
+  it.each([
+    ["pending", "in_progress", 67],
+    ["ready", "complete", 100],
+    ["failed", "needs_attention", 67],
+    ["unavailable", "needs_attention", 67],
+  ] as const)(
+    "maps %s client notes to %s readiness",
+    (notesState, state, progress) => {
+      const view = toArticleWorkspaceViewModel(
+        article,
+        "writer",
+        metadata,
+        { hasBrief: false, hasOutline: false, hasDraft: false },
+        clientInvitation({
+          progressState: "completed",
+          questionsAnswered: 6,
+          completedAt: "2026-09-08T12:09:00.000Z",
+        }),
+        null,
+        null,
+        notesState,
+      );
+      expect(view.readiness[2].state).toBe(state);
+      expect(view.progress).toBe(progress);
+      expect(view.status).toBe("ready_to_draft");
+    },
+  );
+
+  it("tracks writer interview progress using two live stages", () => {
+    const selfMetadata = { ...metadata, interviewMethod: "self" as const };
+    const notStarted = toArticleWorkspaceViewModel(
       article,
       "writer",
-      metadata,
+      selfMetadata,
       { hasBrief: false, hasOutline: false, hasDraft: false },
-      {
-        articleId: article.id,
-        participantName: "Avery Chen",
-        participantEmail: "avery@client.com",
-        token: "a".repeat(48),
-        status: "active",
-        createdAt: "2026-09-08T12:00:00.000Z",
-        expiresAt: null,
-        progressState: "completed",
-        questionsAnswered: 6,
-        estimatedQuestions: 8,
-        openedAt: "2026-09-08T12:03:00.000Z",
-        completedAt: "2026-09-08T12:09:00.000Z",
-        generation: 1,
-      },
     );
-    expect(view.status).toBe("ready_to_draft");
-    expect(view.participants[0].state).toBe("Completed");
-    expect(view.readiness[0].state).toBe("complete");
-    expect(view.nextAction.title).toContain("Review");
-  });
+    expect(notStarted.readiness[1]).toMatchObject({
+      label: "Writer interview",
+      state: "not_started",
+    });
+    expect(notStarted.progressLabel).toBe("1 of 2 stages complete");
 
-  it("makes a completed self-interview available as writer-supplied material", () => {
-    const selfMetadata = { ...metadata, interviewMethod: "self" as const };
     const material = createWriterInterviewMaterial(article.id);
     const answered = submitClientInterviewAnswer(
       startClientInterview(material.session),
       "A detailed writer perspective based on direct experience with agency content workflows.",
     );
-    const writerMaterial = {
-      ...material,
-      session: completeClientInterview(answered),
-    };
+    const inProgress = toArticleWorkspaceViewModel(
+      article,
+      "writer",
+      selfMetadata,
+      { hasBrief: false, hasOutline: false, hasDraft: false },
+      null,
+      { ...material, session: answered },
+    );
+    expect(inProgress.readiness[1]).toMatchObject({
+      state: "in_progress",
+      detail: "1 response saved. Continue the whole-article interview.",
+    });
+    expect(inProgress.progress).toBe(50);
+
     const view = toArticleWorkspaceViewModel(
       article,
       "writer",
       selfMetadata,
       { hasBrief: false, hasOutline: false, hasDraft: false },
       null,
-      writerMaterial,
+      { ...material, session: completeClientInterview(answered) },
     );
-
-    expect(view.writerInterview).toMatchObject({
-      state: "completed",
-      responses: 1,
-    });
-    expect(view.readiness[0]).toMatchObject({
+    expect(view.readiness[1]).toMatchObject({
       label: "Writer interview",
       state: "complete",
     });
-    expect(view.participants[0]).toMatchObject({
-      role: "Writer · Whole article",
-      state: "Complete",
-    });
-    expect(view.nextAction.href).toBe(`/articles/${article.id}/sources`);
+    expect(view.progress).toBe(100);
+    expect(view.progressLabel).toBe("2 of 2 stages complete");
   });
 
-  it("keeps legacy production stages unavailable in the current workspace", () => {
-    const view = toArticleWorkspaceViewModel(article, "writer", null, {
-      hasBrief: true,
-      hasOutline: true,
-      hasDraft: false,
-    });
-    expect(view.nextAction.href).toBeNull();
-    expect(view.nextAction.title).toContain("unavailable");
-    expect(view.readiness.find((item) => item.id === "outline")?.state).toBe(
-      "complete",
+  it("marks existing source notes complete without legacy production stages", () => {
+    const view = toArticleWorkspaceViewModel(
+      article,
+      "writer",
+      { ...metadata, interviewMethod: "notes" },
+      { hasBrief: true, hasOutline: true, hasDraft: false },
     );
+    expect(view.readiness.map((item) => item.id)).toEqual([
+      "setup",
+      "collection",
+    ]);
+    expect(view.readiness[1]).toMatchObject({
+      label: "Source material",
+      state: "complete",
+    });
+    expect(view.progress).toBe(100);
+    expect(view.progressLabel).toBe("2 of 2 stages complete");
   });
 });

@@ -18,7 +18,6 @@ import type { AuthIdentity } from "@/lib/auth/identity";
 import { ArticleWorkspaceNav } from "./article-workspace-nav";
 import { ArticleWorkspaceOverview } from "./article-workspace-overview";
 import { ClientInterviewManager } from "./client-interview-manager";
-import { WriterInterviewPanel } from "./writer-interview-panel";
 import { InterviewNotes } from "../interview-notes/interview-notes";
 import { useArticleWorkspace } from "./use-article-workspace";
 import styles from "./article-workspace.module.css";
@@ -187,10 +186,7 @@ export function ArticleWorkspace({
 
           <ArticleWorkspaceNav activeTab={activeTab} articleId={articleId} />
           {activeTab === "interviews" ? (
-            <>
-              <WriterInterviewPanel workspace={workspace} />
-              <ClientInterviewManager workspace={workspace} />
-            </>
+            <ClientInterviewManager workspace={workspace} />
           ) : activeTab === "sources" ? (
             <InterviewNotes workspace={workspace} />
           ) : (

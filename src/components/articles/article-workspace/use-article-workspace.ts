@@ -1,8 +1,16 @@
 import { useEffect, useState } from "react";
 import { ArticleRequestError, getArticle } from "@/lib/articles/client";
 import { articleSetupMetadataFromArticle } from "@/lib/articles/article-setup";
+import {
+  getInterviewInvitation,
+  getInterviewTranscript,
+  InterviewInvitationRequestError,
+} from "@/lib/articles/client-interview-api";
 import { loadInterviewInvitation } from "@/lib/articles/client-interview-storage";
-import type { ArticleWorkspaceViewModel } from "@/lib/articles/article-workspace";
+import type {
+  ArticleWorkspaceViewModel,
+  ClientInterviewNotesState,
+} from "@/lib/articles/article-workspace";
 import { toArticleWorkspaceViewModel } from "@/lib/articles/article-workspace";
 import {
   loadWriterInterviewMaterial,
@@ -22,14 +30,49 @@ type WorkspaceLoadState =
 
 async function loadWorkspace(articleId: string, currentWriter: string) {
   const article = await getArticle(articleId);
+  const metadata = articleSetupMetadataFromArticle(article);
+  let invitation = loadInterviewInvitation(articleId);
+  let clientNotesState: ClientInterviewNotesState = null;
+
+  if (metadata?.interviewMethod === "client") {
+    try {
+      invitation = await getInterviewInvitation(articleId);
+    } catch {
+      if (invitation?.progressState === "completed") {
+        clientNotesState = "unavailable";
+      }
+    }
+
+    if (invitation?.progressState === "completed") {
+      if (!invitation.id) {
+        clientNotesState = "unavailable";
+      } else {
+        try {
+          const transcript = await getInterviewTranscript(
+            articleId,
+            invitation.id,
+          );
+          clientNotesState = transcript.insight_status;
+        } catch (error) {
+          clientNotesState =
+            error instanceof InterviewInvitationRequestError &&
+            error.status === 404
+              ? "pending"
+              : "unavailable";
+        }
+      }
+    }
+  }
+
   return toArticleWorkspaceViewModel(
     article,
     currentWriter,
-    articleSetupMetadataFromArticle(article),
+    metadata,
     { hasBrief: false, hasOutline: false, hasDraft: false },
-    loadInterviewInvitation(articleId),
+    invitation,
     loadWriterInterviewMaterial(articleId),
     loadSourceReview(articleId),
+    clientNotesState,
   );
 }
 

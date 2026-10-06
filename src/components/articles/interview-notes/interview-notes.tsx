@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowClockwise,
   ChatCenteredText,
@@ -39,20 +39,26 @@ function speakerLabel(speaker: StoredTranscriptTurn["speaker"]) {
 function NotesList({
   items,
   onSource,
+  prominent = false,
 }: {
   items: Array<{ text: string; source_item_ids: string[] }>;
   onSource: (itemId: string) => void;
+  prominent?: boolean;
 }) {
-  if (!items.length)
-    return <p className={styles.emptyList}>Nothing flagged.</p>;
-
   return (
-    <ul className={styles.notesList}>
-      {items.map((item) => (
+    <ul className={prominent ? styles.keyInsightsList : styles.notesList}>
+      {items.map((item, index) => (
         <li key={item.text}>
-          <span>{item.text}</span>
+          {prominent ? (
+            <span className={styles.insightNumber}>{index + 1}</span>
+          ) : null}
+          <p>{item.text}</p>
           {item.source_item_ids.length ? (
-            <div>
+            <div className={styles.sourceActions}>
+              <span>
+                {item.source_item_ids.length}{" "}
+                {item.source_item_ids.length === 1 ? "source" : "sources"}
+              </span>
               {item.source_item_ids.map((itemId, index) => (
                 <button
                   key={itemId}
@@ -78,6 +84,7 @@ function TranscriptPanel({
   selectedItemId: string | null;
 }) {
   const [query, setQuery] = useState("");
+  const panelRef = useRef<HTMLElement>(null);
   const visibleTurns = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
     if (!normalized) return turns;
@@ -93,17 +100,28 @@ function TranscriptPanel({
       ?.scrollIntoView?.({ behavior: "smooth", block: "center" });
   }, [selectedItemId]);
 
+  useEffect(() => {
+    if (selectedItemId) return;
+    panelRef.current?.scrollIntoView?.({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, [selectedItemId]);
+
   return (
     <section
       className={styles.transcriptPanel}
       aria-labelledby="transcript-title"
+      ref={panelRef}
     >
       <header>
         <div>
           <p>Conversation record</p>
           <h2 id="transcript-title">Transcript</h2>
         </div>
-        <span>{turns.length} turns</span>
+        <div className={styles.transcriptActions}>
+          <span>{turns.length} turns</span>
+        </div>
       </header>
       <label className={styles.search}>
         <FileMagnifyingGlass aria-hidden size={17} />
@@ -151,10 +169,12 @@ function NotesWorkspace({
   refreshing: boolean;
 }) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
   const insights = transcript.insights;
 
   function openSource(itemId: string) {
     setSelectedItemId(itemId);
+    setTranscriptOpen(true);
   }
 
   return (
@@ -178,17 +198,21 @@ function NotesWorkspace({
       </section>
 
       <div className={styles.workspace}>
-        <TranscriptPanel
-          selectedItemId={selectedItemId}
-          turns={transcript.turns}
-        />
-        <aside className={styles.notesPanel} aria-labelledby="notes-title">
+        <section className={styles.notesPanel} aria-labelledby="notes-title">
           <header>
             <div>
               <p>Structured notes</p>
               <h2 id="notes-title">What matters for the article</h2>
             </div>
-            <ChatCenteredText aria-hidden size={22} />
+            <button
+              className={styles.transcriptToggle}
+              onClick={() => setTranscriptOpen((open) => !open)}
+              type="button"
+            >
+              <ChatCenteredText aria-hidden size={17} />
+              {transcriptOpen ? "Hide transcript" : "View transcript"}
+              <span>{transcript.turns.length} turns</span>
+            </button>
           </header>
 
           {transcript.insight_status === "pending" ? (
@@ -217,51 +241,71 @@ function NotesWorkspace({
           ) : (
             <>
               <section className={styles.summary}>
-                <h3>Summary</h3>
+                <p>Editorial summary</p>
+                <h3>Interview overview</h3>
                 <p>{insights.summary}</p>
               </section>
-              <section className={styles.noteSection}>
-                <h3>
-                  <CheckCircle aria-hidden size={18} /> Key insights
-                </h3>
-                <NotesList
-                  items={insights.key_insights}
-                  onSource={openSource}
-                />
-              </section>
-              <section className={styles.noteSection}>
-                <h3>
-                  <WarningCircle aria-hidden size={18} /> Claims to verify
-                </h3>
-                <NotesList
-                  items={insights.claims_to_verify}
-                  onSource={openSource}
-                />
-              </section>
-              <section className={styles.noteSection}>
-                <h3>
-                  <Quotes aria-hidden size={18} /> Examples and evidence
-                </h3>
-                <NotesList
-                  items={insights.examples_and_evidence}
-                  onSource={openSource}
-                />
-              </section>
-              <section className={styles.noteSection}>
-                <h3>Open questions</h3>
+              {insights.key_insights.length ? (
+                <section className={styles.keyInsights}>
+                  <header>
+                    <div>
+                      <p>Primary takeaways</p>
+                      <h3>
+                        <CheckCircle aria-hidden size={19} /> Key insights
+                      </h3>
+                    </div>
+                    <span>{insights.key_insights.length}</span>
+                  </header>
+                  <NotesList
+                    items={insights.key_insights}
+                    onSource={openSource}
+                    prominent
+                  />
+                </section>
+              ) : null}
+              <div className={styles.secondaryNotes}>
+                {insights.claims_to_verify.length ? (
+                  <section className={styles.noteSection} data-tone="warning">
+                    <h3>
+                      <WarningCircle aria-hidden size={18} /> Claims to verify
+                    </h3>
+                    <NotesList
+                      items={insights.claims_to_verify}
+                      onSource={openSource}
+                    />
+                  </section>
+                ) : null}
+                {insights.examples_and_evidence.length ? (
+                  <section className={styles.noteSection}>
+                    <h3>
+                      <Quotes aria-hidden size={18} /> Examples and evidence
+                    </h3>
+                    <NotesList
+                      items={insights.examples_and_evidence}
+                      onSource={openSource}
+                    />
+                  </section>
+                ) : null}
                 {insights.open_questions.length ? (
-                  <ul className={styles.openQuestions}>
-                    {insights.open_questions.map((question) => (
-                      <li key={question}>{question}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className={styles.emptyList}>No open questions.</p>
-                )}
-              </section>
+                  <section className={styles.noteSection}>
+                    <h3>Open questions</h3>
+                    <ul className={styles.openQuestions}>
+                      {insights.open_questions.map((question) => (
+                        <li key={question}>{question}</li>
+                      ))}
+                    </ul>
+                  </section>
+                ) : null}
+              </div>
             </>
           )}
-        </aside>
+        </section>
+        {transcriptOpen ? (
+          <TranscriptPanel
+            selectedItemId={selectedItemId}
+            turns={transcript.turns}
+          />
+        ) : null}
       </div>
     </div>
   );

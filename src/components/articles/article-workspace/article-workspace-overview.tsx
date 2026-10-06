@@ -1,13 +1,19 @@
-import Link from "next/link";
 import {
-  ArrowRight,
   CheckCircle,
   Clock,
   FileText,
   UserCircle,
+  WarningCircle,
 } from "@phosphor-icons/react";
 import type { ArticleWorkspaceViewModel } from "@/lib/articles/article-workspace";
 import styles from "./article-workspace-overview.module.css";
+
+const readinessStateLabels = {
+  complete: "Complete",
+  in_progress: "In progress",
+  not_started: "Not started",
+  needs_attention: "Needs attention",
+} as const;
 
 export function ArticleWorkspaceOverview({
   workspace,
@@ -17,24 +23,6 @@ export function ArticleWorkspaceOverview({
   return (
     <div className={styles.layout}>
       <div className={styles.mainColumn}>
-        <section
-          className={styles.nextAction}
-          aria-labelledby="next-action-title"
-        >
-          <p>Recommended next action</p>
-          <h2 id="next-action-title">{workspace.nextAction.title}</h2>
-          <span>{workspace.nextAction.description}</span>
-          {workspace.nextAction.href ? (
-            <Link href={workspace.nextAction.href}>
-              Continue <ArrowRight size={16} aria-hidden />
-            </Link>
-          ) : (
-            <button type="button" disabled>
-              {workspace.nextAction.unavailableLabel}
-            </button>
-          )}
-        </section>
-
         <section className={styles.panel} aria-labelledby="readiness-title">
           <header>
             <div>
@@ -54,6 +42,8 @@ export function ArticleWorkspaceOverview({
               <li data-state={item.state} key={item.id}>
                 {item.state === "complete" ? (
                   <CheckCircle size={22} weight="fill" aria-hidden />
+                ) : item.state === "needs_attention" ? (
+                  <WarningCircle size={22} weight="fill" aria-hidden />
                 ) : (
                   <Clock size={22} aria-hidden />
                 )}
@@ -61,7 +51,7 @@ export function ArticleWorkspaceOverview({
                   <strong>{item.label}</strong>
                   <span>{item.detail}</span>
                 </div>
-                <small>{item.state}</small>
+                <small>{readinessStateLabels[item.state]}</small>
               </li>
             ))}
           </ol>
@@ -75,24 +65,29 @@ export function ArticleWorkspaceOverview({
             </div>
             <FileText size={23} aria-hidden />
           </header>
-          <div className={styles.sourceCard}>
-            <strong>Article setup</strong>
-            <span>{workspace.sourceSummary}</span>
-            <p>{workspace.article.notes}</p>
+          <div className={styles.sourceList}>
+            <article className={styles.sourceItem}>
+              <div className={styles.sourceHeading}>
+                <strong>Article setup</strong>
+                <span>Setup notes</span>
+              </div>
+              <p>{workspace.article.notes}</p>
+              <small>{workspace.sourceSummary}</small>
+            </article>
+            {workspace.writerInterview.responses > 0 ? (
+              <article className={styles.sourceItem}>
+                <div className={styles.sourceHeading}>
+                  <strong>Writer interview</strong>
+                  <span>Writer supplied</span>
+                </div>
+                <p>
+                  Whole-article interview with{" "}
+                  {workspace.writerInterview.responses} responses saved.
+                </p>
+                <small>Available separately during source review</small>
+              </article>
+            ) : null}
           </div>
-          {workspace.writerInterview.responses > 0 ? (
-            <div className={styles.sourceCard} data-source="writer">
-              <strong>Writer-supplied material</strong>
-              <span>
-                Whole-article interview · {workspace.writerInterview.responses}{" "}
-                responses saved
-              </span>
-              <p>
-                Kept separate from client interview answers and from
-                section-specific interviews in the draft editor.
-              </p>
-            </div>
-          ) : null}
         </section>
       </div>
 

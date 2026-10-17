@@ -24,6 +24,7 @@ export type VoiceEndReason =
   | "component_unmounted";
 
 type RealtimeInterviewOptions = {
+  createSession?: typeof createVoiceInterviewSession;
   onComplete?: (reason: RealtimeCompletionReason) => void;
   onTranscriptTurn?: (turn: InterviewTranscriptTurn) => Promise<void>;
 };
@@ -92,8 +93,16 @@ function loadOutbox(token: string) {
 export function useRealtimeInterview(
   token: string,
   transport: VoiceTransport,
-  { onComplete, onTranscriptTurn }: RealtimeInterviewOptions = {},
+  {
+    onComplete,
+    onTranscriptTurn,
+    createSession,
+  }: RealtimeInterviewOptions = {},
 ) {
+  const createSessionRef = useRef(createSession);
+  useEffect(() => {
+    createSessionRef.current = createSession;
+  }, [createSession]);
   const connectionRef = useRef<RTCPeerConnection | null>(null);
   const eventsRef = useRef<RTCDataChannel | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -128,6 +137,9 @@ export function useRealtimeInterview(
   const attemptRef = useRef<(reconnecting: boolean) => void>(() => {});
   const scheduleReconnectRef = useRef<(message: string) => void>(() => {});
   const flushRef = useRef<() => Promise<void>>(async () => {});
+  const [activity, setActivity] = useState<"listening" | "speaking">(
+    "listening",
+  );
   const [status, setStatus] = useState<RealtimeInterviewStatus>("idle");
   const [error, setError] = useState<string | null>(null);
 
@@ -179,68 +191,66 @@ export function useRealtimeInterview(
     }
   }, [token]);
 
-  const {
-    startSession: startElevenSession,
-    endSession: endElevenSession,
-  } = useConversation({
-    clientTools: {
-      end_interview: (parameters: { reason?: unknown }) => {
-        if (
-          parameters.reason !== "participant_finished" &&
-          parameters.reason !== "questions_complete"
-        ) {
-          return "invalid_completion_reason";
-        }
-        completionReasonRef.current = parameters.reason;
-        if (completionTimerRef.current !== null)
-          window.clearTimeout(completionTimerRef.current);
-        completionTimerRef.current = window.setTimeout(() => {
-          completionTimerRef.current = null;
-          const reason = completionReasonRef.current;
-          completionReasonRef.current = null;
-          if (reason && activeRef.current) onCompleteRef.current?.(reason);
-        }, FINAL_AUDIO_CLOSE_DELAY_MS);
-        return "accepted";
+  const { startSession: startElevenSession, endSession: endElevenSession } =
+    useConversation({
+      clientTools: {
+        end_interview: (parameters: { reason?: unknown }) => {
+          if (
+            parameters.reason !== "participant_finished" &&
+            parameters.reason !== "questions_complete"
+          ) {
+            return "invalid_completion_reason";
+          }
+          completionReasonRef.current = parameters.reason;
+          if (completionTimerRef.current !== null)
+            window.clearTimeout(completionTimerRef.current);
+          completionTimerRef.current = window.setTimeout(() => {
+            completionTimerRef.current = null;
+            const reason = completionReasonRef.current;
+            completionReasonRef.current = null;
+            if (reason && activeRef.current) onCompleteRef.current?.(reason);
+          }, FINAL_AUDIO_CLOSE_DELAY_MS);
+          return "accepted";
+        },
       },
-    },
-    onConnect: ({ conversationId }) => {
-      externalSessionIdRef.current = conversationId;
-      setInterviewStatus("connected");
-      setError(null);
-      const sessionId = voiceSessionIdRef.current;
-      if (sessionId)
-        void associateVoiceInterviewSession(
-          token,
-          sessionId,
-          conversationId,
-        ).catch(() => undefined);
-    },
-    onDisconnect: (details) => {
-      if (!activeRef.current || details.reason === "user") return;
-      scheduleReconnectRef.current("The voice connection was interrupted.");
-    },
-    onError: () => {
-      if (activeRef.current)
+      onConnect: ({ conversationId }) => {
+        externalSessionIdRef.current = conversationId;
+        setInterviewStatus("connected");
+        setError(null);
+        const sessionId = voiceSessionIdRef.current;
+        if (sessionId)
+          void associateVoiceInterviewSession(
+            token,
+            sessionId,
+            conversationId,
+          ).catch(() => undefined);
+      },
+      onDisconnect: (details) => {
+        if (!activeRef.current || details.reason === "user") return;
         scheduleReconnectRef.current("The voice connection was interrupted.");
-    },
-    onMessage: ({ event_id, message, role }) => {
-      const text = message.trim();
-      if (!text || !activeRef.current) return;
-      const externalId = externalSessionIdRef.current ?? "pending";
-      const itemId = `elevenlabs:${externalId}:${event_id}`;
-      outboxRef.current.set(itemId, {
-        itemId,
-        speaker: role === "user" ? "participant" : "interviewer",
-        text,
-        provider: "elevenlabs",
-        ...(voiceSessionIdRef.current
-          ? { voiceSessionId: voiceSessionIdRef.current }
-          : {}),
-      });
-      persistOutbox();
-      void flushRef.current().catch(() => undefined);
-    },
-  });
+      },
+      onError: () => {
+        if (activeRef.current)
+          scheduleReconnectRef.current("The voice connection was interrupted.");
+      },
+      onMessage: ({ event_id, message, role }) => {
+        const text = message.trim();
+        if (!text || !activeRef.current) return;
+        const externalId = externalSessionIdRef.current ?? "pending";
+        const itemId = `elevenlabs:${externalId}:${event_id}`;
+        outboxRef.current.set(itemId, {
+          itemId,
+          speaker: role === "user" ? "participant" : "interviewer",
+          text,
+          provider: "elevenlabs",
+          ...(voiceSessionIdRef.current
+            ? { voiceSessionId: voiceSessionIdRef.current }
+            : {}),
+        });
+        persistOutbox();
+        void flushRef.current().catch(() => undefined);
+      },
+    });
 
   const flushTranscript = useCallback(async () => {
     if (flushPromiseRef.current) return flushPromiseRef.current;
@@ -278,8 +288,6 @@ export function useRealtimeInterview(
       .finally(() => {
         if (flushPromiseRef.current !== promise) return;
         flushPromiseRef.current = null;
-        if (outboxRef.current.size > 0)
-          void flushRef.current().catch(() => undefined);
       })
       .catch(() => undefined);
     return promise;
@@ -374,10 +382,15 @@ export function useRealtimeInterview(
       if (!reconnecting) setError(null);
       try {
         if (transport === "elevenlabs_webrtc") {
-          const session = await createVoiceInterviewSession(token);
-          if (generation !== generationRef.current || !activeRef.current) return;
+          const session = await (
+            createSessionRef.current ?? createVoiceInterviewSession
+          )(token);
+          if (generation !== generationRef.current || !activeRef.current)
+            return;
           if (session.transport !== "elevenlabs_webrtc")
-            throw new Error("The configured voice transport changed unexpectedly.");
+            throw new Error(
+              "The configured voice transport changed unexpectedly.",
+            );
           voiceSessionIdRef.current = session.session_id;
           externalSessionIdRef.current = session.conversation_id ?? null;
           startElevenSession({
@@ -482,6 +495,23 @@ export function useRealtimeInterview(
             type?: string;
             error?: { code?: string; type?: string };
           };
+          if (
+            [
+              "session.output_audio.delta",
+              "response.output_audio.delta",
+              "output_audio_buffer.started",
+            ].includes(liveEvent.type ?? "")
+          )
+            setActivity("speaking");
+          if (
+            [
+              "session.output_audio.done",
+              "response.output_audio.done",
+              "output_audio_buffer.stopped",
+              "input_audio_buffer.speech_started",
+            ].includes(liveEvent.type ?? "")
+          )
+            setActivity("listening");
           if (liveEvent.type === "error") {
             logVoiceDiagnostic("realtime_server_error", {
               callAttemptId: callAttemptIdRef.current,
@@ -662,10 +692,14 @@ export function useRealtimeInterview(
         // Drain the durable outbox first so its context includes the final turns
         // received just before the interrupted connection closed.
         await flushRef.current();
-        const answer = await createVoiceInterviewSession(token, sdp);
+        const answer = await (
+          createSessionRef.current ?? createVoiceInterviewSession
+        )(token, sdp);
         if (generation !== generationRef.current || !activeRef.current) return;
         if (answer.transport !== "openai_webrtc")
-          throw new Error("The configured voice transport changed unexpectedly.");
+          throw new Error(
+            "The configured voice transport changed unexpectedly.",
+          );
         voiceSessionIdRef.current = answer.session_id;
         await connection.setRemoteDescription({
           type: "answer",
@@ -793,7 +827,24 @@ export function useRealtimeInterview(
   }, [clearTimers]);
   useEffect(() => stop, [stop]);
 
-  return { error, flushTranscript, start, status, stop };
+  const [muted, setMuted] = useState(false);
+  const toggleMute = () => {
+    const next = !muted;
+    streamRef.current?.getAudioTracks().forEach((track) => {
+      track.enabled = !next;
+    });
+    setMuted(next);
+  };
+  return {
+    error,
+    flushTranscript,
+    start,
+    status,
+    stop,
+    muted,
+    toggleMute,
+    activity,
+  };
 }
 
 export const useVoiceInterview = useRealtimeInterview;

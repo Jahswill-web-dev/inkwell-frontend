@@ -28,6 +28,11 @@ vi.mock("next/navigation", () => ({
 afterEach(cleanup);
 
 beforeEach(() => {
+  window.history.replaceState(null, "", "/signup");
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue({ json: async () => ({ enabled: true }) }),
+  );
   postMock.mockReset();
   pushMock.mockReset();
   postMock.mockResolvedValue({ data: { user: {} }, status: 201 });
@@ -48,6 +53,7 @@ async function fillValidForm() {
 describe("SignupForm", () => {
   it("shows useful validation for invalid details", async () => {
     render(<SignupForm />);
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await userEvent.click(
       screen.getByRole("button", { name: "Create account" }),
@@ -65,6 +71,7 @@ describe("SignupForm", () => {
 
   it("rejects uppercase and whitespace in usernames", async () => {
     render(<SignupForm />);
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await userEvent.type(
       screen.getByLabelText("Email address"),
@@ -89,6 +96,7 @@ describe("SignupForm", () => {
 
   it("lets a user reveal and hide their password", async () => {
     render(<SignupForm />);
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     const password = screen.getByLabelText("Password", { exact: true });
 
     await userEvent.type(password, "thoughtful-password");
@@ -105,6 +113,7 @@ describe("SignupForm", () => {
 
   it("submits normalized data and opens onboarding", async () => {
     render(<SignupForm />);
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     await fillValidForm();
 
     await userEvent.click(
@@ -118,6 +127,7 @@ describe("SignupForm", () => {
           email: "writer@example.com",
           username: "writer_01",
           password: "thoughtful-password",
+          experience: "marketing",
         },
         { headers: { "Content-Type": "application/json" } },
       ),
@@ -134,6 +144,7 @@ describe("SignupForm", () => {
         }),
     );
     render(<SignupForm />);
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     await fillValidForm();
 
     await userEvent.click(
@@ -160,6 +171,7 @@ describe("SignupForm", () => {
       response: { data: { error: { code, message } } },
     });
     render(<SignupForm />);
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     await fillValidForm();
 
     await userEvent.click(
@@ -193,6 +205,7 @@ describe("SignupForm", () => {
       },
     });
     render(<SignupForm />);
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     await fillValidForm();
 
     await userEvent.click(
@@ -210,6 +223,7 @@ describe("SignupForm", () => {
   it("shows a retryable alert when registration is unavailable", async () => {
     postMock.mockRejectedValue({ isAxiosError: true });
     render(<SignupForm />);
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     await fillValidForm();
 
     await userEvent.click(
@@ -223,4 +237,16 @@ describe("SignupForm", () => {
       screen.getByRole("button", { name: "Create account" }),
     ).toBeEnabled();
   });
+});
+
+it("persists consultant selection across reload and submits it", async () => {
+  window.history.replaceState(null, "", "/signup?experience=consultant");
+  render(<SignupForm />);
+  await screen.findByLabelText("Email address");
+  await fillValidForm();
+  await userEvent.click(screen.getByRole("button", { name: "Create account" }));
+  await waitFor(() =>
+    expect(pushMock).toHaveBeenCalledWith("/consultant/onboarding"),
+  );
+  expect(postMock.mock.calls[0][1].experience).toBe("consultant");
 });

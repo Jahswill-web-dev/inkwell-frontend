@@ -4,6 +4,7 @@ test("renders the responsive signup experience without overflow", async ({
   page,
 }) => {
   await page.goto("/signup");
+  await page.getByRole("button", { name: "Continue" }).click();
 
   await expect(
     page.getByRole("heading", {
@@ -27,6 +28,7 @@ test("validates signup details and toggles password visibility", async ({
   page,
 }) => {
   await page.goto("/signup");
+  await page.getByRole("button", { name: "Continue" }).click();
 
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page.getByText("Enter a valid email address.")).toBeVisible();
@@ -55,6 +57,7 @@ test("registers through the same-origin endpoint and opens onboarding", async ({
       email: "writer@example.com",
       username: "writer_01",
       password: "thoughtful-password",
+      experience: "marketing",
     });
     await route.fulfill({
       status: 201,
@@ -71,6 +74,7 @@ test("registers through the same-origin endpoint and opens onboarding", async ({
     });
   });
   await page.goto("/signup");
+  await page.getByRole("button", { name: "Continue" }).click();
 
   await page.getByLabel("Email address").fill(" Writer@Example.com ");
   await page.getByLabel("Username").fill("writer_01");
@@ -98,6 +102,7 @@ test("shows duplicate username errors returned by registration", async ({
     });
   });
   await page.goto("/signup");
+  await page.getByRole("button", { name: "Continue" }).click();
 
   await page.getByLabel("Email address").fill("writer@example.com");
   await page.getByLabel("Username").fill("writer_01");

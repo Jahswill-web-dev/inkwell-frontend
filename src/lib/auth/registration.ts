@@ -7,6 +7,7 @@ export const registrationMessages = {
 } as const;
 
 export const registrationSchema = z.object({
+  experience: z.enum(["marketing", "consultant"]).optional(),
   email: z
     .string()
     .trim()
@@ -43,6 +44,7 @@ export const loginSchema = z.object({
 });
 
 export const publicUserSchema = z.object({
+  preferred_experience: z.enum(["marketing", "consultant"]).optional(),
   id: z.string().uuid(),
   email: z.string().email(),
   username: z.string(),

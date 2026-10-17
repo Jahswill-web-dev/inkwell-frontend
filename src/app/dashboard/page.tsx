@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { DashboardHome } from "@/components/dashboard/dashboard-home";
 import { requireUser } from "@/lib/auth/session";
@@ -10,5 +11,6 @@ export const metadata: Metadata = {
 
 export default async function DashboardPage() {
   const user = await requireUser("/dashboard");
+  if (user.preferred_experience === "consultant") redirect("/consultant");
   return <DashboardHome user={toAuthIdentity(user)} />;
 }

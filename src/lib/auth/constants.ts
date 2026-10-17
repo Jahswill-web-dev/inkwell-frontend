@@ -17,6 +17,8 @@ export function safeProtectedPath(value: string | null | undefined): string {
   try {
     const url = new URL(value, "http://inkwell.local");
     const isProtected =
+      url.pathname === "/consultant" ||
+      url.pathname.startsWith("/consultant/") ||
       url.pathname === "/onboarding" ||
       url.pathname === "/dashboard" ||
       url.pathname.startsWith("/dashboard/") ||

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ExperienceSwitcher } from "@/components/consultant/experience-switcher";
 import { Plus } from "@phosphor-icons/react";
 import styles from "./dashboard.module.css";
 
@@ -6,6 +7,7 @@ export function WorkspaceHeader({ firstName }: { firstName: string }) {
   return (
     <header className={styles.workspaceIntro}>
       <div>
+        <ExperienceSwitcher />
         <p className={styles.eyebrow}>Content workspace</p>
         <h1>Keep every client article moving.</h1>
         <p className={styles.workspaceSummary}>

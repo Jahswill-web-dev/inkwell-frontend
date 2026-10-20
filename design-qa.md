@@ -1,56 +1,52 @@
-# Agency landing-page design QA
+# Export popover design QA
 
-**Comparison target**
+## Evidence
 
-- Product visual truth: the user-supplied agency screens, preserved at `public/images/landing/agency-flow/`:
-  - `agency-article-setup.png` (1350 × 653)
-  - `editorial-direction.png` (1352 × 642)
-  - `expertise-collection.png` (1350 × 638)
-  - `private-interview-link.png` (1348 × 653)
-  - `client-interview-workspace.png` (1354 × 636)
-- Implementation: `http://localhost:3000/`, rendered in the Codex in-app browser.
-- Desktop evidence: 1440 × 1000 CSS px, device scale factor 1.
-- Mobile evidence: 390 × 844 CSS px, device scale factor 1.
-- Browser-rendered screenshot evidence: in-app browser captures from this QA pass. The browser surface does not persist its captures as local files.
-- State: default landing page, `#how-it-works` anchor, and opened/closed mobile navigation.
+- Source visual truth: `C:\Users\Dell\.codex\generated_images\01a154e2-7c44-7b43-b8f9-abd270d9f29c\exec-3e2f4737-feab-4a4f-81c5-9d79b9b20b27.png`
+- Browser-rendered desktop implementation: `C:\Users\Dell\Documents\useinkwell\inkwell-frontend\test-results\consultant-export-open-chromium.png`
+- Focused desktop component: `C:\Users\Dell\Documents\useinkwell\inkwell-frontend\test-results\consultant-export-popover-chromium.png`
+- Focused mobile component: `C:\Users\Dell\Documents\useinkwell\inkwell-frontend\test-results\consultant-export-popover-mobile-chromium.png`
+- Combined comparison: `C:\Users\Dell\Documents\useinkwell\inkwell-frontend\test-results\consultant-export-design-comparison.png`
+- State: export popover open after a successful Copy to clipboard action.
+- Desktop viewport: 1280 x 720 CSS px at device scale factor 1. The full-page capture is 1280 x 762 px and the focused popover is 601 x 397 px.
+- Mobile viewport: Pixel 5 emulation at 393 x 727 CSS px and device scale factor 2.75. The focused popover capture is 993 x 1095 px.
+- Source pixels: 1536 x 1024. The concept crop and implementation full view were proportionally resized into the 1480 x 700 comparison canvas; no fidelity judgment was based on raw pixel density.
 
-**Findings**
+## Full-view comparison
 
-- No actionable P0, P1, or P2 findings.
-- The first desktop pass wrapped the new agency headline too aggressively. The hero measure was widened and display size tuned; the revised desktop pass presents it in two balanced lines.
+The implementation preserves the selected concept's hierarchy: a crimson-accented Export trigger opens a white anchored surface; the editorial heading and supporting text lead into one emphasized copy action and two quieter download rows. The production version is intentionally more compact in the existing consultant toolbar, while preserving the concept's visual weight and scan order. The popover remains fully visible in both tested responsive layouts.
 
-**Required fidelity surfaces**
+## Focused comparison
 
-- Fonts and typography: preserved the existing Newsreader display / Manrope UI pairing from the approved Inkwell product screens. The agency message uses the same editorial hierarchy on desktop and mobile.
-- Spacing and layout rhythm: preserved the warm-paper background, centered marketing composition, airy image treatment, card framing, and alternating feature rows. The five-stage workflow becomes a vertical scan on mobile.
-- Colors and visual tokens: retained Inkwell navy, crimson, muted text, warm-paper, and border tokens. The active interview step uses crimson consistently with the product screens.
-- Image quality and asset fidelity: all visible product screenshots are the supplied real application captures, copied unchanged at their native dimensions. `ResponsiveProductImage` now accepts source dimensions to avoid aspect-ratio drift and layout shift.
-- Copy and content: the page now accurately explains the agency flow: editorial setup, client/expert interview choice, private AI interview link, source review, and writer-ready handoff.
+The focused captures confirm the Newsreader/Manrope typography pairing, warm paper and white surfaces, navy text, crimson emphasis, fine dividers, restrained radius and shadow, Phosphor icons, descriptive row copy, and inline Copied confirmation. No raster product assets are present in the source; vector UI icons appropriately use the existing Phosphor library.
 
-**Interaction evidence**
+## Findings
 
-- Desktop `See the client flow` scrolled to `#how-it-works`.
-- On mobile, the menu opened with keyboard focus on `How it works` and closed after it was selected.
-- Browser console: no errors.
-- Focused landing component tests: 5 passing.
-- Type checking: passing.
+No actionable P0, P1, or P2 differences remain.
 
-**Comparison history**
+- Fonts and typography: display and UI font roles, weights, wrapping, and hierarchy match the concept at production scale.
+- Spacing and layout rhythm: the anchor, header padding, highlighted row, separators, row spacing, radius, and elevation are consistent and responsive.
+- Colors and visual tokens: cream, white, navy, muted ink, and crimson semantic states follow existing Inkwell tokens and the selected design.
+- Image and icon fidelity: there are no photographic or illustrative assets. Icons come from the project's Phosphor icon package and remain sharp at both densities.
+- Copy and content: labels and descriptions match the selected direction and explain each export outcome.
+- Accessibility and interaction: the trigger exposes expanded state and menu semantics; Escape closes the popover; disabled, hover, focus, success, and download states work.
 
-1. Replaced the generic writer-first product story with the user-supplied agency screens and current client-interview workflow.
-2. Updated screenshots to preserve their native aspect ratios in the responsive image component.
-3. Tuned the desktop hero measure after visual inspection, then rechecked desktop and mobile layouts plus primary navigation.
+## Comparison history
 
-**Implementation checklist**
+1. Initial comparison found one P2 state mismatch: keyboard focus changed the copied row to a blue surface, while the selected design retained a warm crimson tint.
+2. The primary row's hover and focus styling was corrected to `#fff0f1`.
+3. Post-fix desktop and mobile captures show the copied state using the intended warm tint. Copy feedback and Markdown download both pass, and the browser console reports no errors.
 
-- [x] Use the supplied agency application screens as real landing-page assets.
-- [x] Explain the private AI client interview and structured writer handoff.
-- [x] Preserve responsive image proportions and accessible alternative text.
-- [x] Keep desktop and mobile navigation functional.
-- [x] Verify browser rendering, interaction states, and console errors.
+## Verification
 
-**Follow-up polish**
+- TypeScript typecheck passed.
+- ESLint passed for the changed consultant component and E2E test.
+- Desktop and mobile Chromium interaction tests passed: 2 tests.
+- Primary interactions tested: open, Escape close, copy feedback, Markdown download, and responsive rendering.
+- Browser console errors checked: none.
 
-- [P3] Add dedicated, full-height mobile product captures if a future campaign needs legible text inside every screenshot at a very narrow viewport.
+## Follow-up polish
+
+No blocking follow-up is required. A future iteration could add an optional keyboard shortcut only after the product implements that shortcut behavior.
 
 final result: passed

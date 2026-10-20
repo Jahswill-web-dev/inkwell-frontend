@@ -16,7 +16,6 @@ export default async function ConsultantLayout({
         </Link>
         <nav className={styles.links} aria-label="Consultant navigation">
           <Link href="/consultant">My articles</Link>
-          <Link href="/consultant/voice">My voice</Link>
           <Link href="/consultant/settings">Settings</Link>
         </nav>
         <ExperienceSwitcher current="consultant" />

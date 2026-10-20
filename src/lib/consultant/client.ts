@@ -19,24 +19,11 @@ export async function consultantRequest<T>(
     );
   return value as T;
 }
-export type Voice = {
-  vocabulary: string[];
-  explanation_patterns: string;
-  analogies: string;
-  formality: string;
-  rhythm: string;
-  perspective: string;
-  avoid: string[];
-  excerpts: string[];
-};
 export type Profile = {
   display_name: string;
   specialty: string;
   audience: string;
   onboarding_complete: boolean;
-  voice: Partial<Voice>;
-  suggested_voice: Voice | null;
-  voice_revision: number;
 };
 export type Turn = {
   item_id: string;
@@ -67,6 +54,9 @@ export type Revision = {
   sections: Section[];
   gaps: string[];
   created_at: string;
+  request?: string;
+  summary?: string;
+  sources?: { id: string; title: string; url: string }[];
 };
 export type Article = {
   id: string;
@@ -79,6 +69,8 @@ export type Article = {
     state: string;
     stage: string;
     error: string | null;
+    attempts: number;
+    instruction?: string;
   } | null;
   sections: Section[];
   draft_updated_at: string | null;

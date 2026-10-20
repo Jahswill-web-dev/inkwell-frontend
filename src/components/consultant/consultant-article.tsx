@@ -1,31 +1,67 @@
 "use client";
+import {
+  CaretDown,
+  CheckCircle,
+  Code,
+  Copy,
+  DownloadSimple,
+  Export,
+  PencilSimple,
+  Sparkle,
+  X,
+} from "@phosphor-icons/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   consultantRequest as api,
   type Article,
-  type Interview,
   type Revision,
   type Section,
 } from "@/lib/consultant/client";
 import { DraftRichSection } from "@/components/articles/draft-editor/draft-rich-section";
-import { ConsultantVoice } from "./consultant-voice";
 import styles from "./consultant.module.css";
-function plainText(value: unknown): string {
-  if (!value || typeof value !== "object") return "";
-  const node = value as { text?: string; children?: unknown[]; type?: string };
-  return (
-    (node.text ?? "") +
-    (node.children?.map(plainText).join(node.type === "root" ? "\n\n" : "") ??
-      "")
-  );
+type ExportNode = {
+  type?: string;
+  text?: string;
+  url?: string;
+  children?: ExportNode[];
+};
+function safeSourceUrl(url: string | undefined): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    return ["http:", "https:"].includes(parsed.protocol) ? parsed.href : null;
+  } catch {
+    return null;
+  }
+}
+function markdownNode(node: ExportNode): string {
+  const content =
+    (node.children ?? []).map(markdownNode).join("") || node.text || "";
+  if (node.type === "link") {
+    const url = safeSourceUrl(node.url);
+    return url ? `[${content}](${url})` : content;
+  }
+  return node.type === "paragraph" ? `${content}\n\n` : content;
+}
+function htmlNode(node: ExportNode): string {
+  const content =
+    (node.children ?? []).map(htmlNode).join("") || escapeHtml(node.text || "");
+  if (node.type === "link") {
+    const url = safeSourceUrl(node.url);
+    return url
+      ? `<a href="${escapeHtml(url)}" rel="noopener noreferrer">${content}</a>`
+      : content;
+  }
+  return node.type === "paragraph" ? `<p>${content}</p>` : content;
 }
 function markdown(title: string, sections: Section[]) {
   return (
     `# ${title}\n\n` +
     sections
       .map(
-        (s) => `## ${s.title}\n\n${plainText(JSON.parse(s.editor_state).root)}`,
+        (s) =>
+          `## ${s.title}\n\n${markdownNode(JSON.parse(s.editor_state).root).trim()}`,
       )
       .join("\n\n")
   );
@@ -37,6 +73,43 @@ function escapeHtml(text: string) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
 }
+
+function withoutHeadingNumber(title: string) {
+  return title.replace(/^\s*\d+[.)]\s+/, "");
+}
+
+function normalizeArticleHeadings(article: Article): Article {
+  const normalize = (section: Section) => ({
+    ...section,
+    title: withoutHeadingNumber(section.title).trim(),
+  });
+  return {
+    ...article,
+    sections: article.sections.map(normalize),
+    revisions: article.revisions.map((revision) => ({
+      ...revision,
+      sections: revision.sections.map(normalize),
+    })),
+  };
+}
+
+function revisionLabel(kind: string) {
+  if (kind === "proposal") return "Rewrite proposal";
+  if (kind === "generated") return "Generated draft";
+  return `${kind.charAt(0).toUpperCase()}${kind.slice(1)} draft`;
+}
+
+function sectionsMatch(left: Section[], right: Section[]) {
+  return (
+    left.length === right.length &&
+    left.every(
+      (section, index) =>
+        section.title === right[index]?.title &&
+        section.editor_state === right[index]?.editor_state,
+    )
+  );
+}
+
 export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
   const router = useRouter();
   const [article, setArticle] = useState<Article | null>(null);
@@ -46,11 +119,28 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailTitle, setDetailTitle] = useState("");
+  const [detailDescription, setDetailDescription] = useState("");
+  const [exportOpen, setExportOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [instruction, setInstruction] = useState("");
+  const assistantInputRef = useRef<HTMLTextAreaElement>(null);
+  const assistantTriggerRef = useRef<HTMLButtonElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
   const [preview, setPreview] = useState<Revision | null>(null);
-  const [transcripts, setTranscripts] = useState<Interview[] | null>(null);
+  const [previewMode, setPreviewMode] = useState<"version" | "compare">(
+    "version",
+  );
+  const previewDialogRef = useRef<HTMLElement>(null);
+  const previewCloseButtonRef = useRef<HTMLButtonElement>(null);
+  const previewTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [editorVersion, setEditorVersion] = useState(0);
   const reload = useCallback(async () => {
-    const a = await api<Article>(`articles/${articleId}`);
+    const a = normalizeArticleHeadings(
+      await api<Article>(`articles/${articleId}`),
+    );
     setArticle(a);
     if (!dirtyRef.current) setSections(a.sections);
     return a;
@@ -58,8 +148,9 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
   useEffect(() => {
     let active = true;
     api<Article>(`articles/${articleId}`)
-      .then((a) => {
+      .then((response) => {
         if (active) {
+          const a = normalizeArticleHeadings(response);
           setArticle(a);
           setSections(a.sections);
         }
@@ -80,6 +171,35 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
     return () => clearInterval(timer);
   }, [article?.job, reload]);
   useEffect(() => {
+    if (!exportOpen) return;
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!exportMenuRef.current?.contains(event.target as Node)) {
+        setExportOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setExportOpen(false);
+    };
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [exportOpen]);
+  useEffect(() => {
+    if (!assistantOpen || preview) return;
+    assistantInputRef.current?.focus();
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setAssistantOpen(false);
+        assistantTriggerRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onEscape);
+    return () => window.removeEventListener("keydown", onEscape);
+  }, [assistantOpen, preview]);
+  useEffect(() => {
     const warn = (e: BeforeUnloadEvent) => {
       if (dirtyRef.current) {
         e.preventDefault();
@@ -89,7 +209,56 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, []);
-  async function run(action: () => Promise<void>) {
+  useEffect(() => {
+    if (!preview) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const focusFrame = window.requestAnimationFrame(() =>
+      previewCloseButtonRef.current?.focus(),
+    );
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setPreview(null);
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = previewDialogRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable?.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      window.requestAnimationFrame(() => previewTriggerRef.current?.focus());
+    };
+  }, [preview]);
+
+  function openPreview(revision: Revision, trigger: HTMLButtonElement) {
+    previewTriggerRef.current = trigger;
+    setPreviewMode("compare");
+    setPreview(revision);
+  }
+
+  function closePreview() {
+    setPreview(null);
+  }
+  async function run(action: () => Promise<unknown>) {
     setBusy(true);
     setError("");
     setNotice("");
@@ -110,8 +279,26 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
     );
     dirtyRef.current = false;
     setDirty(false);
-    await reload();
+    const updated = await reload();
     setNotice("Draft saved.");
+    return updated;
+  }
+  async function requestAIChange() {
+    const requestText = instruction.trim();
+    if (requestText.length < 3) return;
+    const current = dirty ? await save() : article;
+    if (!current?.draft_updated_at) return;
+    await api(
+      `articles/${articleId}/ai-requests`,
+      "POST",
+      {
+        instruction: requestText,
+        request_key: crypto.randomUUID(),
+      },
+      { "If-Unmodified-Since": current.draft_updated_at },
+    );
+    await reload();
+    setNotice("Your suggestion is being prepared.");
   }
   async function start() {
     const i = await api<{ id: string }>(
@@ -120,23 +307,14 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
     );
     router.push(`/consultant/interviews/${i.id}`);
   }
-  async function generate(instruction: string) {
-    if (dirty) await save();
-    const interview = article?.interviews.at(-1);
-    if (!interview) return;
-    await api(`interviews/${interview.id}/generate`, "POST", {
-      request_key: crypto.randomUUID(),
-      instruction,
-    });
-    await reload();
-  }
   async function exportDraft(format: "copy" | "markdown" | "html") {
     if (!article) return;
     if (dirty) await save();
     const md = markdown(article.title, sections);
     if (format === "copy") {
       await navigator.clipboard.writeText(md);
-      setNotice("Draft copied.");
+      setCopied(true);
+      setNotice("Article copied to clipboard.");
       return;
     }
     const content =
@@ -145,12 +323,7 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
         : `<!doctype html><html lang="en"><meta charset="utf-8"><title>${escapeHtml(article.title)}</title><body><h1>${escapeHtml(article.title)}</h1>${sections
             .map(
               (s) =>
-                `<h2>${escapeHtml(s.title)}</h2>${plainText(
-                  JSON.parse(s.editor_state).root,
-                )
-                  .split("\n\n")
-                  .map((p) => `<p>${escapeHtml(p)}</p>`)
-                  .join("")}`,
+                `<h2>${escapeHtml(s.title)}</h2>${htmlNode(JSON.parse(s.editor_state).root)}`,
             )
             .join("")}</body></html>`;
     const url = URL.createObjectURL(
@@ -166,6 +339,7 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
     link.download = `${article.title.replace(/[^a-z0-9]+/gi, "-").slice(0, 80)}.${format === "html" ? "html" : "md"}`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setExportOpen(false);
     setNotice("Draft exported.");
   }
   if (!article)
@@ -176,74 +350,203 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
     );
   const generating =
     article.job && ["queued", "running"].includes(article.job.state);
+  const aiJob =
+    article.job &&
+    !["initial", "clearer", "concise", "closer", "updated"].includes(
+      article.job.instruction ?? "initial",
+    );
+  const proposal = article.revisions[0];
+  const generationSteps = [
+    { id: "understand", label: "Understand your argument and voice" },
+    { id: "write", label: "Write the article" },
+    { id: "check", label: "Check it against your interview" },
+  ];
+  const activeStage = generationSteps.findIndex(
+    (step) => step.id === article.job?.stage,
+  );
+  const previewHasDifferences = preview
+    ? !sectionsMatch(sections, preview.sections)
+    : false;
+  const savedDetailTitle = article.title;
+  const savedDetailDescription = article.description;
+  const detailsDirty =
+    detailTitle !== savedDetailTitle ||
+    detailDescription !== savedDetailDescription;
+
+  function resetArticleDetails() {
+    setDetailTitle(savedDetailTitle);
+    setDetailDescription(savedDetailDescription);
+  }
+
   return (
     <>
       <p className={styles.eyebrow}>My article</p>
       <h1>{article.title}</h1>
-      <details>
-        <summary>Edit article details</summary>
-        <form
-          className={`${styles.form} ${styles.card}`}
-          onSubmit={(event) => {
-            event.preventDefault();
-            const data = new FormData(event.currentTarget);
-            void run(async () => {
-              await api(`articles/${articleId}/details`, "PUT", {
-                title: data.get("title"),
-                description: data.get("description"),
-              });
-              await reload();
-              setNotice("Article details saved.");
-            });
+      <div className={styles.articleDetails}>
+        <button
+          aria-controls="article-details-panel"
+          aria-expanded={detailsOpen}
+          className={styles.articleDetailsTrigger}
+          onClick={() => {
+            resetArticleDetails();
+            setDetailsOpen((open) => !open);
           }}
+          type="button"
         >
-          <label>
-            Working title
-            <input
-              name="title"
-              defaultValue={article.title}
-              required
-              maxLength={200}
-            />
-          </label>
-          <label>
-            What is it about?
-            <textarea
-              name="description"
-              defaultValue={article.description}
-              required
-              maxLength={20000}
-            />
-          </label>
-          <button className={styles.secondary} disabled={busy || !!generating}>
-            Save article details
-          </button>
-        </form>
-      </details>
+          <PencilSimple aria-hidden="true" size={19} weight="bold" />
+          <span>Article details</span>
+          <CaretDown
+            aria-hidden="true"
+            className={detailsOpen ? styles.articleDetailsCaretOpen : ""}
+            size={16}
+            weight="bold"
+          />
+        </button>
+        {detailsOpen && (
+          <form
+            className={styles.articleDetailsPanel}
+            id="article-details-panel"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void run(async () => {
+                await api(`articles/${articleId}/details`, "PUT", {
+                  title: detailTitle,
+                  description: detailDescription,
+                });
+                await reload();
+                setNotice("Article details saved.");
+              });
+            }}
+          >
+            <header className={styles.articleDetailsHeader}>
+              <h2>Article details</h2>
+              <p>
+                Set the title and short brief used when drafting and exporting.
+              </p>
+            </header>
+            <div className={styles.articleDetailsBody}>
+              <label className={styles.articleDetailsField}>
+                <span className={styles.articleDetailsLabel}>
+                  <span>Working title</span>
+                  <span aria-hidden="true">{detailTitle.length}/200</span>
+                </span>
+                <input
+                  aria-label="Working title"
+                  name="title"
+                  value={detailTitle}
+                  onChange={(event) => setDetailTitle(event.target.value)}
+                  required
+                  maxLength={200}
+                />
+              </label>
+              <label className={styles.articleDetailsField}>
+                <span className={styles.articleDetailsLabel}>
+                  <span>Article brief</span>
+                  <span aria-hidden="true">
+                    {detailDescription.length.toLocaleString()}/20,000
+                  </span>
+                </span>
+                <textarea
+                  aria-label="Article brief"
+                  name="description"
+                  value={detailDescription}
+                  onChange={(event) => setDetailDescription(event.target.value)}
+                  required
+                  maxLength={20000}
+                />
+                <small>
+                  A short summary to guide the drafting process and keep the
+                  content focused.
+                </small>
+              </label>
+            </div>
+            <footer className={styles.articleDetailsFooter}>
+              <span aria-live="polite" className={styles.articleDetailsStatus}>
+                {detailsDirty ? "Unsaved changes" : ""}
+              </span>
+              <div className={styles.articleDetailsActions}>
+                <button
+                  className={styles.secondary}
+                  disabled={busy}
+                  onClick={() => {
+                    resetArticleDetails();
+                    setDetailsOpen(false);
+                  }}
+                  type="button"
+                >
+                  Cancel
+                </button>
+                <button
+                  className={styles.primary}
+                  disabled={busy || !!generating || !detailsDirty}
+                  type="submit"
+                >
+                  Save changes
+                </button>
+              </div>
+            </footer>
+          </form>
+        )}
+      </div>
       {error && (
         <p role="alert" className={styles.error}>
           {error}
         </p>
       )}
       {notice && <p role="status">{notice}</p>}
-      {generating && (
-        <section className={styles.card} aria-live="polite">
-          <h2>
-            {article.job?.state === "queued"
-              ? "Your draft is queued"
-              : ({
-                  understand: "Finding your argument and voice",
-                  write: "Writing your article",
-                  check: "Checking the draft against your interview",
-                }[article.job!.stage] ?? "Creating your draft")}
-          </h2>
+      {generating && !aiJob && (
+        <section
+          className={`${styles.card} ${styles.generationCard}`}
+          aria-live="polite"
+          role="status"
+        >
+          <div className={styles.generationHeading}>
+            <span className={styles.spinner} aria-hidden="true" />
+            <div>
+              <p className={styles.eyebrow}>Draft in progress</p>
+              <h2>
+                {article.job?.state === "queued"
+                  ? article.job.attempts > 0
+                    ? "Your draft will retry shortly"
+                    : "Your draft is waiting to begin"
+                  : ({
+                      understand: "Finding your argument and voice",
+                      write: "Writing your article",
+                      check: "Checking the draft against your interview",
+                    }[article.job!.stage] ?? "Creating your draft")}
+              </h2>
+            </div>
+          </div>
+          <ol className={styles.generationSteps}>
+            {generationSteps.map((step, index) => {
+              const complete =
+                article.job?.state === "running" && index < activeStage;
+              const current =
+                article.job?.state === "running" && index === activeStage;
+              return (
+                <li
+                  key={step.id}
+                  className={
+                    complete
+                      ? styles.stepComplete
+                      : current
+                        ? styles.stepCurrent
+                        : styles.stepPending
+                  }
+                >
+                  <span aria-hidden="true">{complete ? "✓" : index + 1}</span>
+                  {step.label}
+                </li>
+              );
+            })}
+          </ol>
           <p>
             You can leave this page. Your interview is saved, and drafting
             continues in the background.
           </p>
         </section>
       )}
-      {article.job?.state === "failed" && (
+      {article.job?.state === "failed" && !aiJob && (
         <section className={styles.card}>
           <p>{article.job.error}</p>
           <button
@@ -285,46 +588,100 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
               {dirty ? "Save changes" : "Saved"}
             </button>
             <button
-              className={styles.secondary}
-              disabled={busy || !!generating || dirty}
-              onClick={() => void run(start)}
+              aria-controls="consultant-ai-drawer"
+              aria-expanded={assistantOpen}
+              className={`${styles.primary} ${styles.assistantTrigger}`}
+              onClick={() => setAssistantOpen((open) => !open)}
+              ref={assistantTriggerRef}
+              type="button"
             >
-              Add more detail
+              <Sparkle aria-hidden="true" size={18} weight="fill" />
+              {proposal
+                ? "Review AI suggestion"
+                : generating && aiJob
+                  ? "AI is working"
+                  : "Ask AI"}
             </button>
-            <button
-              className={styles.secondary}
-              disabled={busy}
-              onClick={() =>
-                void run(async () => {
-                  setTranscripts(
-                    await Promise.all(
-                      article.interviews.map((i) =>
-                        api<Interview>(`interviews/${i.id}`),
-                      ),
-                    ),
-                  );
-                })
-              }
-            >
-              View interview
-            </button>
-            <details>
-              <summary>Export</summary>
-              <div className={styles.actions}>
-                {(["copy", "markdown", "html"] as const).map((format) => (
+            <div className={styles.exportMenu} ref={exportMenuRef}>
+              <button
+                aria-expanded={exportOpen}
+                aria-haspopup="menu"
+                className={styles.exportTrigger}
+                disabled={busy}
+                onClick={() => {
+                  setCopied(false);
+                  setExportOpen((open) => !open);
+                }}
+              >
+                <Export aria-hidden="true" size={20} />
+                Export
+                <CaretDown
+                  aria-hidden="true"
+                  className={exportOpen ? styles.exportCaretOpen : ""}
+                  size={16}
+                />
+              </button>
+              {exportOpen && (
+                <section
+                  aria-label="Export article"
+                  className={styles.exportPopover}
+                  role="menu"
+                >
+                  <header className={styles.exportHeader}>
+                    <h2>Export article</h2>
+                    <p>Choose how you’d like to use your draft.</p>
+                  </header>
                   <button
-                    key={format}
-                    className={styles.secondary}
+                    className={`${styles.exportOption} ${styles.exportOptionPrimary}`}
                     disabled={busy}
-                    onClick={() => void run(() => exportDraft(format))}
+                    onClick={() => void run(() => exportDraft("copy"))}
+                    role="menuitem"
                   >
-                    {format === "copy"
-                      ? "Copy draft"
-                      : `Download ${format.toUpperCase()}`}
+                    <Copy aria-hidden="true" size={24} />
+                    <span>
+                      <strong>Copy to clipboard</strong>
+                      <small>Paste into Docs, Notion, or your CMS</small>
+                    </span>
+                    {copied && (
+                      <span className={styles.exportSuccess} role="status">
+                        <CheckCircle
+                          aria-hidden="true"
+                          size={20}
+                          weight="fill"
+                        />
+                        Copied
+                      </span>
+                    )}
                   </button>
-                ))}
-              </div>
-            </details>
+                  <button
+                    className={styles.exportOption}
+                    disabled={busy}
+                    onClick={() => void run(() => exportDraft("markdown"))}
+                    role="menuitem"
+                  >
+                    <DownloadSimple aria-hidden="true" size={24} />
+                    <span>
+                      <strong>Download Markdown</strong>
+                      <small>
+                        Best for writing tools and publishing workflows
+                      </small>
+                    </span>
+                  </button>
+                  <button
+                    className={styles.exportOption}
+                    disabled={busy}
+                    onClick={() => void run(() => exportDraft("html"))}
+                    role="menuitem"
+                  >
+                    <Code aria-hidden="true" size={24} />
+                    <span>
+                      <strong>Download HTML</strong>
+                      <small>Ready for websites and email editors</small>
+                    </span>
+                  </button>
+                </section>
+              )}
+            </div>
           </div>
           <p className={styles.muted}>
             {dirty
@@ -341,6 +698,18 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
                   editorState: s.editor_state,
                 }}
                 index={index}
+                onTitleChange={(id, title) => {
+                  setSections((current) =>
+                    current.map((section) =>
+                      section.id === id
+                        ? { ...section, title: withoutHeadingNumber(title) }
+                        : section,
+                    ),
+                  );
+                  dirtyRef.current = true;
+                  setDirty(true);
+                }}
+                showSectionNumber={false}
                 onChange={(id, state) => {
                   setSections((current) => {
                     const next = current.map((s) =>
@@ -354,214 +723,428 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
               />
             ))}
           </div>
-          <div className={styles.actions}>
-            {(
-              [
-                ["clearer", "Make this clearer"],
-                ["concise", "Make this more concise"],
-                ["closer", "Closer to my interview wording"],
-              ] as const
-            ).map(([instruction, label]) => (
-              <button
-                className={styles.secondary}
-                key={instruction}
-                disabled={busy || !!generating}
-                onClick={() => void run(() => generate(instruction))}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
           <p className={styles.muted}>
-            Rewrites create a proposal for you to review. Your current draft
-            stays intact.
+            Ask AI to improve this article. You will review the full suggestion
+            before it replaces your draft.
           </p>
-          <ConsultantVoice
-            compact
-            key={article.job?.id + (article.job?.state ?? "")}
-          />
         </>
       )}
-      {transcripts && (
-        <section className={styles.card}>
-          <h2>Interview source material</h2>
-          <p>
-            Corrections apply to future drafts. Exclude anything you do not want
-            used.
-          </p>
-          {transcripts.map((interview) => (
-            <div key={interview.id}>
-              {interview.turns.map((turn) => (
-                <div key={turn.item_id} className={styles.turn}>
-                  <strong>
-                    {turn.speaker === "participant" ? "You" : "Inkwell"}
-                  </strong>
-                  <textarea
-                    className={styles.input}
-                    aria-label={`${turn.speaker} transcript correction`}
-                    value={
-                      interview.corrections[turn.item_id]?.text ?? turn.text
-                    }
-                    onChange={(e) =>
-                      setTranscripts((current) =>
-                        current!.map((i) =>
-                          i.id !== interview.id
-                            ? i
-                            : {
-                                ...i,
-                                corrections: {
-                                  ...i.corrections,
-                                  [turn.item_id]: {
-                                    excluded:
-                                      i.corrections[turn.item_id]?.excluded ??
-                                      false,
-                                    text: e.target.value,
-                                  },
-                                },
-                              },
-                        ),
-                      )
-                    }
-                  />
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={
-                        interview.corrections[turn.item_id]?.excluded ?? false
-                      }
-                      onChange={(e) =>
-                        setTranscripts((current) =>
-                          current!.map((i) =>
-                            i.id !== interview.id
-                              ? i
-                              : {
-                                  ...i,
-                                  corrections: {
-                                    ...i.corrections,
-                                    [turn.item_id]: {
-                                      text:
-                                        i.corrections[turn.item_id]?.text ??
-                                        null,
-                                      excluded: e.target.checked,
-                                    },
-                                  },
-                                },
-                          ),
-                        )
-                      }
-                    />{" "}
-                    Do not use
-                  </label>
-                </div>
-              ))}
+      {assistantOpen && sections.length > 0 && (
+        <aside
+          aria-label="Ask AI to improve this article"
+          className={styles.assistantDrawer}
+          id="consultant-ai-drawer"
+        >
+          <header className={styles.assistantHeader}>
+            <div>
+              <p className={styles.eyebrow}>Your writing partner</p>
+              <h2>Ask AI to improve this draft</h2>
             </div>
-          ))}
-          <button
-            className={styles.primary}
-            disabled={busy || !!generating}
-            onClick={() =>
-              void run(async () => {
-                for (const i of transcripts)
-                  await api(`interviews/${i.id}/corrections`, "PUT", {
-                    corrections: i.corrections,
-                  });
-                await generate("updated");
-                setNotice("Corrections saved. Creating a new proposal.");
-              })
-            }
-          >
-            Save corrections and create proposal
-          </button>
-        </section>
-      )}
-      {article.revisions.length > 0 && (
-        <section className={styles.card}>
-          <h2>Draft versions</h2>
-          {article.revisions.slice(0, 20).map((r) => (
-            <div className={styles.row} key={r.id}>
-              <span>
-                {r.kind === "proposal" ? "New draft proposal" : r.kind} ·{" "}
-                {new Date(r.created_at).toLocaleString()}
-              </span>
-              <button
-                className={styles.secondary}
-                onClick={() => setPreview(r)}
+            <button
+              aria-label="Close Ask AI"
+              className={styles.previewClose}
+              onClick={() => {
+                setAssistantOpen(false);
+                assistantTriggerRef.current?.focus();
+              }}
+              type="button"
+            >
+              <X aria-hidden="true" size={20} />
+            </button>
+          </header>
+          <div className={styles.assistantBody}>
+            {proposal ? (
+              <div className={styles.assistantResult} role="status">
+                <span className={styles.assistantResultIcon}>
+                  <CheckCircle size={20} weight="fill" />
+                </span>
+                <h3>Your suggestion is ready</h3>
+                <p>
+                  {proposal.summary ||
+                    "Review the proposed article before replacing your current draft."}
+                </p>
+                {proposal.request && (
+                  <p className={styles.assistantRequest}>
+                    Your request: “{proposal.request}”
+                  </p>
+                )}
+                {(proposal.sources?.length ?? 0) > 0 && (
+                  <div className={styles.assistantSources}>
+                    <strong>Sources used</strong>
+                    {proposal.sources?.map((source) => (
+                      <a
+                        href={source.url}
+                        key={source.id}
+                        rel="noopener noreferrer"
+                        target="_blank"
+                      >
+                        {source.title}
+                      </a>
+                    ))}
+                  </div>
+                )}
+                {proposal.request &&
+                  /\b(source|citation|research|real.world|study|statistics?)\b/i.test(
+                    proposal.request,
+                  ) &&
+                  !proposal.sources?.length && (
+                    <p className={styles.assistantSourceNote}>
+                      No verifiable public source was found. Check the full
+                      proposal for any omitted examples.
+                    </p>
+                  )}
+                <button
+                  className={styles.primary}
+                  onClick={(event) =>
+                    openPreview(proposal, event.currentTarget)
+                  }
+                  type="button"
+                >
+                  Review full article
+                </button>
+              </div>
+            ) : generating && aiJob ? (
+              <div
+                aria-live="polite"
+                className={styles.assistantProgress}
+                role="status"
               >
-                Review version
+                <p className={styles.assistantRequest}>
+                  Your request: “{article.job?.instruction}”
+                </p>
+                <span className={styles.spinner} aria-hidden="true" />
+                <h3>Preparing your preview</h3>
+                <ol>
+                  <li
+                    className={
+                      article.job?.stage === "understand"
+                        ? styles.stepCurrent
+                        : styles.stepComplete
+                    }
+                  >
+                    Reading your draft and interview
+                  </li>
+                  <li
+                    className={
+                      article.job?.stage === "research"
+                        ? styles.stepCurrent
+                        : ""
+                    }
+                  >
+                    Finding sources when needed
+                  </li>
+                  <li
+                    className={
+                      article.job?.stage === "write" ? styles.stepCurrent : ""
+                    }
+                  >
+                    Writing the suggestion
+                  </li>
+                  <li
+                    className={
+                      article.job?.stage === "check" ? styles.stepCurrent : ""
+                    }
+                  >
+                    Checking the result
+                  </li>
+                </ol>
+                <p>Your saved draft stays unchanged while this runs.</p>
+              </div>
+            ) : (
+              <form
+                id="consultant-ai-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void run(requestAIChange);
+                }}
+              >
+                {aiJob && article.job?.state === "failed" && (
+                  <div className={styles.assistantFailure} role="alert">
+                    <strong>We couldn’t prepare the suggestion.</strong>
+                    <p>{article.job.error}</p>
+                    {!/draft changed/i.test(article.job.error ?? "") && (
+                      <button
+                        className={styles.secondary}
+                        disabled={busy}
+                        onClick={() =>
+                          void run(async () => {
+                            await api(`jobs/${article.job!.id}/retry`, "POST");
+                            await reload();
+                          })
+                        }
+                        type="button"
+                      >
+                        Retry request
+                      </button>
+                    )}
+                  </div>
+                )}
+                <label
+                  className={styles.assistantLabel}
+                  htmlFor="consultant-ai-instruction"
+                >
+                  What would you like to change?
+                </label>
+                <textarea
+                  id="consultant-ai-instruction"
+                  maxLength={1200}
+                  onChange={(event) => setInstruction(event.target.value)}
+                  placeholder="Describe a change you’d like to see in the article…"
+                  ref={assistantInputRef}
+                  required
+                  value={instruction}
+                />
+                <div className={styles.assistantSuggestions}>
+                  <span>Try asking</span>
+                  {[
+                    "Make the article more structured",
+                    "Add real-world examples with sources",
+                    "Make the opening clearer",
+                  ].map((suggestion) => (
+                    <button
+                      key={suggestion}
+                      onClick={() => {
+                        setInstruction(suggestion);
+                        assistantInputRef.current?.focus();
+                      }}
+                      type="button"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              </form>
+            )}
+          </div>
+          <footer className={styles.assistantFooter}>
+            {!proposal && !(generating && aiJob) && (
+              <button
+                className={styles.primary}
+                disabled={busy || !!generating || instruction.trim().length < 3}
+                form="consultant-ai-form"
+                type="submit"
+              >
+                <Sparkle aria-hidden="true" size={18} /> Generate preview
               </button>
-            </div>
-          ))}
-        </section>
+            )}
+            <span>Your draft changes only when you approve a preview.</span>
+          </footer>
+        </aside>
       )}
       {preview && (
-        <section className={styles.card}>
-          <h2>Review draft version</h2>
-          {preview.sections.map((s, index) => (
-            <DraftRichSection
-              key={`preview:${preview.id}:${s.id}`}
-              section={{
-                ...s,
-                outlineSectionId: s.outline_section_id,
-                editorState: s.editor_state,
-              }}
-              index={index}
-              readOnly
-            />
-          ))}
-          {preview.gaps.length > 0 && (
-            <>
-              <h3>Useful details to add</h3>
-              <ul>
-                {preview.gaps.map((g, i) => (
-                  <li key={i}>{g}</li>
-                ))}
-              </ul>
-            </>
-          )}
-          <div className={styles.actions}>
-            <button
-              className={styles.primary}
-              disabled={busy || dirty}
-              onClick={() =>
-                void run(async () => {
-                  await api(
-                    `articles/${articleId}/revisions/${preview.id}/apply`,
-                    "POST",
-                    undefined,
-                    { "If-Unmodified-Since": article.draft_updated_at ?? "" },
-                  );
-                  await reload();
-                  setEditorVersion((v) => v + 1);
-                  setPreview(null);
-                  setNotice(
-                    "Version applied. Your previous draft remains in version history.",
-                  );
-                })
-              }
-            >
-              Use this version
-            </button>
-            <button
-              className={styles.secondary}
-              onClick={() => setPreview(null)}
-            >
-              Close preview
-            </button>
-          </div>
-          {dirty && (
-            <p>Save your current changes before applying another version.</p>
-          )}
-        </section>
-      )}
-      {article.revisions[0]?.gaps.length > 0 && (
-        <section className={styles.card}>
-          <h2>Useful details to add</h2>
-          <ul>
-            {article.revisions[0].gaps.map((gap, index) => (
-              <li key={index}>{gap}</li>
-            ))}
-          </ul>
-        </section>
+        <div
+          className={styles.previewBackdrop}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closePreview();
+          }}
+        >
+          <section
+            aria-labelledby="consultant-version-preview-title"
+            aria-modal="true"
+            className={styles.previewDialog}
+            ref={previewDialogRef}
+            role="dialog"
+          >
+            <header className={styles.previewHeader}>
+              <div>
+                <p className={styles.eyebrow}>Suggested rewrite</p>
+                <h2 id="consultant-version-preview-title">
+                  Preview suggested rewrite
+                </h2>
+                <div className={styles.previewMetadata}>
+                  <span>{preview.request || revisionLabel(preview.kind)}</span>
+                  <span aria-hidden="true">·</span>
+                  <time dateTime={preview.created_at}>
+                    {new Date(preview.created_at).toLocaleString()}
+                  </time>
+                </div>
+              </div>
+              <button
+                aria-label="Close rewrite preview"
+                className={styles.previewClose}
+                onClick={closePreview}
+                ref={previewCloseButtonRef}
+              >
+                <X aria-hidden="true" size={22} />
+              </button>
+            </header>
+
+            {(preview.summary || (preview.sources?.length ?? 0) > 0) && (
+              <div className={styles.previewSummary}>
+                {preview.summary && <p>{preview.summary}</p>}
+                {(preview.sources?.length ?? 0) > 0 && (
+                  <p>
+                    Sources:{" "}
+                    {preview.sources?.map((source, index) => (
+                      <span key={source.id}>
+                        {index > 0 ? " · " : ""}
+                        <a
+                          href={source.url}
+                          rel="noopener noreferrer"
+                          target="_blank"
+                        >
+                          {source.title}
+                        </a>
+                      </span>
+                    ))}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {previewHasDifferences && (
+              <div
+                aria-label="Rewrite preview view"
+                className={styles.previewToggle}
+                role="group"
+              >
+                <button
+                  aria-pressed={previewMode === "version"}
+                  className={previewMode === "version" ? styles.active : ""}
+                  onClick={() => setPreviewMode("version")}
+                >
+                  Rewrite only
+                </button>
+                <button
+                  aria-pressed={previewMode === "compare"}
+                  className={previewMode === "compare" ? styles.active : ""}
+                  onClick={() => setPreviewMode("compare")}
+                >
+                  Compare with current
+                </button>
+              </div>
+            )}
+
+            <div className={styles.previewBody}>
+              {previewMode === "compare" && previewHasDifferences ? (
+                <div className={styles.comparisonGrid}>
+                  <article className={styles.comparisonPane}>
+                    <h3>Current draft</h3>
+                    {sections.map((section, index) => (
+                      <DraftRichSection
+                        key={`current:${section.id}`}
+                        section={{
+                          ...section,
+                          outlineSectionId: section.outline_section_id,
+                          editorState: section.editor_state,
+                        }}
+                        index={index}
+                        readOnly
+                        showSectionNumber={false}
+                      />
+                    ))}
+                  </article>
+                  <article
+                    className={`${styles.comparisonPane} ${styles.proposedPane}`}
+                  >
+                    <h3>Suggested rewrite</h3>
+                    {preview.sections.map((section, index) => {
+                      const original = sections[index];
+                      const changed =
+                        !original ||
+                        original.title !== section.title ||
+                        original.editor_state !== section.editor_state;
+                      return (
+                        <div
+                          className={changed ? styles.changedSection : ""}
+                          key={`compare:${preview.id}:${section.id}`}
+                        >
+                          {changed && (
+                            <span className={styles.changeLabel}>Changed</span>
+                          )}
+                          <DraftRichSection
+                            section={{
+                              ...section,
+                              outlineSectionId: section.outline_section_id,
+                              editorState: section.editor_state,
+                            }}
+                            index={index}
+                            readOnly
+                            showSectionNumber={false}
+                          />
+                        </div>
+                      );
+                    })}
+                  </article>
+                </div>
+              ) : (
+                <article className={styles.versionPreview}>
+                  {preview.sections.map((section, index) => (
+                    <DraftRichSection
+                      key={`preview:${preview.id}:${section.id}`}
+                      section={{
+                        ...section,
+                        outlineSectionId: section.outline_section_id,
+                        editorState: section.editor_state,
+                      }}
+                      index={index}
+                      readOnly
+                      showSectionNumber={false}
+                    />
+                  ))}
+                </article>
+              )}
+            </div>
+
+            <footer className={styles.previewFooter}>
+              <div>
+                <strong>Ready to switch?</strong>
+                <span>This will replace your current draft.</span>
+                {dirty && (
+                  <span className={styles.previewWarning}>
+                    Save your current changes before applying this version.
+                  </span>
+                )}
+              </div>
+              <div className={styles.previewActions}>
+                <button
+                  className={styles.secondary}
+                  disabled={busy}
+                  onClick={() =>
+                    void run(async () => {
+                      await api(
+                        `articles/${articleId}/revisions/${preview.id}`,
+                        "DELETE",
+                      );
+                      await reload();
+                      setPreview(null);
+                      setInstruction("");
+                      setNotice(
+                        "Suggestion rejected. Your draft is unchanged.",
+                      );
+                    })
+                  }
+                >
+                  Reject change
+                </button>
+                <button
+                  className={styles.primary}
+                  disabled={busy || dirty}
+                  onClick={() =>
+                    void run(async () => {
+                      await api(
+                        `articles/${articleId}/revisions/${preview.id}/apply`,
+                        "POST",
+                        undefined,
+                        {
+                          "If-Unmodified-Since": article.draft_updated_at ?? "",
+                        },
+                      );
+                      await reload();
+                      setEditorVersion((v) => v + 1);
+                      setPreview(null);
+                      setAssistantOpen(false);
+                      setInstruction("");
+                      setNotice("Draft updated with the suggested rewrite.");
+                    })
+                  }
+                >
+                  Use this version
+                </button>
+              </div>
+            </footer>
+          </section>
+        </div>
       )}
     </>
   );

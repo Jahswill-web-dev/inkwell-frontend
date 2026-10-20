@@ -5,7 +5,7 @@ Inkwell supports two writing experiences in one account:
 - **Content marketing:** manage clients and work through source collection, briefs, outlines,
   section drafting, review, and export.
 - **Consultant:** describe an article, talk through it in a live or typed interview, and receive
-  a structured draft in your voice. Review voice preferences, edit drafts, and accept revisions explicitly.
+  a structured draft based on that conversation. Edit drafts and accept revisions explicitly.
 
 Consultants use a separate personal workspace. Switching experiences does not move articles or change
 permissions. Existing marketing accounts and workflows remain supported.
@@ -198,7 +198,6 @@ npm run start
 | `/consultant/new` | Working title, description, optional reader/takeaway/length |
 | `/consultant/interviews/[interviewId]` | Live or typed conversation, persisted transcript, pause/resume/finish |
 | `/consultant/articles/[articleId]` | Generation progress, rich-text editing, proposals, transcript, and export |
-| `/consultant/voice` | Approved voice preferences and suggested updates |
 | `/consultant/settings` | Consultant profile settings |
 
 Signup keeps the experience and form step in URL parameters so Back and refresh preserve the
@@ -239,7 +238,6 @@ Paths in this table follow `/api/consultant` in the browser (or `/api/v1/consult
 | GET | `/availability` | Signup feature visibility |
 | GET / PUT | `/experience` | Read or select enabled experience |
 | GET / PUT | `/profile` | Read or save onboarding/settings |
-| PUT | `/voice` | Save, approve, dismiss, or reset preferences |
 | GET / POST | `/articles` | Dashboard listing or minimal article creation |
 | GET | `/articles/{article_id}` | Article, accepted sections, revisions, latest generation job |
 | PUT | `/articles/{article_id}/details` | Working title and topic changes |
@@ -305,9 +303,9 @@ work remains accessible. Frontend deployment alone neither migrates the database
   produce proposals that must be previewed and explicitly applied; manual edits are preserved.
 - Draft saves and revision application send the exact `draft_updated_at` value in
   `If-Unmodified-Since`. On a conflict, reload before saving; never overwrite a newer draft blindly.
-- The editor reuses Lexical sections. Transcript corrections, missing information, and voice suggestions
-  stay outside article prose. Only approved voice preferences carry into later articles.
-- Copy, Markdown, and HTML export use the accepted draft and exclude transcript/voice metadata.
+- The editor reuses Lexical sections. Transcript corrections stay outside article prose. Each draft
+  derives its wording and explanation style from its own interview.
+- Copy, Markdown, and HTML export use the accepted draft and exclude transcript metadata.
   Export does not mark the article published. Save edits before exporting them.
 
 ### Consultant implementation map
@@ -320,7 +318,6 @@ work remains accessible. Frontend deployment alone neither migrates the database
 | `src/components/consultant/consultant-start.tsx` | Dashboard, onboarding/settings, article setup |
 | `src/components/consultant/consultant-interview.tsx` | Live and typed interview orchestration |
 | `src/components/consultant/consultant-article.tsx` | Jobs, editing, proposals, transcript corrections, exports |
-| `src/components/consultant/consultant-voice.tsx` | Approved and suggested voice preferences |
 | `src/components/consultant/experience-switcher.tsx` | Persistent experience selection |
 | `src/components/interview/use-realtime-interview.ts` | Shared live transport and transcript outbox |
 | `e2e/consultant.spec.ts` | Desktop/mobile consultant flow tests with mocked APIs |

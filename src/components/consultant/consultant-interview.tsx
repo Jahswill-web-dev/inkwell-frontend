@@ -42,6 +42,11 @@ function ConsultantInterviewContent({ interviewId }: { interviewId: string }) {
       .then(setInterview)
       .catch((e) => setError(e.message));
   }, [interviewId]);
+  useEffect(() => {
+    if (interview?.state === "completed") {
+      router.replace(`/consultant/articles/${interview.article_id}`);
+    }
+  }, [interview, router]);
   const voice = useRealtimeInterview(
     `consultant:${interviewId}`,
     "openai_webrtc",
@@ -137,12 +142,17 @@ function ConsultantInterviewContent({ interviewId }: { interviewId: string }) {
   if (interview.state === "completed")
     return (
       <>
-        <h1>Your interview is saved.</h1>
+        <p className={styles.eyebrow}>Interview complete</p>
+        <h1>Opening your draft progress…</h1>
+        <p className={styles.muted}>
+          Your interview is saved and draft generation continues in the
+          background.
+        </p>
         <Link
           className={styles.primary}
           href={`/consultant/articles/${interview.article_id}`}
         >
-          View draft progress
+          Open draft progress
         </Link>
       </>
     );

@@ -398,6 +398,31 @@
 .articleSection > h2[aria-current="location"] {
   color: var(--color-ink-crimson);
 }
+.sectionTitleInput {
+  display: block;
+  width: 100%;
+  margin: 29px 0 8px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: #07143d;
+  padding: 0 0 3px;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 1.52rem;
+  font-weight: 650;
+  line-height: 1.25;
+}
+.sectionTitleInput:hover {
+  border-bottom-color: var(--color-ink-line);
+}
+.sectionTitleInput:focus {
+  border-bottom-color: var(--color-ink-crimson);
+  outline: 0;
+}
+.sectionTitleInput[aria-current="location"] {
+  color: var(--color-ink-crimson);
+}
 
 .editorShell {
   position: relative;
@@ -1585,6 +1610,10 @@
 }
 
 @media (max-width: 800px) {
+  .sectionTitleInput {
+    margin-top: 24px;
+    font-size: 1.3rem;
+  }
   .desktopWorkspace,
   .page > aside {
     display: none;

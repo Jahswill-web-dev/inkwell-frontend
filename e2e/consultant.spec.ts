@@ -141,10 +141,19 @@ test("article details panel supports cancel and save", async ({ page }) => {
   });
 });
 
-test("minimal article proceeds to authenticated typed interview and queues its draft", async ({
+test("minimal article opens a voice-only interview and queues its draft", async ({
   page,
 }) => {
-  let turns: { item_id: string; speaker: string; text: string }[] = [];
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: {
+        getUserMedia: async () => {
+          throw new DOMException("Microphone unavailable", "NotAllowedError");
+        },
+      },
+    });
+  });
   let finished = false;
   await page.route("**/api/consultant/**", async (route) => {
     const path = new URL(route.request().url()).pathname.replace(
@@ -163,16 +172,6 @@ test("minimal article proceeds to authenticated typed interview and queues its d
     }
     if (path === `articles/${articleId}/interviews`)
       return route.fulfill({ json: { id: interviewId } });
-    if (path === `interviews/${interviewId}/answer`) {
-      turns = [
-        {
-          item_id: "one",
-          speaker: "participant",
-          text: route.request().postDataJSON().text,
-        },
-      ];
-      return route.fulfill({ json: { complete: false, saved: true } });
-    }
     if (path === `interviews/${interviewId}/finish`) {
       finished = true;
       return route.fulfill({ json: { id: "job", state: "queued" } });
@@ -185,7 +184,18 @@ test("minimal article proceeds to authenticated typed interview and queues its d
           title: "Better handoffs",
           description: "Tools cannot solve unclear ownership.",
           state: "active",
-          turns,
+          turns: [
+            {
+              item_id: "one",
+              speaker: "interviewer",
+              text: "What should readers understand?",
+            },
+            {
+              item_id: "two",
+              speaker: "participant",
+              text: "I call it expensive confusion.",
+            },
+          ],
           corrections: {},
           questions: [{ id: "0", text: "What should readers understand?" }],
         },
@@ -222,14 +232,25 @@ test("minimal article proceeds to authenticated typed interview and queues its d
     .fill("Tools cannot solve unclear ownership.");
   await page.getByRole("button", { name: "Start my interview" }).click();
   await page.getByRole("button", { name: "Prepare my interview" }).click();
-  await page.getByRole("button", { name: "Answer by typing" }).click();
-  await page
-    .getByLabel("What should readers understand?")
-    .fill(
-      "I call it expensive confusion. Decide who owns the next step before buying a tool.",
-    );
-  await page.getByRole("button", { name: "Send answer" }).click();
-  await expect(page.getByText(/I call it expensive confusion/)).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Check microphone" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Answer by typing" }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Start conversation" }).click();
+  await expect(page.getByRole("button", { name: "Mute" })).toBeVisible();
+  await expect(page.getByLabel("Interview duration")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Pause|Resume/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Interview transcript" }),
+  ).toHaveCount(0);
+  await expect(page.getByText("I call it expensive confusion.")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Switch to typing" }),
+  ).toHaveCount(0);
   await page.getByRole("button", { name: "Finish and create draft" }).click();
   await expect(page).toHaveURL(`/consultant/articles/${articleId}`);
   await expect(

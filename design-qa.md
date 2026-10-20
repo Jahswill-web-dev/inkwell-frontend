@@ -50,3 +50,26 @@ No actionable P0, P1, or P2 differences remain.
 No blocking follow-up is required. A future iteration could add an optional keyboard shortcut only after the product implements that shortcut behavior.
 
 final result: passed
+
+# Consultant voice interview design QA
+
+## Evidence
+
+- Selected design: `C:\Users\Dell\.codex\generated_images\01a154e2-7c44-7b43-b8f9-abd270d9f29c\exec-6ea6c868-90e0-4626-9f57-c607881ce61d.png`
+- Browser-rendered desktop: `C:\Users\Dell\Documents\useinkwell\inkwell-frontend\test-results\voice-interview-desktop.jpg` at 1440 × 1024 CSS px.
+- Browser-rendered mobile: `C:\Users\Dell\Documents\useinkwell\inkwell-frontend\test-results\voice-interview-mobile.jpg` at 390 × 844 CSS px.
+- Rendered state: connecting, using a mock interview without a live voice provider. The selected design shows the listening state.
+
+## Comparison
+
+The implementation follows the selected centered composition: small crimson eyebrow, editorial title and supporting copy, luminous crimson/navy orb with an in-orb voice status, elapsed time, and Mute, Pause, and Finish controls. It uses the existing Inkwell page header and fonts. The orb scales down on phone and short viewports so the primary action stays visible. Status-specific animation is present for listening and speaking, and reduced-motion settings disable it.
+
+The browser comparison found one P2 mobile issue: the Finish action initially sat below the 844 px fold. The orb size was reduced at that viewport; the final capture shows all controls inside the screen. No remaining P0, P1, or P2 differences were found.
+
+## Verification
+
+- TypeScript, ESLint, and Prettier checks passed.
+- Focused consultant interview browser test passed in desktop and mobile Chrome: 2 tests.
+- The browser preview confirmed layout and connecting state. A live microphone-to-provider conversation was outside this mock preview.
+
+final result: passed

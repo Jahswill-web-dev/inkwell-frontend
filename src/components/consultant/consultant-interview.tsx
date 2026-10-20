@@ -3,6 +3,15 @@ import { useEffect, useRef, useState } from "react";
 import { ConversationProvider } from "@elevenlabs/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
+import {
+  Microphone,
+  MicrophoneSlash,
+  Pause,
+  Play,
+  Stop,
+  Waveform,
+} from "@phosphor-icons/react";
 import {
   consultantRequest as api,
   type Interview,
@@ -25,13 +34,10 @@ function ConsultantInterviewContent({ interviewId }: { interviewId: string }) {
   const router = useRouter();
   const [interview, setInterview] = useState<Interview | null>(null);
   const [error, setError] = useState("");
-  const [mode, setMode] = useState<"prepare" | "voice" | "typed">("prepare");
-  const [answer, setAnswer] = useState("");
+  const [started, setStarted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const finishing = useRef(false);
-  const answerId = useRef(crypto.randomUUID());
-  const [micStatus, setMicStatus] = useState("");
   async function reload() {
     const next = await api<Interview>(`interviews/${interviewId}`);
     setInterview(next);
@@ -70,15 +76,6 @@ function ConsultantInterviewContent({ interviewId }: { interviewId: string }) {
         await api(`interviews/${interviewId}/transcript`, "POST", {
           turns: [saved],
         });
-        setInterview(
-          (current) =>
-            current && {
-              ...current,
-              turns: current.turns.some((t) => t.item_id === saved.item_id)
-                ? current.turns
-                : [...current.turns, saved],
-            },
-        );
       },
       onComplete: () => {
         void finish();
@@ -108,31 +105,6 @@ function ConsultantInterviewContent({ interviewId }: { interviewId: string }) {
       finishing.current = false;
     }
   }
-  async function submit(skip = false) {
-    if (!skip && !answer.trim()) return;
-    setBusy(true);
-    setError("");
-    try {
-      const result = await api<{ complete: boolean }>(
-        `interviews/${interviewId}/answer`,
-        "POST",
-        {
-          item_id: answerId.current,
-          text: skip ? "Skip this question" : answer,
-          skip,
-        },
-      );
-      answerId.current = crypto.randomUUID();
-      setAnswer("");
-      await reload();
-      if (result.complete) await finish();
-    } catch (e) {
-      setError((e as Error).message);
-      await reload().catch(() => {});
-    } finally {
-      setBusy(false);
-    }
-  }
   if (!interview)
     return (
       <p role={error ? "alert" : "status"}>
@@ -156,193 +128,153 @@ function ConsultantInterviewContent({ interviewId }: { interviewId: string }) {
         </Link>
       </>
     );
-  const lastQuestion =
-    [...interview.turns].reverse().find((t) => t.speaker === "interviewer")
-      ?.text ?? interview.questions[0]?.text;
+  const voiceState = busy
+    ? "saving"
+    : voice.status === "connected"
+      ? voice.muted
+        ? "muted"
+        : voice.activity
+      : voice.status;
+  const voiceLabel = {
+    saving: "Creating your draft",
+    listening: "Inkwell is listening",
+    speaking: "Inkwell is speaking",
+    muted: "Microphone muted",
+    idle: "Conversation paused",
+    connecting: "Connecting…",
+    reconnecting: "Reconnecting",
+    error: "Connection lost",
+  }[voiceState];
+  const elapsed = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
   return (
     <>
-      <p className={styles.eyebrow}>Your interview</p>
-      <h1>{interview.title}</h1>
-      <p>{interview.description}</p>
-      <p className={styles.muted}>
-        Your conversation is transcribed. Finishing automatically creates your
-        draft. You can pause and return later.
-      </p>
-      {(error || voice.error) && (
-        <p role="alert" className={styles.error}>
-          {error || voice.error}
-        </p>
-      )}
-      {mode === "prepare" ? (
-        <section className={styles.card}>
-          <h2>Let’s talk through your idea.</h2>
-          <p>
-            Inkwell will ask about your perspective, examples, and practical
-            advice. Allow about 10–15 minutes.
+      {!started ? (
+        <>
+          <p className={styles.eyebrow}>Your interview</p>
+          <h1>{interview.title}</h1>
+          <p>{interview.description}</p>
+          <p className={styles.muted}>
+            Your conversation is transcribed. Finishing automatically creates
+            your draft. You can pause and return later.
           </p>
-          <div className={styles.actions}>
+          {(error || voice.error) && (
+            <p role="alert" className={styles.error}>
+              {error || voice.error}
+            </p>
+          )}
+          <section className={styles.card}>
+            <h2>Let’s talk through your idea.</h2>
+            <p>
+              Inkwell will ask about your perspective, examples, and practical
+              advice. Allow about 10–15 minutes.
+            </p>
+            <div className={styles.actions}>
+              <button
+                className={styles.primary}
+                onClick={() => {
+                  setStarted(true);
+                  voice.start();
+                }}
+              >
+                Start conversation
+              </button>
+            </div>
+          </section>
+        </>
+      ) : (
+        <section
+          className={styles.voiceExperience}
+          data-voice-state={voiceState}
+        >
+          <div className={styles.voiceHeading}>
+            <p className={styles.eyebrow}>Your interview</p>
+            <h1>{interview.title}</h1>
+            <p>{interview.description}</p>
+          </div>
+          {(error || voice.error) && (
+            <p role="alert" className={styles.error}>
+              {error || voice.error}
+            </p>
+          )}
+          <div className={styles.voiceStage}>
+            <Image
+              alt=""
+              aria-hidden="true"
+              className={styles.voiceOrbImage}
+              src="/images/consultant/voice-orb.png"
+              width={640}
+              height={640}
+              priority
+            />
+            <div
+              className={styles.voiceOrbContent}
+              role="status"
+              aria-live="polite"
+            >
+              <h2>{voiceLabel}</h2>
+              <Waveform aria-hidden="true" size={40} weight="bold" />
+            </div>
+          </div>
+          <time className={styles.voiceElapsed} aria-label="Interview duration">
+            {elapsed}
+          </time>
+          <div className={styles.voiceControls}>
             <button
-              className={styles.secondary}
+              className={styles.voiceControl}
+              type="button"
+              aria-pressed={voice.muted}
+              disabled={busy || voice.status !== "connected"}
+              onClick={voice.toggleMute}
+            >
+              {voice.muted ? (
+                <MicrophoneSlash aria-hidden="true" size={22} weight="bold" />
+              ) : (
+                <Microphone aria-hidden="true" size={22} weight="bold" />
+              )}
+              {voice.muted ? "Unmute" : "Mute"}
+            </button>
+            <button
+              className={styles.voiceControl}
+              type="button"
+              disabled={
+                busy ||
+                voice.status === "connecting" ||
+                voice.status === "reconnecting"
+              }
               onClick={async () => {
-                try {
-                  const stream = await navigator.mediaDevices.getUserMedia({
-                    audio: true,
-                  });
-                  stream.getTracks().forEach((t) => t.stop());
-                  setMicStatus("Microphone is ready.");
-                } catch {
-                  setMicStatus(
-                    "Microphone unavailable. Check permissions or answer by typing.",
-                  );
+                if (voice.status === "idle" || voice.status === "error")
+                  voice.start();
+                else {
+                  voice.stop();
+                  try {
+                    await voice.flushTranscript();
+                    await api(`interviews/${interviewId}/pause`, "POST");
+                  } catch (e) {
+                    setError((e as Error).message);
+                  }
                 }
               }}
             >
-              Check microphone
-            </button>
-            <span role="status">{micStatus}</span>
-          </div>
-          <div className={styles.actions}>
-            <button
-              className={styles.primary}
-              onClick={() => {
-                setMode("voice");
-                voice.start();
-              }}
-            >
-              Start conversation
+              {voice.status === "idle" || voice.status === "error" ? (
+                <Play aria-hidden="true" size={22} weight="fill" />
+              ) : (
+                <Pause aria-hidden="true" size={22} weight="fill" />
+              )}
+              {voice.status === "idle" || voice.status === "error"
+                ? "Resume"
+                : "Pause"}
             </button>
             <button
-              className={styles.secondary}
-              onClick={() => setMode("typed")}
+              className={styles.voiceFinish}
+              type="button"
+              disabled={busy}
+              onClick={() => void finish()}
             >
-              Answer by typing
+              <Stop aria-hidden="true" size={20} weight="fill" />
+              {busy ? "Saving…" : "Finish and create draft"}
             </button>
           </div>
         </section>
-      ) : (
-        <>
-          <div className={styles.actions}>
-            <span className={styles.status} role="status">
-              {mode === "typed"
-                ? "Written conversation"
-                : voice.status === "connected"
-                  ? voice.activity === "speaking"
-                    ? "Inkwell is speaking"
-                    : "Listening to you"
-                  : voice.status === "idle"
-                    ? "Paused"
-                    : voice.status}{" "}
-              · {Math.floor(seconds / 60)}:
-              {String(seconds % 60).padStart(2, "0")}
-            </span>
-            {mode === "voice" && (
-              <>
-                <button className={styles.secondary} onClick={voice.toggleMute}>
-                  {voice.muted ? "Unmute" : "Mute"}
-                </button>
-                <button
-                  className={styles.secondary}
-                  onClick={async () => {
-                    if (voice.status === "idle" || voice.status === "error")
-                      voice.start();
-                    else {
-                      voice.stop();
-                      try {
-                        await voice.flushTranscript();
-                        await api(`interviews/${interviewId}/pause`, "POST");
-                      } catch (e) {
-                        setError((e as Error).message);
-                      }
-                    }
-                  }}
-                >
-                  {voice.status === "idle" || voice.status === "error"
-                    ? "Resume"
-                    : "Pause"}
-                </button>
-                <button
-                  className={styles.secondary}
-                  onClick={async () => {
-                    voice.stop();
-                    try {
-                      await voice.flushTranscript();
-                      setMode("typed");
-                    } catch (e) {
-                      setError((e as Error).message);
-                    }
-                  }}
-                >
-                  Switch to typing
-                </button>
-              </>
-            )}
-          </div>
-          <p className={styles.muted}>Current question: {lastQuestion}</p>
-          <section
-            className={`${styles.card} ${styles.transcript}`}
-            aria-label="Interview transcript"
-            aria-live="polite"
-          >
-            {interview.turns.map((turn) => (
-              <div
-                key={turn.item_id}
-                className={`${styles.turn} ${turn.speaker === "participant" ? styles.participant : ""}`}
-              >
-                <strong>
-                  {turn.speaker === "participant" ? "You" : "Inkwell"}
-                </strong>
-                <p>{turn.text}</p>
-              </div>
-            ))}
-            {interview.turns.length === 0 && <p>Ready when you are.</p>}
-          </section>
-          {mode === "typed" && (
-            <form
-              className={styles.form}
-              onSubmit={(e) => {
-                e.preventDefault();
-                void submit();
-              }}
-            >
-              <label>
-                {lastQuestion}
-                <textarea
-                  value={answer}
-                  onChange={(e) => setAnswer(e.target.value)}
-                  maxLength={20000}
-                  disabled={busy}
-                />
-              </label>
-              <div className={styles.actions}>
-                <button
-                  disabled={busy || !answer.trim()}
-                  className={styles.primary}
-                >
-                  Send answer
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  className={styles.secondary}
-                  onClick={() => void submit(true)}
-                >
-                  Skip question
-                </button>
-              </div>
-            </form>
-          )}
-          <button
-            className={styles.primary}
-            disabled={busy || (mode === "typed" && !!answer.trim())}
-            onClick={() => void finish()}
-          >
-            {busy ? "Saving…" : "Finish and create draft"}
-          </button>
-          <p className={styles.muted}>
-            Only server-acknowledged turns appear above. Send any typed answer
-            before finishing.
-          </p>
-        </>
       )}
     </>
   );

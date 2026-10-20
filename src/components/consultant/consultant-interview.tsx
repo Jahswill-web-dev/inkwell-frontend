@@ -150,13 +150,7 @@ function ConsultantInterviewContent({ interviewId }: { interviewId: string }) {
     <>
       {!started ? (
         <>
-          <p className={styles.eyebrow}>Your interview</p>
           <h1>{interview.title}</h1>
-          <p>{interview.description}</p>
-          <p className={styles.muted}>
-            Your conversation is transcribed. Finishing automatically creates
-            your draft. You can pause and return later.
-          </p>
           {(error || voice.error) && (
             <p role="alert" className={styles.error}>
               {error || voice.error}
@@ -187,9 +181,7 @@ function ConsultantInterviewContent({ interviewId }: { interviewId: string }) {
           data-voice-state={voiceState}
         >
           <div className={styles.voiceHeading}>
-            <p className={styles.eyebrow}>Your interview</p>
             <h1>{interview.title}</h1>
-            <p>{interview.description}</p>
           </div>
           {(error || voice.error) && (
             <p role="alert" className={styles.error}>

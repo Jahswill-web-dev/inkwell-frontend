@@ -547,8 +547,8 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
         </section>
       )}
       {article.job?.state === "failed" && !aiJob && (
-        <section className={styles.card}>
-          <p>{article.job.error}</p>
+        <section className={styles.card} role="alert">
+          <p className={styles.generationFailureText}>{article.job.error}</p>
           <button
             className={styles.primary}
             disabled={busy}
@@ -861,8 +861,12 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
                 {aiJob && article.job?.state === "failed" && (
                   <div className={styles.assistantFailure} role="alert">
                     <strong>We couldn’t prepare the suggestion.</strong>
-                    <p>{article.job.error}</p>
-                    {!/draft changed/i.test(article.job.error ?? "") && (
+                    <p className={styles.generationFailureText}>
+                      {article.job.error}
+                    </p>
+                    {!article.job.error?.startsWith(
+                      "Your draft changed while this suggestion was generated.",
+                    ) && (
                       <button
                         className={styles.secondary}
                         disabled={busy}

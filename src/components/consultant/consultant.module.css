@@ -1246,26 +1246,18 @@
 .voiceHeading {
   max-width: 760px;
 }
-.voiceHeading .eyebrow {
-  margin: 0;
-}
 .voiceHeading h1 {
-  margin: 14px 0 8px;
-  font-size: clamp(34px, 4vw, 50px);
-}
-.voiceHeading > p:last-child {
   margin: 0;
-  color: var(--color-ink-navy);
-  font-size: clamp(15px, 1.6vw, 18px);
+  font-size: clamp(34px, 4vw, 50px);
 }
 .voiceStage {
   position: relative;
   display: grid;
-  width: min(560px, max(250px, calc(100dvh - 430px)), 100%);
+  width: min(600px, max(340px, calc(100dvh - 320px)), 100%);
   aspect-ratio: 1;
   flex: 0 0 auto;
   place-items: center;
-  margin: 12px auto 0;
+  margin: 16px auto 0;
 }
 .voiceOrbImage {
   width: 100%;
@@ -1275,19 +1267,24 @@
 }
 .voiceOrbContent {
   position: absolute;
+  inset: 0;
   z-index: 1;
-  display: grid;
-  width: 60%;
-  place-items: center;
-  gap: 20px;
+  display: flex;
+  width: 58%;
+  height: 58%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: auto;
   color: #fff;
 }
 .voiceOrbContent h2 {
-  max-width: 260px;
+  width: 100%;
   margin: 0;
   color: #fff;
-  font-size: clamp(20px, 2.1vw, 29px);
-  line-height: 1.08;
+  font-size: clamp(20px, 2.1vw, 30px);
+  line-height: 1.12;
   text-wrap: balance;
 }
 .voiceOrbContent svg {
@@ -1358,26 +1355,35 @@
   opacity: 0.55;
 }
 .voiceExperience[data-voice-state="listening"] .voiceOrbImage {
-  animation: voice-orb-breathe 3.2s ease-in-out infinite;
+  animation: voice-orb-listening 3.6s ease-in-out infinite;
 }
 .voiceExperience[data-voice-state="speaking"] .voiceOrbImage {
-  animation: voice-orb-breathe 1.8s ease-in-out infinite;
+  animation: voice-orb-speaking 1.45s ease-in-out infinite;
 }
 .voiceExperience[data-voice-state="speaking"] .voiceOrbContent svg {
-  animation: voice-wave 800ms ease-in-out infinite alternate;
+  animation: voice-wave 520ms ease-in-out infinite alternate;
 }
 .voiceExperience[data-voice-state="idle"] .voiceOrbImage,
 .voiceExperience[data-voice-state="muted"] .voiceOrbImage,
 .voiceExperience[data-voice-state="error"] .voiceOrbImage {
   filter: saturate(0.6);
 }
-@keyframes voice-orb-breathe {
+@keyframes voice-orb-listening {
   0%,
   100% {
-    transform: scale(0.985);
+    transform: scale(0.98);
   }
   50% {
     transform: scale(1.025);
+  }
+}
+@keyframes voice-orb-speaking {
+  0%,
+  100% {
+    transform: scale(0.97);
+  }
+  50% {
+    transform: scale(1.095);
   }
 }
 @keyframes voice-wave {
@@ -1404,11 +1410,11 @@
     font-size: clamp(32px, 9vw, 42px);
   }
   .voiceStage {
-    width: min(100%, 430px, max(270px, calc(100dvh - 510px)));
-    margin-top: 22px;
+    width: min(100%, 430px, max(310px, calc(100dvh - 445px)));
+    margin-top: 18px;
   }
   .voiceOrbContent {
-    gap: 12px;
+    gap: 10px;
   }
   .voiceOrbContent h2 {
     font-size: clamp(20px, 6vw, 27px);
@@ -1439,6 +1445,10 @@
 }
 .generationCard {
   border-top: 4px solid var(--color-ink-crimson);
+}
+.generationFailureText {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 .generationHeading {
   display: flex;

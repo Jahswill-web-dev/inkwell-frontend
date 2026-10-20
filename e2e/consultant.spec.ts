@@ -141,6 +141,51 @@ test("article details panel supports cancel and save", async ({ page }) => {
   });
 });
 
+test("failed generation shows the draft checker's objections", async ({
+  page,
+}) => {
+  const objection = "The example is not supported by the interview.";
+  await page.route("**/api/consultant/**", async (route) => {
+    const path = new URL(route.request().url()).pathname.replace(
+      "/api/consultant/",
+      "",
+    );
+    if (path === "profile") return route.fulfill({ json: profile });
+    if (path === `articles/${articleId}`)
+      return route.fulfill({
+        json: {
+          id: articleId,
+          title: "Better handoffs",
+          description: "Why clear ownership matters",
+          status: "ready_to_draft",
+          interviews: [{ id: interviewId, state: "completed" }],
+          sections: [],
+          revisions: [],
+          draft_updated_at: null,
+          job: {
+            id: "failed-job",
+            state: "failed",
+            stage: "check",
+            attempts: 1,
+            instruction: "initial",
+            error: `We couldn't verify this draft against your interview. The draft checker flagged:\n1. ${objection}\nYour interview is saved. Please review these points before retrying.`,
+          },
+        },
+      });
+    return route.fulfill({ json: {} });
+  });
+
+  await page.goto(`/consultant/articles/${articleId}`);
+  await expect(page.getByText(objection, { exact: false })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Retry generation" }),
+  ).toBeVisible();
+  await expect(page.getByText(objection, { exact: false })).toHaveCSS(
+    "white-space",
+    "pre-line",
+  );
+});
+
 test("minimal article opens a voice-only interview and queues its draft", async ({
   page,
 }) => {
@@ -239,6 +284,12 @@ test("minimal article opens a voice-only interview and queues its draft", async 
     page.getByRole("button", { name: "Answer by typing" }),
   ).toHaveCount(0);
   await page.getByRole("button", { name: "Start conversation" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Better handoffs", level: 1 }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Tools cannot solve unclear ownership.", { exact: true }),
+  ).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Mute" })).toBeVisible();
   await expect(page.getByLabel("Interview duration")).toBeVisible();
   await expect(

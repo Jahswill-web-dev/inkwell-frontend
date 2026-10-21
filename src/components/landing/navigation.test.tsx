@@ -17,11 +17,11 @@ describe("Navigation", () => {
 
     expect(screen.getAllByRole("link", { name: "Sign in" })[0]).toHaveAttribute(
       "href",
-      "/login",
+      "/login?next=%2Fconsultant",
     );
     expect(
-      screen.getAllByRole("link", { name: "Start free" })[0],
-    ).toHaveAttribute("href", "/signup");
+      screen.getAllByRole("link", { name: "Start an article" })[0],
+    ).toHaveAttribute("href", "/signup?experience=consultant");
   });
 
   it("opens, focuses, and closes the mobile navigation", async () => {

@@ -277,7 +277,6 @@ Playwright:
 - [ ] Profile: name, email, and image.
 - [ ] Writing preferences: audience, tone, length, language, avoided phrases,
       and formatting.
-- [ ] Voice profile: writing samples, characteristics, update, and disable.
 - [ ] Account: subscription, password, data export, and account deletion UI.
 
 Playwright:
@@ -319,7 +318,7 @@ Playwright:
 Initial data model:
 
 - [ ] User, Account, Session, VerificationToken.
-- [ ] UserPreferences and VoiceProfile.
+- [ ] UserPreferences.
 - [ ] Article, ArticleBrief, OutlineSection, DraftSection.
 - [ ] Source and Citation.
 - [ ] ReviewRun and ReviewIssue.

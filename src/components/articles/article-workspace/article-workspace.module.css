@@ -108,7 +108,8 @@
 }
 
 .editLink,
-.interviewLink {
+.interviewLink,
+.deleteButton {
   display: inline-flex;
   min-height: 41px;
   flex: 0 0 auto;
@@ -121,6 +122,13 @@
   font-size: 0.81rem;
   font-weight: 650;
   text-decoration: none;
+}
+
+.deleteButton {
+  border-color: #e2b7be;
+  background: white;
+  color: var(--color-ink-crimson);
+  cursor: pointer;
 }
 
 .interviewLink {

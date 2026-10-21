@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, CalendarBlank } from "@phosphor-icons/react";
+import { ArrowRight, CalendarBlank, Trash } from "@phosphor-icons/react";
 import {
   agencyStatusActions,
   agencyStatusLabels,
@@ -14,8 +14,12 @@ function articleHref(articleId: string) {
 
 export function MobileArticleCard({
   article,
+  onDelete,
+  pendingDeletion,
 }: {
   article: AgencyArticleSummary;
+  onDelete: () => void;
+  pendingDeletion: boolean;
 }) {
   return (
     <li>
@@ -38,6 +42,15 @@ export function MobileArticleCard({
           </strong>
         </div>
       </Link>
+      <button
+        aria-label={`Delete ${article.working_title}`}
+        className={styles.mobileDeleteAction}
+        disabled={pendingDeletion}
+        onClick={onDelete}
+        type="button"
+      >
+        <Trash aria-hidden size={14} /> Delete article
+      </button>
     </li>
   );
 }

@@ -92,8 +92,8 @@ describe("SourceReview", () => {
     );
     expect(screen.getByText("Source material approved")).toBeVisible();
     expect(
-      screen.getByRole("link", { name: "Continue to brief" }),
-    ).toHaveAttribute("href", `/articles/new/brief?articleId=${article.id}`);
+      screen.getByText("Content generation is not available in this workspace yet."),
+    ).toBeVisible();
     expect(loadSourceReview(article.id)?.status).toBe("approved");
   });
 

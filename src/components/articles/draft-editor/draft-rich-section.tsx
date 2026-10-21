@@ -125,8 +125,10 @@ export function DraftRichSection({
   isActive = false,
   readOnly = false,
   onChange,
+  onTitleChange,
   onEditor,
   onSelection,
+  showSectionNumber = true,
   temporaryContent,
 }: {
   section: DraftSection;
@@ -134,8 +136,10 @@ export function DraftRichSection({
   isActive?: boolean;
   readOnly?: boolean;
   onChange?: (sectionId: string, editorState: string) => void;
+  onTitleChange?: (sectionId: string, title: string) => void;
   onEditor?: (sectionId: string, editor: LexicalEditor) => void;
   onSelection?: (sectionId: string, text: string) => void;
+  showSectionNumber?: boolean;
   temporaryContent?: ReactNode;
 }) {
   const initialConfig = {
@@ -174,9 +178,21 @@ export function DraftRichSection({
       id={`draft-section-${section.id}`}
     >
       {index > 0 ? (
-        <h2 aria-current={isActive ? "location" : undefined}>
-          {index}. {section.title}
-        </h2>
+        readOnly || !onTitleChange ? (
+          <h2 aria-current={isActive ? "location" : undefined}>
+            {showSectionNumber ? `${index}. ` : ""}
+            {section.title}
+          </h2>
+        ) : (
+          <input
+            aria-current={isActive ? "location" : undefined}
+            aria-label={`Section heading: ${section.title}`}
+            className={styles.sectionTitleInput}
+            maxLength={300}
+            onChange={(event) => onTitleChange(section.id, event.target.value)}
+            value={section.title}
+          />
+        )
       ) : null}
       <div hidden={Boolean(temporaryContent)}>
         <LexicalComposer initialConfig={initialConfig}>

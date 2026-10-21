@@ -186,6 +186,11 @@
   line-height: 1.7;
 }
 
+.voiceReconnectMessage {
+  color: #8c431d !important;
+  font-size: 0.8rem !important;
+}
+
 .voicePrivacy {
   display: inline-flex;
   align-items: center;

@@ -9,9 +9,13 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardHome } from "./dashboard-home";
 
-const { listMock } = vi.hoisted(() => ({ listMock: vi.fn() }));
+const { deleteMock, listMock } = vi.hoisted(() => ({
+  deleteMock: vi.fn(),
+  listMock: vi.fn(),
+}));
 vi.mock("@/lib/articles/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/articles/client")>()),
+  deleteArticle: deleteMock,
   listArticles: listMock,
 }));
 vi.mock("next/navigation", () => ({
@@ -68,6 +72,7 @@ beforeEach(() => {
     offset: 0,
     limit: 20,
   });
+  deleteMock.mockReset().mockResolvedValue(undefined);
 });
 afterEach(cleanup);
 
@@ -175,6 +180,48 @@ describe("DashboardHome", () => {
     expect(
       await screen.findByRole("heading", { name: "No client articles yet" }),
     ).toBeVisible();
+  });
+
+  it("confirms deletion and removes the article from the dashboard", async () => {
+    render(<DashboardHome />);
+    await screen.findAllByText("The Case for Slower Thinking");
+
+    await userEvent.click(
+      screen.getAllByRole("button", {
+        name: "Delete The Case for Slower Thinking",
+      })[0],
+    );
+    const dialog = screen.getByRole("dialog", { name: "Delete this article?" });
+    expect(dialog).toHaveTextContent("will be permanently deleted");
+    expect(deleteMock).not.toHaveBeenCalled();
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Delete article" }));
+    await waitFor(() =>
+      expect(deleteMock).toHaveBeenCalledWith(articles[0].id),
+    );
+    expect(screen.queryByText("The Case for Slower Thinking")).not.toBeInTheDocument();
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Deleted “The Case for Slower Thinking”.",
+    );
+  });
+
+  it("keeps the article visible when dashboard deletion fails", async () => {
+    deleteMock.mockRejectedValueOnce(new Error("offline"));
+    render(<DashboardHome />);
+    await screen.findAllByText("The Case for Slower Thinking");
+
+    await userEvent.click(
+      screen.getAllByRole("button", {
+        name: "Delete The Case for Slower Thinking",
+      })[0],
+    );
+    const dialog = screen.getByRole("dialog", { name: "Delete this article?" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Delete article" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "We couldn’t delete this article. Please try again.",
+    );
+    expect(screen.getAllByText("The Case for Slower Thinking")[0]).toBeVisible();
   });
 
   it("retries an initial failure", async () => {

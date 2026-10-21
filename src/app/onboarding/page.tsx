@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { OnboardingScreen } from "@/components/onboarding/onboarding-screen/onboarding-screen";
 import { requireUser } from "@/lib/auth/session";
@@ -8,6 +9,8 @@ export const metadata: Metadata = {
 };
 
 export default async function OnboardingPage() {
-  await requireUser("/onboarding");
+  const user = await requireUser("/onboarding");
+  if (user.preferred_experience === "consultant")
+    redirect("/consultant/onboarding");
   return <OnboardingScreen />;
 }

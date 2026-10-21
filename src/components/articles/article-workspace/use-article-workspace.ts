@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
-import {
-  ArticleRequestError,
-  getArticle,
-  getArticleBrief,
-  getArticleDraft,
-  getArticleOutline,
-} from "@/lib/articles/client";
+import { ArticleRequestError, getArticle } from "@/lib/articles/client";
 import { articleSetupMetadataFromArticle } from "@/lib/articles/article-setup";
+import {
+  getInterviewInvitation,
+  getInterviewTranscript,
+  InterviewInvitationRequestError,
+} from "@/lib/articles/client-interview-api";
 import { loadInterviewInvitation } from "@/lib/articles/client-interview-storage";
-import type { ArticleWorkspaceViewModel } from "@/lib/articles/article-workspace";
+import type {
+  ArticleWorkspaceViewModel,
+  ClientInterviewNotesState,
+} from "@/lib/articles/article-workspace";
 import { toArticleWorkspaceViewModel } from "@/lib/articles/article-workspace";
 import {
   loadWriterInterviewMaterial,
@@ -26,33 +28,51 @@ type WorkspaceLoadState =
   | { type: "unauthorized" }
   | { type: "error" };
 
-async function exists(request: Promise<unknown>) {
-  try {
-    await request;
-    return true;
-  } catch (error) {
-    if (error instanceof ArticleRequestError && error.status === 404) {
-      return false;
-    }
-    throw error;
-  }
-}
-
 async function loadWorkspace(articleId: string, currentWriter: string) {
   const article = await getArticle(articleId);
-  const [hasBrief, hasOutline, hasDraft] = await Promise.all([
-    exists(getArticleBrief(articleId)),
-    exists(getArticleOutline(articleId)),
-    exists(getArticleDraft(articleId)),
-  ]);
+  const metadata = articleSetupMetadataFromArticle(article);
+  let invitation = loadInterviewInvitation(articleId);
+  let clientNotesState: ClientInterviewNotesState = null;
+
+  if (metadata?.interviewMethod === "client") {
+    try {
+      invitation = await getInterviewInvitation(articleId);
+    } catch {
+      if (invitation?.progressState === "completed") {
+        clientNotesState = "unavailable";
+      }
+    }
+
+    if (invitation?.progressState === "completed") {
+      if (!invitation.id) {
+        clientNotesState = "unavailable";
+      } else {
+        try {
+          const transcript = await getInterviewTranscript(
+            articleId,
+            invitation.id,
+          );
+          clientNotesState = transcript.insight_status;
+        } catch (error) {
+          clientNotesState =
+            error instanceof InterviewInvitationRequestError &&
+            error.status === 404
+              ? "pending"
+              : "unavailable";
+        }
+      }
+    }
+  }
+
   return toArticleWorkspaceViewModel(
     article,
     currentWriter,
-    articleSetupMetadataFromArticle(article),
-    { hasBrief, hasOutline, hasDraft },
-    loadInterviewInvitation(articleId),
+    metadata,
+    { hasBrief: false, hasOutline: false, hasDraft: false },
+    invitation,
     loadWriterInterviewMaterial(articleId),
     loadSourceReview(articleId),
+    clientNotesState,
   );
 }
 

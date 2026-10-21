@@ -1,20 +1,24 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import {
   CalendarBlank,
   Microphone,
   PencilSimple,
+  Trash,
   User,
 } from "@phosphor-icons/react";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
+import { ArticleDeleteDialog } from "@/components/articles/article-delete-dialog";
+import { ArticleRequestError, deleteArticle } from "@/lib/articles/client";
 import { formatDueDate } from "@/lib/dashboard/agency-format";
 import type { AuthIdentity } from "@/lib/auth/identity";
 import { ArticleWorkspaceNav } from "./article-workspace-nav";
 import { ArticleWorkspaceOverview } from "./article-workspace-overview";
 import { ClientInterviewManager } from "./client-interview-manager";
-import { WriterInterviewPanel } from "./writer-interview-panel";
-import { SourceReview } from "../source-review/source-review";
+import { InterviewNotes } from "../interview-notes/interview-notes";
 import { useArticleWorkspace } from "./use-article-workspace";
 import styles from "./article-workspace.module.css";
 
@@ -79,7 +83,11 @@ export function ArticleWorkspace({
   identity: AuthIdentity;
   activeTab?: "overview" | "interviews" | "sources";
 }) {
+  const router = useRouter();
   const { state, retry } = useArticleWorkspace(articleId, identity.username);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   if (state.type !== "ready") {
     return (
@@ -92,6 +100,24 @@ export function ArticleWorkspace({
   }
 
   const { workspace } = state;
+  const removeArticle = async () => {
+    setIsDeleting(true);
+    setDeleteError("");
+    try {
+      await deleteArticle(articleId);
+      router.push("/dashboard?section=articles");
+      router.refresh();
+    } catch (error) {
+      setDeleteError(
+        error instanceof ArticleRequestError
+          ? error.message
+          : "We couldn’t delete this article. Please try again.",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <main className={styles.page}>
       <DashboardSidebar
@@ -145,22 +171,41 @@ export function ArticleWorkspace({
               >
                 <PencilSimple size={16} aria-hidden /> Edit setup
               </Link>
+              <button
+                className={styles.deleteButton}
+                onClick={() => {
+                  setDeleteError("");
+                  setShowDeleteDialog(true);
+                }}
+                type="button"
+              >
+                <Trash size={16} aria-hidden /> Delete article
+              </button>
             </div>
           </header>
 
           <ArticleWorkspaceNav activeTab={activeTab} articleId={articleId} />
           {activeTab === "interviews" ? (
-            <>
-              <WriterInterviewPanel workspace={workspace} />
-              <ClientInterviewManager workspace={workspace} />
-            </>
+            <ClientInterviewManager workspace={workspace} />
           ) : activeTab === "sources" ? (
-            <SourceReview workspace={workspace} />
+            <InterviewNotes workspace={workspace} />
           ) : (
             <ArticleWorkspaceOverview workspace={workspace} />
           )}
         </div>
       </div>
+      {showDeleteDialog ? (
+        <ArticleDeleteDialog
+          articleTitle={workspace.article.working_title}
+          error={deleteError}
+          isDeleting={isDeleting}
+          onCancel={() => {
+            setDeleteError("");
+            setShowDeleteDialog(false);
+          }}
+          onConfirm={() => void removeArticle()}
+        />
+      ) : null}
     </main>
   );
 }

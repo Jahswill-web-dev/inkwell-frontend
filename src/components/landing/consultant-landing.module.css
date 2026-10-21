@@ -85,12 +85,12 @@
 .heroInterview,
 .heroDraft {
   position: absolute;
-  width: min(57%, 358px);
+  width: min(49%, 340px);
 }
 
 .heroInterview {
   z-index: 2;
-  left: 1%;
+  left: 0;
   top: 4%;
   transform: rotate(-2deg);
 }
@@ -173,9 +173,6 @@
 .soundBars {
   margin-top: 8px;
   color: #d80844;
-  font-size: 0.93rem;
-  letter-spacing: 3px;
-  line-height: 1;
 }
 
 .question {
@@ -580,20 +577,27 @@
   }
 
   .heroVisual {
-    min-height: 410px;
-    padding: 0;
+    display: grid;
+    min-height: 0;
+    gap: 0;
+    padding: 0 0 20px;
   }
 
   .heroInterview {
-    left: 0;
-    top: 2%;
-    width: 60%;
+    position: relative;
+    left: auto;
+    top: auto;
+    width: min(82%, 340px);
+    justify-self: start;
   }
 
   .heroDraft {
-    right: 0;
-    bottom: 1%;
-    width: 56%;
+    position: relative;
+    right: auto;
+    bottom: auto;
+    width: min(82%, 340px);
+    justify-self: end;
+    margin-top: -16px;
   }
 
   .interviewCompact {
@@ -697,18 +701,6 @@
 }
 
 @media (max-width: 430px) {
-  .heroVisual {
-    min-height: 350px;
-  }
-
-  .heroInterview {
-    width: 62%;
-  }
-
-  .heroDraft {
-    width: 58%;
-  }
-
   .interviewCompact .orbImage {
     width: 120px;
   }

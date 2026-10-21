@@ -51,6 +51,29 @@ No blocking follow-up is required. A future iteration could add an optional keyb
 
 final result: passed
 
+# Consultant landing page redesign
+
+## Evidence
+
+- Selected expanded visual: `C:\Users\Dell\.codex\generated_images\01a154e2-7c44-7b43-b8f9-abd270d9f29c\exec-47fa36be-42bc-4d47-bd19-33160dd9d581.png`.
+- Browser-rendered desktop: `C:\Users\Dell\Documents\useinkwell\inkwell-frontend\test-results\consultant-landing-desktop-full.png` at 1280 CSS px width.
+- Browser-rendered mobile: `C:\Users\Dell\Documents\useinkwell\inkwell-frontend\test-results\consultant-landing-mobile.png` at 393 CSS px width.
+
+## Comparison
+
+The implementation keeps the selected conversation-first hero, product previews, cream/navy/crimson palette, and serif editorial typography. The previously short middle section is now three spacious alternating chapters: conversation, first draft, and final review. Export and a final call to action extend the journey without adding unsupported claims. At desktop width, the interview and draft previews sit side by side so both are legible. On mobile they stack with a small overlap; the draft title and copy remain readable.
+
+The design concept uses more illustrative product framing than the live components. The implementation uses the existing Inkwell voice-orb asset and faithful static interface previews; all actions on the landing page link to the consultant sign-up or in-page sections. No P0, P1, or P2 visual differences remain after the mobile hero adjustment.
+
+## Verification
+
+- TypeScript passed.
+- Landing unit tests: 6 passed.
+- Consultant landing browser tests: 6 passed, 2 expected viewport skips. Desktop and mobile had no horizontal overflow.
+- ESLint passed with 2 existing warnings in unrelated files.
+
+final result: passed
+
 # Consultant voice interview design QA
 
 ## Evidence

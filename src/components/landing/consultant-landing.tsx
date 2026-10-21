@@ -4,9 +4,11 @@ import {
   Copy,
   DownloadSimple,
   FileText,
+  ListBullets,
   Pause,
   Sparkle,
   Stop,
+  Waveform,
 } from "@phosphor-icons/react/dist/ssr";
 import Image from "next/image";
 import { Footer } from "./footer";
@@ -29,7 +31,7 @@ function InterviewPreview({ compact = false }: { compact?: boolean }) {
           className={styles.orbImage}
         />
         <span className={styles.listening}>Listening…</span>
-        <span className={styles.soundBars} aria-hidden="true">▮▯▮▮▯▮▯▮▮▯▮</span>
+        <Waveform className={styles.soundBars} size={42} weight="thin" aria-hidden="true" />
       </div>
       <p className={styles.question}>
         What is a lesson you learned from working with clients?
@@ -74,7 +76,7 @@ function EditorPreview() {
         <span>T<span className={styles.toolbarSmall}>T</span></span>
         <strong>B</strong>
         <em>I</em>
-        <span>☷</span>
+        <ListBullets size={18} />
       </div>
       <div className={styles.editorBody}>
         <h3>Turning Ambiguity into Progress</h3>

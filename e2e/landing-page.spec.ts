@@ -35,6 +35,7 @@ test("opens and closes the accessible mobile navigation", async ({
 }) => {
   test.skip(!isMobile, "Mobile navigation is only present at narrow widths.");
   await page.goto("/");
+  await page.waitForLoadState("networkidle");
 
   await page.getByRole("button", { name: "Open navigation" }).click();
   const mobileNavigation = page.getByRole("navigation", {

@@ -34,7 +34,7 @@ export function Footer() {
               {link.label}
             </a>
           ))}
-          <a className={linkClass} href="/login">
+          <a className={linkClass} href="/login?next=%2Fconsultant">
             Sign in
           </a>
         </nav>

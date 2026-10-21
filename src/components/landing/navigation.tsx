@@ -60,12 +60,12 @@ export function Navigation() {
           ))}
           <a
             className="transition-colors duration-150 hover:text-ink-crimson"
-            href="/login"
+            href="/login?next=%2Fconsultant"
           >
             Sign in
           </a>
-          <a className={primaryButtonClass} href="/signup">
-            Start free
+          <a className={primaryButtonClass} href="/signup?experience=consultant">
+            Start an article
           </a>
         </nav>
 
@@ -105,15 +105,15 @@ export function Navigation() {
             {link.label}
           </a>
         ))}
-        <a className={mobileLinkClass} href="/login" onClick={closeMenu}>
+        <a className={mobileLinkClass} href="/login?next=%2Fconsultant" onClick={closeMenu}>
           Sign in
         </a>
         <a
           className={`${primaryButtonClass} mt-2 w-full`}
-          href="/signup"
+          href="/signup?experience=consultant"
           onClick={closeMenu}
         >
-          Start free
+          Start an article
         </a>
       </nav>
     </header>

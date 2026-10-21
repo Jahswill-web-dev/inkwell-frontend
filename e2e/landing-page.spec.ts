@@ -5,15 +5,16 @@ test("renders the product promise and route destinations", async ({ page }) => {
 
   await expect(
     page.getByRole("heading", {
-      name: /turn client expertise into content writers can use/i,
+      name: /talk through your ideas. turn them into articles that sound like you/i,
     }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "Build a client article" }).first(),
-  ).toHaveAttribute("href", "/signup");
+    page.getByRole("link", { name: "Start an article" }).first(),
+  ).toHaveAttribute("href", "/signup?experience=consultant");
   await expect(
     page.getByRole("link", { name: "Sign in" }).first(),
-  ).toHaveAttribute("href", "/login");
+  ).toHaveAttribute("href", "/login?next=%2Fconsultant");
+  await expect(page.getByRole("heading", { name: "Refine every word." })).toBeVisible();
 });
 
 test("navigates to the writing workflow", async ({ page, isMobile }) => {
@@ -53,20 +54,16 @@ test("opens and closes the accessible mobile navigation", async ({
   ).toHaveAttribute("aria-expanded", "false");
 });
 
-test("uses responsive product artwork without horizontal overflow", async ({
+test("shows the consultant workflow without horizontal overflow", async ({
   page,
   isMobile,
 }) => {
   await page.goto("/");
 
-  const visibleHeroImages = await page
-    .getByAltText(/Inkwell agency article setup screen/i)
-    .evaluateAll(
-      (images) =>
-        images.filter((image) => (image as HTMLElement).offsetParent !== null)
-          .length,
-    );
-  expect(visibleHeroImages).toBe(1);
+  await expect(
+    page.locator('section[aria-labelledby="landing-title"] img[src*="voice-orb"]'),
+  ).toHaveCount(1);
+  await expect(page.getByRole("heading", { name: "Ready when you are." })).toBeVisible();
 
   const hasOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth > window.innerWidth + 1,
@@ -78,4 +75,11 @@ test("uses responsive product artwork without horizontal overflow", async ({
       page.getByRole("button", { name: "Open navigation" }),
     ).toBeVisible();
   }
+
+  await page.screenshot({
+    path: isMobile
+      ? "test-results/consultant-landing-mobile.png"
+      : "test-results/consultant-landing-desktop-full.png",
+    fullPage: true,
+  });
 });

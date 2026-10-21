@@ -28,8 +28,7 @@ export type ProductFeatureContent = {
 
 export const navigationLinks: readonly NavigationLink[] = [
   { label: "How it works", href: "#how-it-works" },
-  { label: "For agencies", href: "#features" },
-  { label: "Pricing", href: "/pricing" },
+  { label: "For consultants", href: "#for-consultants" },
 ];
 
 export const workflowStages: readonly WorkflowStage[] = [

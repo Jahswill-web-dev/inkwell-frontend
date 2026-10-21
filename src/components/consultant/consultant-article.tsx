@@ -110,6 +110,52 @@ function sectionsMatch(left: Section[], right: Section[]) {
   );
 }
 
+function sectionText(section: Section): string {
+  const walk = (node: ExportNode): string =>
+    (node.text ?? "") +
+    (node.children ?? []).map(walk).join(node.type === "root" ? "\n" : "");
+  return walk(JSON.parse(section.editor_state).root);
+}
+
+function wordChanges(before: string, after: string) {
+  const left = before.match(/\s+|\S+/g) ?? [];
+  const right = after.match(/\s+|\S+/g) ?? [];
+  const rows = Array.from({ length: left.length + 1 }, () =>
+    Array<number>(right.length + 1).fill(0),
+  );
+  for (let i = left.length - 1; i >= 0; i--) {
+    for (let j = right.length - 1; j >= 0; j--) {
+      rows[i][j] =
+        left[i] === right[j]
+          ? rows[i + 1][j + 1] + 1
+          : Math.max(rows[i + 1][j], rows[i][j + 1]);
+    }
+  }
+  if (rows[0][0] < Math.max(left.length, right.length) * 0.35) {
+    return [
+      { kind: "removed_block", text: before },
+      { kind: "added_block", text: after },
+    ];
+  }
+  const changes: { kind: "same" | "added" | "removed"; text: string }[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < left.length || j < right.length) {
+    if (i < left.length && j < right.length && left[i] === right[j]) {
+      changes.push({ kind: "same", text: left[i++] });
+      j++;
+    } else if (
+      j < right.length &&
+      (i === left.length || rows[i][j + 1] >= rows[i + 1][j])
+    ) {
+      changes.push({ kind: "added", text: right[j++] });
+    } else {
+      changes.push({ kind: "removed", text: left[i++] });
+    }
+  }
+  return changes;
+}
+
 export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
   const router = useRouter();
   const [article, setArticle] = useState<Article | null>(null);
@@ -351,10 +397,12 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
   const generating =
     article.job && ["queued", "running"].includes(article.job.state);
   const aiJob =
-    article.job &&
-    !["initial", "clearer", "concise", "closer", "updated"].includes(
-      article.job.instruction ?? "initial",
-    );
+    article.job?.request_kind === "ask_ai" ||
+    (article.job &&
+      !article.job.request_kind &&
+      !["initial", "clearer", "concise", "closer", "updated"].includes(
+        article.job.instruction ?? "initial",
+      ));
   const proposal = article.revisions[0];
   const generationSteps = [
     { id: "understand", label: "Understand your argument and voice" },
@@ -563,6 +611,24 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
           </button>
         </section>
       )}
+      {article.job?.state === "succeeded" &&
+        !aiJob &&
+        (article.job.writing_suggestions?.length ?? 0) > 0 && (
+          <section className={`${styles.card} ${styles.writingNotes}`}>
+            <h2>Writing notes</h2>
+            <p>
+              Your article is ready. These optional ideas may help you polish
+              it.
+            </p>
+            <ul>
+              {article.job.writing_suggestions?.map((suggestion, index) => (
+                <li key={`${suggestion.section}-${index}`}>
+                  <strong>{suggestion.section}:</strong> {suggestion.text}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       {!sections.length && !generating && !article.job && (
         <section className={styles.card}>
           <p>{article.description}</p>
@@ -817,6 +883,13 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
                 <ol>
                   <li
                     className={
+                      article.job?.stage === "plan" ? styles.stepCurrent : ""
+                    }
+                  >
+                    Understanding the requested changes
+                  </li>
+                  <li
+                    className={
                       article.job?.stage === "understand"
                         ? styles.stepCurrent
                         : styles.stepComplete
@@ -842,7 +915,9 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
                   </li>
                   <li
                     className={
-                      article.job?.stage === "check" ? styles.stepCurrent : ""
+                      ["check", "repair"].includes(article.job?.stage ?? "")
+                        ? styles.stepCurrent
+                        : ""
                     }
                   >
                     Checking the result
@@ -858,6 +933,16 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
                   void run(requestAIChange);
                 }}
               >
+                {aiJob && article.job?.state === "needs_clarification" && (
+                  <div className={styles.assistantClarification} role="status">
+                    <strong>One detail before I make the change</strong>
+                    <p>{article.job.clarification_question}</p>
+                    <p>
+                      Add the detail to your request below, then generate a new
+                      preview.
+                    </p>
+                  </div>
+                )}
                 {aiJob && article.job?.state === "failed" && (
                   <div className={styles.assistantFailure} role="alert">
                     <strong>We couldn’t prepare the suggestion.</strong>
@@ -1043,18 +1128,29 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
                   >
                     <h3>Suggested rewrite</h3>
                     {preview.sections.map((section, index) => {
-                      const original = sections[index];
+                      const original = sections.find(
+                        (item) => item.id === section.id,
+                      );
+                      const originalIndex = sections.findIndex(
+                        (item) => item.id === section.id,
+                      );
+                      const moved =
+                        originalIndex >= 0 && originalIndex !== index;
                       const changed =
                         !original ||
                         original.title !== section.title ||
                         original.editor_state !== section.editor_state;
                       return (
                         <div
-                          className={changed ? styles.changedSection : ""}
+                          className={changed || moved ? styles.changedSection : ""}
                           key={`compare:${preview.id}:${section.id}`}
                         >
-                          {changed && (
-                            <span className={styles.changeLabel}>Changed</span>
+                          {(changed || moved) && (
+                            <span className={styles.changeLabel}>
+                              {moved
+                                ? `Moved from section ${originalIndex + 1}`
+                                : "Edited"}
+                            </span>
                           )}
                           <DraftRichSection
                             section={{
@@ -1066,6 +1162,52 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
                             readOnly
                             showSectionNumber={false}
                           />
+                          {original && changed && (
+                            <div
+                              className={styles.wordChanges}
+                              aria-label={`Text changes in ${section.title}`}
+                            >
+                              <strong>Exact text changes</strong>
+                              <p>
+                                {wordChanges(
+                                  original.title === section.title
+                                    ? sectionText(original)
+                                    : `${original.title}\n${sectionText(original)}`,
+                                  original.title === section.title
+                                    ? sectionText(section)
+                                    : `${section.title}\n${sectionText(section)}`,
+                                ).map((part, partIndex) =>
+                                  part.kind === "added" ||
+                                  part.kind === "added_block" ? (
+                                    <ins
+                                      className={
+                                        part.kind === "added_block"
+                                          ? styles.changeBlock
+                                          : ""
+                                      }
+                                      key={partIndex}
+                                    >
+                                      {part.text}
+                                    </ins>
+                                  ) : part.kind === "removed" ||
+                                    part.kind === "removed_block" ? (
+                                    <del
+                                      className={
+                                        part.kind === "removed_block"
+                                          ? styles.changeBlock
+                                          : ""
+                                      }
+                                      key={partIndex}
+                                    >
+                                      {part.text}
+                                    </del>
+                                  ) : (
+                                    <span key={partIndex}>{part.text}</span>
+                                  ),
+                                )}
+                              </p>
+                            </div>
+                          )}
                         </div>
                       );
                     })}

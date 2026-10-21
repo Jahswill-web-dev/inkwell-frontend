@@ -73,3 +73,12 @@ The browser comparison found one P2 mobile issue: the Finish action initially sa
 - The browser preview confirmed layout and connecting state. A live microphone-to-provider conversation was outside this mock preview.
 
 final result: passed
+
+## Generation performance page
+
+- Selected visual: `C:\Users\Dell\.codex\generated_images\01a154e2-7c44-7b43-b8f9-abd270d9f29c\exec-f7137729-6259-48ed-b1fc-298f1a750353.png`.
+- Rendered desktop comparison: `C:\Users\Dell\Documents\useinkwell\inkwell-frontend\test-results\performance-desktop.png`, captured with the timeline expanded at 1440px width.
+- The page follows the selected editorial heading, cream/navy/crimson palette, four filters, compact job ledger, and inline attempt timeline. It keeps the application's existing navigation and uses actual model names from records. Historical jobs explicitly say “Detailed timing unavailable” while retaining stored totals.
+- Desktop and mobile interaction checks passed. The ledger scrolls horizontally on narrow screens and controls retain visible keyboard focus.
+
+final result: passed

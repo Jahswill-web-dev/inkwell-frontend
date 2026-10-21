@@ -71,6 +71,9 @@ export type Article = {
     error: string | null;
     attempts: number;
     instruction?: string;
+    request_kind?: "ask_ai" | "generation";
+    clarification_question?: string | null;
+    writing_suggestions?: { section: string; text: string }[];
   } | null;
   sections: Section[];
   draft_updated_at: string | null;

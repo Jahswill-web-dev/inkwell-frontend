@@ -992,6 +992,36 @@
   padding-left: 14px;
   margin-left: -17px;
 }
+.wordChanges {
+  margin: 16px 0 22px;
+  border: 1px solid var(--color-ink-line);
+  border-radius: 9px;
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+.wordChanges p {
+  margin: 7px 0 0;
+}
+.wordChanges ins {
+  background: #e5f4e9;
+  text-decoration: none;
+}
+.wordChanges del {
+  background: #ffe6e9;
+}
+.wordChanges .changeBlock {
+  display: block;
+  margin: 5px 0;
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+.assistantClarification {
+  border-left: 3px solid var(--color-ink-crimson);
+  background: var(--color-ink-paper);
+  padding: 14px;
+}
 .changeLabel {
   color: var(--color-ink-crimson);
   font-size: 11px;
@@ -1449,6 +1479,24 @@
 .generationFailureText {
   white-space: pre-line;
   overflow-wrap: anywhere;
+}
+.writingNotes {
+  background: #fffdf9;
+  border-color: var(--color-ink-line);
+}
+.writingNotes h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+.writingNotes p {
+  margin: 0;
+  color: var(--color-ink-muted);
+}
+.writingNotes ul {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding-left: 20px;
 }
 .generationHeading {
   display: flex;

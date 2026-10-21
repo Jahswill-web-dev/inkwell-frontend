@@ -5,6 +5,7 @@ const e2eAuthToken = "inkwell-e2e-authenticated-session";
 
 export default defineConfig({
   testDir: "./e2e",
+  timeout: 60_000,
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
@@ -32,13 +33,14 @@ export default defineConfig({
   webServer: externalBaseUrl
     ? undefined
     : {
-        command: "node node_modules/next/dist/bin/next dev -p 3100",
+        command: "node node_modules/next/dist/bin/next dev --webpack -p 3100",
         url: "http://localhost:3100",
         reuseExistingServer: !process.env.CI,
         env: {
           ...process.env,
           E2E_AUTH_BYPASS_TOKEN: e2eAuthToken,
           E2E_AUTH_UNAVAILABLE_TOKEN: "inkwell-e2e-unavailable-session",
+          GENERATION_PERFORMANCE_OWNER_EMAIL: "writer@example.com",
           NEXT_DIST_DIR: ".next-e2e",
         },
       },

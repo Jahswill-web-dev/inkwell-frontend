@@ -1,5 +1,56 @@
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
+
+test("private generation performance shows jobs and an attempt timeline", async ({ page }, testInfo) => {
+  const job = {
+    id: "46a42280-6ad8-4bb6-a29c-1604adbf0c36",
+    article_id: articleId,
+    article_title: "Better handoffs",
+    request_type: "generation",
+    status: "succeeded",
+    queued_at: "2026-10-21T10:00:00Z",
+    first_claimed_at: "2026-10-21T10:00:12Z",
+    finished_at: "2026-10-21T10:02:03Z",
+    attempts: 1,
+    models: ["writer-model", "checker-model"],
+    queue_seconds: 12,
+    active_seconds: 111,
+    rate_limit_seconds: 65,
+    total_seconds: 123,
+    total_tokens: 4200,
+    detailed_timing_available: true,
+  };
+  await page.route("**/api/consultant/performance/jobs**", route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith(job.id)) return route.fulfill({ json: {
+      ...job, events: [
+        { id: "event-1", attempt: 0, kind: "queue", operation: null, model_id: null, started_at: "2026-10-21T10:00:00Z", ended_at: "2026-10-21T10:00:12Z", duration_ms: 12000, outcome: "completed", input_tokens: null, output_tokens: null, provider_request_id: null },
+        { id: "event-2", attempt: 1, kind: "call", operation: "write", model_id: "writer-model", started_at: "2026-10-21T10:00:14Z", ended_at: "2026-10-21T10:00:45Z", duration_ms: 31000, outcome: "succeeded", input_tokens: 1000, output_tokens: 2000, provider_request_id: "req-test" },
+        { id: "event-3", attempt: 1, kind: "wait", operation: "rate_limit", model_id: "checker-model", started_at: "2026-10-21T10:00:45Z", ended_at: "2026-10-21T10:01:50Z", duration_ms: 65000, outcome: "completed", input_tokens: null, output_tokens: null, provider_request_id: null },
+      ],
+    }});
+    return route.fulfill({ json: { items: [
+      job,
+      { ...job, id: "46a42280-6ad8-4bb6-a29c-1604adbf0c37", article_title: "A clearer opening", request_type: "ask_ai", total_seconds: 54, queue_seconds: 4, rate_limit_seconds: 0, models: ["writer-model"], total_tokens: 930 },
+      { ...job, id: "46a42280-6ad8-4bb6-a29c-1604adbf0c38", article_title: "Why ownership matters", status: "failed", total_seconds: 187, queue_seconds: 22, rate_limit_seconds: 65 },
+      { ...job, id: "46a42280-6ad8-4bb6-a29c-1604adbf0c39", article_title: "Lessons from client handoffs", total_seconds: 79, queue_seconds: 7, rate_limit_seconds: 0 },
+      { ...job, id: "46a42280-6ad8-4bb6-a29c-1604adbf0c40", article_title: "An earlier article", detailed_timing_available: false, total_seconds: 95, queue_seconds: null, rate_limit_seconds: null },
+    ], page: 1, page_size: 20, total: 5, median_seconds: 95, p95_seconds: 187 } });
+  });
+  if (testInfo.project.name === "chromium") await page.setViewportSize({ width: 1440, height: 1024 });
+  await page.goto("/consultant/performance");
+  await expect(page.getByRole("heading", { name: "Generation performance" })).toBeVisible();
+  await expect(page.getByText("Better handoffs")).toBeVisible();
+  await expect(page.getByText("Detailed timing unavailable")).toBeVisible();
+  await page.getByRole("button", { name: /Better handoffs/ }).click();
+  await expect(page.getByText("Attempt 1")).toBeVisible();
+  await expect(page.getByText("req-test")).toBeVisible();
+  await expect(page.getByText("Rate-limit wait")).toBeVisible();
+  if (testInfo.project.name === "chromium")
+    await page.screenshot({ path: "test-results/performance-desktop.png", fullPage: true });
+  await page.getByLabel("Request type").selectOption("ask_ai");
+  await expect(page).toHaveURL(/performance/);
+});
 const articleId = "46a42280-6ad8-4bb6-a29c-1604adbf0c31";
 const interviewId = "46a42280-6ad8-4bb6-a29c-1604adbf0c32";
 const profile = {
@@ -186,9 +237,96 @@ test("failed generation shows the draft checker's objections", async ({
   );
 });
 
+test("a style suggestion is shown as an optional note beside the saved article", async ({
+  page,
+}) => {
+  await page.route("**/api/consultant/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/profile")) return route.fulfill({ json: profile });
+    return route.fulfill({
+      json: {
+        id: articleId,
+        title: "Better handoffs",
+        description: "Why clear ownership matters",
+        status: "in_review",
+        interviews: [{ id: interviewId, state: "completed" }],
+        sections: [
+          {
+            id: "section-one",
+            outline_section_id: null,
+            title: "Opening",
+            goal: "Introduce the article",
+            checklist: [],
+            editor_state: JSON.stringify({
+              root: {
+                type: "root",
+                version: 1,
+                direction: "ltr",
+                format: "",
+                indent: 0,
+                children: [
+                  {
+                    type: "paragraph",
+                    version: 1,
+                    direction: "ltr",
+                    format: "",
+                    indent: 0,
+                    children: [
+                      {
+                        type: "text",
+                        version: 1,
+                        text: "Fix the handoff first.",
+                        format: 0,
+                        detail: 0,
+                        mode: "normal",
+                        style: "",
+                      },
+                    ],
+                  },
+                ],
+              },
+            }),
+          },
+        ],
+        revisions: [],
+        draft_updated_at: "2026-10-20T10:00:00Z",
+        job: {
+          id: "initial-job",
+          state: "succeeded",
+          stage: "complete",
+          attempts: 1,
+          instruction: "initial",
+          error: null,
+          writing_suggestions: [
+            {
+              section: "Opening",
+              text: "Consider a shorter first sentence.",
+            },
+          ],
+        },
+      },
+    });
+  });
+
+  await page.goto(`/consultant/articles/${articleId}`);
+  await expect(
+    page.getByRole("heading", { name: "Writing notes" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Consider a shorter first sentence."),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Your article is ready.", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Retry generation" }),
+  ).toHaveCount(0);
+});
+
 test("minimal article opens a voice-only interview and queues its draft", async ({
   page,
 }) => {
+  test.setTimeout(60_000); // The first desktop navigation compiles the interview route.
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "mediaDevices", {
       configurable: true,
@@ -363,10 +501,7 @@ test("draft proposals require explicit acceptance and export the accepted versio
     "46a42280-6ad8-4bb6-a29c-1604adbf0c33",
     "This is my original draft.",
   );
-  const proposed = section(
-    "46a42280-6ad8-4bb6-a29c-1604adbf0c34",
-    "I call that expensive confusion.",
-  );
+  const proposed = section(original.id, "I call that expensive confusion.");
   const proposedEditor = JSON.parse(proposed.editor_state);
   proposedEditor.root.children[0].children.push(
     {
@@ -483,12 +618,14 @@ test("draft proposals require explicit acceptance and export the accepted versio
   await expect(preview.getByRole("article").last()).toContainText(
     "I call that expensive confusion.",
   );
+  await expect(preview.locator("ins")).toContainText("I call");
+  await expect(preview.locator("del")).toContainText("This is");
   await expect(
     preview.getByRole("link", { name: "Case study" }).first(),
   ).toHaveAttribute("href", "https://example.org/study");
   await preview.getByRole("button", { name: "Compare with current" }).click();
   await expect(
-    preview.getByText("This is my original draft.", { exact: true }),
+    preview.getByRole("article").first().getByText("This is my original draft.", { exact: true }),
   ).toBeVisible();
   await expect(preview.getByRole("article").last()).toContainText(
     "I call that expensive confusion.",
@@ -660,6 +797,154 @@ test("rejecting an AI suggestion keeps the current draft", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: "Review AI suggestion" }),
   ).toHaveCount(0);
+});
+
+test("Ask AI asks for missing detail without making a proposal", async ({
+  page,
+}) => {
+  const section = {
+    id: "46a42280-6ad8-4bb6-a29c-1604adbf0c33",
+    outline_section_id: null,
+    title: "Conclusion",
+    goal: "Summarize",
+    checklist: [],
+    editor_state: JSON.stringify({
+      root: {
+        type: "root",
+        version: 1,
+        children: [
+          {
+            type: "paragraph",
+            version: 1,
+            children: [
+              { type: "text", version: 1, text: "Keep this conclusion." },
+            ],
+          },
+        ],
+      },
+    }),
+  };
+  let submitted = "";
+  await page.route("**/api/consultant/**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/profile")) return route.fulfill({ json: profile });
+    if (path.endsWith("/ai-requests")) {
+      submitted = route.request().postDataJSON().instruction;
+      return route.fulfill({
+        json: { id: "new-job", state: "queued", stage: "plan" },
+      });
+    }
+    return route.fulfill({
+      json: {
+        id: articleId,
+        title: "Better handoffs",
+        description: "Ownership",
+        status: "in_review",
+        interviews: [{ id: interviewId, state: "completed" }],
+        sections: [section],
+        revisions: [],
+        draft_updated_at: "2026-10-17T10:00:00+00:00",
+        job: {
+          id: "clarification-job",
+          state: "needs_clarification",
+          stage: "plan",
+          error: null,
+          request_kind: "ask_ai",
+          instruction: "Add this point to the conclusion",
+          clarification_question: "Which point should I add to the conclusion?",
+        },
+      },
+    });
+  });
+  await page.goto(`/consultant/articles/${articleId}`);
+  await page.getByRole("button", { name: "Ask AI", exact: true }).click();
+  await expect(
+    page.getByText("Which point should I add to the conclusion?"),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Review full article" }),
+  ).toHaveCount(0);
+  await page
+    .getByLabel("What would you like to change?")
+    .fill(
+      "Add the point that each next step needs one owner to the conclusion",
+    );
+  await page.getByRole("button", { name: "Generate preview" }).click();
+  await expect.poll(() => submitted).toContain("one owner");
+});
+
+test("comparison identifies moved sections by identity", async ({ page }) => {
+  const makeSection = (id: string, title: string, text: string) => ({
+    id,
+    outline_section_id: null,
+    title,
+    goal: "Explain",
+    checklist: [],
+    editor_state: JSON.stringify({
+      root: {
+        type: "root",
+        version: 1,
+        children: [
+          {
+            type: "paragraph",
+            version: 1,
+            children: [{ type: "text", version: 1, text }],
+          },
+        ],
+      },
+    }),
+  });
+  const background = makeSection(
+    "46a42280-6ad8-4bb6-a29c-1604adbf0c33",
+    "Background",
+    "The handoff was confusing.",
+  );
+  const advice = makeSection(
+    "46a42280-6ad8-4bb6-a29c-1604adbf0c34",
+    "Practical advice",
+    "Give the next step one owner.",
+  );
+  await page.route("**/api/consultant/**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/profile")) return route.fulfill({ json: profile });
+    return route.fulfill({
+      json: {
+        id: articleId,
+        title: "Better handoffs",
+        description: "Ownership",
+        status: "in_review",
+        interviews: [{ id: interviewId, state: "completed" }],
+        sections: [background, advice],
+        draft_updated_at: "2026-10-17T10:00:00+00:00",
+        revisions: [
+          {
+            id: "46a42280-6ad8-4bb6-a29c-1604adbf0c35",
+            kind: "proposal",
+            sections: [advice, background],
+            gaps: [],
+            created_at: "2026-10-17T10:00:00+00:00",
+            summary: "Moved practical advice before background.",
+          },
+        ],
+        job: {
+          id: "move-job",
+          state: "succeeded",
+          stage: "complete",
+          request_kind: "ask_ai",
+          error: null,
+        },
+      },
+    });
+  });
+  await page.goto(`/consultant/articles/${articleId}`);
+  await page.getByRole("button", { name: "Review AI suggestion" }).click();
+  await page.getByRole("button", { name: "Review full article" }).click();
+  const dialog = page.getByRole("dialog", {
+    name: "Preview suggested rewrite",
+  });
+  await expect(dialog.getByText("Moved from section 2")).toBeVisible();
+  await expect(dialog.getByText("Moved from section 1")).toBeVisible();
+  await expect(dialog.locator("ins, del")).toHaveCount(0);
 });
 
 test("consultant section headings are unnumbered and editable", async ({

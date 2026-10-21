@@ -7,7 +7,8 @@ export default async function ConsultantLayout({
 }: {
   children: React.ReactNode;
 }) {
-  await requireUser("/consultant");
+  const user = await requireUser("/consultant");
+  const performanceOwner = process.env.GENERATION_PERFORMANCE_OWNER_EMAIL?.trim().toLowerCase();
   return (
     <div className={styles.shell}>
       <header className={styles.nav}>
@@ -17,6 +18,9 @@ export default async function ConsultantLayout({
         <nav className={styles.links} aria-label="Consultant navigation">
           <Link href="/consultant">My articles</Link>
           <Link href="/consultant/settings">Settings</Link>
+          {performanceOwner && user.email.toLowerCase() === performanceOwner && (
+            <Link href="/consultant/performance">Generation performance</Link>
+          )}
         </nav>
         <ExperienceSwitcher current="consultant" />
       </header>

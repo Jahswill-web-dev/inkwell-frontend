@@ -51,6 +51,30 @@ async function fillValidForm() {
 }
 
 describe("SignupForm", () => {
+  it("offers company and personal usage choices", async () => {
+    render(<SignupForm />);
+
+    expect(
+      screen.getByText("For my company or marketing team"),
+    ).toBeVisible();
+    expect(await screen.findByText("For myself")).toBeVisible();
+    expect(screen.queryByText("I’m a consultant")).not.toBeInTheDocument();
+  });
+
+  it("clearly marks Google sign-up as unavailable", async () => {
+    render(<SignupForm />);
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(
+      screen.getByRole("button", { name: "Google sign-up is coming soon" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByText(
+        "Google sign-up isn’t available yet. Use your email and password.",
+      ),
+    ).toBeVisible();
+  });
+
   it("shows useful validation for invalid details", async () => {
     render(<SignupForm />);
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));

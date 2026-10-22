@@ -19,7 +19,7 @@ describe("consultant landing page", () => {
     expect(screen.getByRole("heading", { name: "Ready when you are." })).toBeVisible();
     expect(screen.getAllByRole("link", { name: /start an article/i })[0]).toHaveAttribute(
       "href",
-      "/signup?experience=consultant",
+      "/signup",
     );
     expect(screen.getAllByRole("link", { name: "How it works" })[0]).toHaveAttribute(
       "href",

@@ -154,7 +154,6 @@ export function SignupForm() {
   const router = useRouter();
   const [errors, setErrors] = useState<SignupErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [notice, setNotice] = useState("");
   const [submitError, setSubmitError] = useState("");
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -164,7 +163,6 @@ export function SignupForm() {
     const result = getSignupInput(event.currentTarget);
     const nextErrors = getSignupErrors(result);
     setErrors(nextErrors);
-    setNotice("");
     setSubmitError("");
 
     if (!result.success) return;
@@ -220,7 +218,7 @@ export function SignupForm() {
               checked={experience === "marketing"}
               onChange={() => selectExperience("marketing")}
             />{" "}
-            <strong>I’m a content marketing team</strong>
+            <strong>For my company or marketing team</strong>
             <p>Interview clients and turn their expertise into articles.</p>
           </label>
           {consultantEnabled && (
@@ -237,7 +235,7 @@ export function SignupForm() {
                 checked={experience === "consultant"}
                 onChange={() => selectExperience("consultant")}
               />{" "}
-              <strong>I’m a consultant</strong>
+              <strong>For myself</strong>
               <p>
                 Talk through your own ideas and turn them into articles in your
                 voice.
@@ -257,17 +255,23 @@ export function SignupForm() {
     <div>
       <button type="button" onClick={back}>
         ← Back ·{" "}
-        {experience === "consultant" ? "Consultant" : "Content marketing"}
+        {experience === "consultant"
+          ? "For myself"
+          : "Company or marketing team"}
       </button>
       <header className={styles.formHeader}>
         <h2>Create your account</h2>
         <p>Start writing better articles with AI that works with you.</p>
       </header>
 
-      <GoogleAuthButton
-        className={styles.googleAction}
-        onClick={() => setNotice("Google sign-up will be available soon.")}
-      />
+      <div className={styles.googleUnavailable}>
+        <GoogleAuthButton
+          className={styles.googleAction}
+          disabled
+          label="Google sign-up is coming soon"
+        />
+        <p>Google sign-up isn’t available yet. Use your email and password.</p>
+      </div>
 
       <AuthDivider />
 
@@ -316,12 +320,6 @@ export function SignupForm() {
       {submitError ? (
         <p className={styles.formError} role="alert">
           {submitError}
-        </p>
-      ) : null}
-
-      {notice ? (
-        <p className={styles.formNotice} role="status">
-          {notice}
         </p>
       ) : null}
 

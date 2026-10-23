@@ -164,6 +164,64 @@ describe("Live interview events", () => {
     expect(onComplete).toHaveBeenCalledWith("questions_complete");
   });
 
+  it("ignores an end_interview call rejected by the backend phase gate", async () => {
+    const onComplete = vi.fn();
+    const approveCompletion = vi.fn().mockResolvedValue(false);
+    const { result } = renderHook(() =>
+      useRealtimeInterview("test-token", "openai_webrtc", {
+        onComplete,
+        approveCompletion,
+      }),
+    );
+    act(() => result.current.start());
+    await waitFor(() => expect(createCallMock).toHaveBeenCalledOnce());
+
+    act(() => {
+      MockPeerConnection.latest.channel.receive({
+        type: "response.output_item.done",
+        item: {
+          type: "function_call",
+          name: "end_interview",
+          arguments: JSON.stringify({ reason: "questions_complete" }),
+        },
+      });
+    });
+    await waitFor(() => expect(approveCompletion).toHaveBeenCalledOnce());
+
+    expect(approveCompletion).toHaveBeenCalledWith(
+      "11111111-1111-4111-8111-111111111111",
+      "questions_complete",
+    );
+    expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  it("finishes after the backend reports completion and closing audio ends", async () => {
+    const onComplete = vi.fn();
+    const checkCompletion = vi.fn().mockResolvedValue("questions_complete");
+    const { result } = renderHook(() =>
+      useRealtimeInterview("test-token", "openai_webrtc", {
+        onComplete,
+        checkCompletion,
+      }),
+    );
+    act(() => result.current.start());
+    await waitFor(() => expect(createCallMock).toHaveBeenCalledOnce());
+
+    vi.useFakeTimers();
+    await act(async () => {
+      MockPeerConnection.latest.channel.receive({
+        type: "session.output_audio.done",
+      });
+      await Promise.resolve();
+    });
+    expect(checkCompletion).toHaveBeenCalledWith(
+      "11111111-1111-4111-8111-111111111111",
+    );
+
+    act(() => vi.advanceTimersByTime(2_000));
+    expect(onComplete).toHaveBeenCalledWith("questions_complete");
+  });
+
   it("normalizes final ElevenLabs messages into the shared transcript contract", async () => {
     createCallMock.mockResolvedValueOnce({
       transport: "elevenlabs_webrtc",

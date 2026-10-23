@@ -4,6 +4,73 @@
   color: var(--color-ink-navy);
   font-family: var(--font-manrope), "Segoe UI", sans-serif;
 }
+
+.reviewSummary {
+  margin: 18px 0 26px;
+  padding: 16px 18px;
+  border: 1px solid rgba(200, 23, 69, 0.3);
+  border-radius: 12px;
+  background: #fff7f8;
+}
+
+.findingList {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 24px;
+}
+
+.findingCard {
+  padding: 14px 16px;
+  border: 1px solid rgba(200, 23, 69, 0.3);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.findingCard[data-classification="interpretation"] {
+  border-color: rgba(201, 151, 34, 0.35);
+  background: #fffcf3;
+}
+
+.findingCard mark {
+  background: #ffdce4;
+  color: inherit;
+}
+
+.findingActions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.repairDialog {
+  width: min(760px, calc(100vw - 32px));
+  max-height: 88dvh;
+  overflow: auto;
+  padding: 24px;
+  border: 0;
+  border-radius: 14px;
+  box-shadow: 0 24px 80px rgba(10, 20, 45, 0.28);
+}
+
+.repairComparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin: 18px 0;
+}
+
+.repairComparison > div {
+  padding: 14px;
+  border-radius: 10px;
+  background: #f7f5f2;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 640px) {
+  .repairComparison {
+    grid-template-columns: 1fr;
+  }
+}
 .nav {
   display: flex;
   align-items: center;

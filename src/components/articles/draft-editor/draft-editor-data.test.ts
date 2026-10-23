@@ -39,9 +39,10 @@ describe("draft editor data", () => {
 
     expect(normalized.root.children).toHaveLength(1);
     expect(normalized.root.children[0]).toMatchObject({
-      type: "paragraph",
+      type: "anchored-paragraph",
       version: 1,
     });
+    expect(normalized.root.children[0]).toHaveProperty("paragraphId");
   });
 
   it("maps an API article and draft into editor state and back", () => {
@@ -83,13 +84,13 @@ describe("draft editor data", () => {
     });
     expect(toArticleDraftPatch(editorDraft)).toEqual({
       sections: draft.sections.map(
-        ({ id, outline_section_id, title, goal, checklist, editor_state }) => ({
+        ({ id, outline_section_id, title, goal, checklist }) => ({
           id,
           outline_section_id,
           title,
           goal,
           checklist,
-          editor_state,
+          editor_state: editorDraft.sections[0].editorState,
         }),
       ),
     });

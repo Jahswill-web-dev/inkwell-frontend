@@ -140,14 +140,29 @@ export function createEditorStateFromBlocks(
 export function normalizeEditorState(editorState: string): string {
   try {
     const parsed = JSON.parse(editorState) as {
-      root?: { children?: unknown };
+      root?: { children?: Array<Record<string, unknown>> };
     };
     if (
       parsed.root &&
       Array.isArray(parsed.root.children) &&
       parsed.root.children.length === 0
     ) {
-      return createEditorState([""]);
+      return normalizeEditorState(createEditorState([""]));
+    }
+    if (parsed.root && Array.isArray(parsed.root.children)) {
+      parsed.root.children = parsed.root.children.map((node) =>
+        node.type === "paragraph"
+          ? {
+              ...node,
+              type: "anchored-paragraph",
+              paragraphId:
+                typeof node.paragraphId === "string"
+                  ? node.paragraphId
+                  : crypto.randomUUID(),
+            }
+          : node,
+      );
+      return JSON.stringify(parsed);
     }
   } catch {
     return editorState;

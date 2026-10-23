@@ -1967,3 +1967,34 @@
     transition: none;
   }
 }
+
+.editorContent
+  [data-fidelity-classification="unsupported"]:not(
+    [data-fidelity-exact="true"]
+  ) {
+  border-left: 4px solid #c81745;
+  margin-left: -14px;
+  padding-left: 10px;
+  background: linear-gradient(90deg, rgba(200, 23, 69, 0.11), transparent 72%);
+}
+
+.editorContent
+  [data-fidelity-classification="interpretation"]:not(
+    [data-fidelity-exact="true"]
+  ) {
+  border-left: 3px solid #c99722;
+  margin-left: -13px;
+  padding-left: 10px;
+  background: linear-gradient(90deg, rgba(201, 151, 34, 0.08), transparent 65%);
+}
+
+::highlight(inkwell-unsupported) {
+  color: inherit;
+  background: #ffd2dc;
+  text-decoration: underline wavy #c81745 1.5px;
+}
+
+::highlight(inkwell-interpretation) {
+  color: inherit;
+  background: #fff0b8;
+}

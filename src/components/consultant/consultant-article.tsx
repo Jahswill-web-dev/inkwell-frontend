@@ -15,8 +15,6 @@ import { useRouter } from "next/navigation";
 import {
   consultantRequest as api,
   type Article,
-  type DraftFinding,
-  type FindingRepairPreview,
   type Revision,
   type Section,
 } from "@/lib/consultant/client";
@@ -189,9 +187,6 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
   const previewCloseButtonRef = useRef<HTMLButtonElement>(null);
   const previewTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [editorVersion, setEditorVersion] = useState(0);
-  const [repairFinding, setRepairFinding] = useState<DraftFinding | null>(null);
-  const [repairPreview, setRepairPreview] =
-    useState<FindingRepairPreview | null>(null);
   const reload = useCallback(async () => {
     const a = normalizeArticleHeadings(
       await api<Article>(`articles/${articleId}`),
@@ -355,48 +350,6 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
     await reload();
     setNotice("Your suggestion is being prepared.");
   }
-  async function previewFindingRepair(finding: DraftFinding) {
-    const current = dirty ? await save() : article;
-    if (!current?.draft_updated_at) return;
-    const result = await api<FindingRepairPreview>(
-      `articles/${articleId}/findings/${finding.id}/repair-preview`,
-      "POST",
-      {},
-      { "If-Unmodified-Since": current.draft_updated_at },
-    );
-    setRepairFinding(finding);
-    setRepairPreview(result);
-  }
-  async function applyFindingRepair() {
-    if (!repairFinding || !repairPreview) return;
-    await api(
-      `articles/${articleId}/findings/${repairFinding.id}/apply`,
-      "POST",
-      { replacement_paragraph: repairPreview.after },
-      { "If-Unmodified-Since": repairPreview.target_version },
-    );
-    setRepairFinding(null);
-    setRepairPreview(null);
-    dirtyRef.current = false;
-    setDirty(false);
-    await reload();
-    setEditorVersion((version) => version + 1);
-    setNotice(
-      "The selected paragraph was repaired. Other sections were unchanged.",
-    );
-  }
-  async function recheckFinding(finding: DraftFinding) {
-    const current = dirty ? await save() : article;
-    if (!current?.draft_updated_at) return;
-    await api(
-      `articles/${articleId}/findings/${finding.id}/recheck`,
-      "POST",
-      {},
-      { "If-Unmodified-Since": current.draft_updated_at },
-    );
-    await reload();
-    setNotice("That paragraph was checked again.");
-  }
   async function start() {
     const i = await api<{ id: string }>(
       `articles/${articleId}/interviews`,
@@ -458,7 +411,7 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
   const generationSteps = [
     { id: "understand", label: "Understand your argument and voice" },
     { id: "write", label: "Write the article" },
-    { id: "check", label: "Check it against your interview" },
+    { id: "saving", label: "Save the article" },
   ];
   const activeStage = generationSteps.findIndex(
     (step) => step.id === article.job?.stage,
@@ -471,13 +424,6 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
   const detailsDirty =
     detailTitle !== savedDetailTitle ||
     detailDescription !== savedDetailDescription;
-  const openFindings = (article.findings ?? []).filter(
-    (finding) => finding.status === "open",
-  );
-  const unsupportedCount = openFindings.filter(
-    (finding) => finding.classification === "unsupported",
-  ).length;
-
   function resetArticleDetails() {
     setDetailTitle(savedDetailTitle);
     setDetailDescription(savedDetailDescription);
@@ -668,24 +614,6 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
           </button>
         </section>
       )}
-      {article.job?.state === "succeeded" &&
-        !aiJob &&
-        (article.job.writing_suggestions?.length ?? 0) > 0 && (
-          <section className={`${styles.card} ${styles.writingNotes}`}>
-            <h2>Writing notes</h2>
-            <p>
-              Your article is ready. These optional ideas may help you polish
-              it.
-            </p>
-            <ul>
-              {article.job.writing_suggestions?.map((suggestion, index) => (
-                <li key={`${suggestion.section}-${index}`}>
-                  <strong>{suggestion.section}:</strong> {suggestion.text}
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
       {!sections.length && !generating && !article.job && (
         <section className={styles.card}>
           <p>{article.description}</p>
@@ -811,111 +739,42 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
               ? "You have unsaved changes. Save before leaving this page."
               : "Your accepted draft is saved."}
           </p>
-          {unsupportedCount > 0 && (
-            <section className={styles.reviewSummary} aria-live="polite">
-              <strong>
-                {unsupportedCount} unsupported{" "}
-                {unsupportedCount === 1 ? "claim" : "claims"} to review
-              </strong>
-              <p>
-                Your complete draft is available. These warnings do not block
-                saving or export.
-              </p>
-            </section>
-          )}
           <div className={styles.editor}>
-            {sections.map((s, index) => {
-              const sectionFindings = openFindings.filter(
-                (finding) =>
-                  finding.section_id === s.id ||
-                  finding.section_index === index,
-              );
-              return (
-                <div key={`${editorVersion}:${s.id}`}>
-                  <DraftRichSection
-                    key={`${editorVersion}:${s.id}`}
-                    section={{
-                      ...s,
-                      outlineSectionId: s.outline_section_id,
-                      editorState: s.editor_state,
-                    }}
-                    index={index}
-                    findings={sectionFindings}
-                    onTitleChange={(id, title) => {
-                      setSections((current) =>
-                        current.map((section) =>
-                          section.id === id
-                            ? { ...section, title: withoutHeadingNumber(title) }
-                            : section,
-                        ),
+            {sections.map((s, index) => (
+              <div key={`${editorVersion}:${s.id}`}>
+                <DraftRichSection
+                  key={`${editorVersion}:${s.id}`}
+                  section={{
+                    ...s,
+                    outlineSectionId: s.outline_section_id,
+                    editorState: s.editor_state,
+                  }}
+                  index={index}
+                  onTitleChange={(id, title) => {
+                    setSections((current) =>
+                      current.map((section) =>
+                        section.id === id
+                          ? { ...section, title: withoutHeadingNumber(title) }
+                          : section,
+                      ),
+                    );
+                    dirtyRef.current = true;
+                    setDirty(true);
+                  }}
+                  showSectionNumber={false}
+                  onChange={(id, state) => {
+                    setSections((current) => {
+                      const next = current.map((s) =>
+                        s.id === id ? { ...s, editor_state: state } : s,
                       );
-                      dirtyRef.current = true;
-                      setDirty(true);
-                    }}
-                    showSectionNumber={false}
-                    onChange={(id, state) => {
-                      setSections((current) => {
-                        const next = current.map((s) =>
-                          s.id === id ? { ...s, editor_state: state } : s,
-                        );
-                        return next;
-                      });
-                      dirtyRef.current = true;
-                      setDirty(true);
-                    }}
-                  />
-                  {sectionFindings.length > 0 && (
-                    <div className={styles.findingList}>
-                      {sectionFindings.map((finding) => (
-                        <article
-                          className={styles.findingCard}
-                          data-classification={finding.classification}
-                          key={finding.id}
-                        >
-                          <strong>
-                            {finding.classification === "unsupported"
-                              ? "Unsupported claim"
-                              : "Editorial interpretation"}
-                          </strong>
-                          {finding.claim_text && (
-                            <p>
-                              <mark>{finding.claim_text}</mark>
-                            </p>
-                          )}
-                          <p>{finding.explanation}</p>
-                          {finding.source_turn_ids.length > 0 && (
-                            <small>
-                              Interview sources:{" "}
-                              {finding.source_turn_ids.join(", ")}
-                            </small>
-                          )}
-                          {finding.classification === "unsupported" && (
-                            <div className={styles.findingActions}>
-                              <button
-                                disabled={busy}
-                                onClick={() =>
-                                  void run(() => previewFindingRepair(finding))
-                                }
-                              >
-                                Repair
-                              </button>
-                              <button
-                                disabled={busy}
-                                onClick={() =>
-                                  void run(() => recheckFinding(finding))
-                                }
-                              >
-                                Recheck
-                              </button>
-                            </div>
-                          )}
-                        </article>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                      return next;
+                    });
+                    dirtyRef.current = true;
+                    setDirty(true);
+                  }}
+                />
+              </div>
+            ))}
           </div>
           <p className={styles.muted}>
             Ask AI to improve this article. You will review the full suggestion
@@ -1208,17 +1067,6 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
                 )}
               </div>
             )}
-            {(preview.findings ?? []).some(
-              (finding) =>
-                finding.status === "open" &&
-                finding.classification === "unsupported",
-            ) && (
-              <div className={styles.reviewSummary} role="status">
-                This proposal contains unsupported claims. You can inspect them
-                now and repair them after applying the proposal.
-              </div>
-            )}
-
             {previewHasDifferences && (
               <div
                 aria-label="Rewrite preview view"
@@ -1299,11 +1147,6 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
                               editorState: section.editor_state,
                             }}
                             index={index}
-                            findings={(preview.findings ?? []).filter(
-                              (finding) =>
-                                finding.section_id === section.id ||
-                                finding.section_index === index,
-                            )}
                             readOnly
                             showSectionNumber={false}
                           />
@@ -1369,11 +1212,6 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
                         editorState: section.editor_state,
                       }}
                       index={index}
-                      findings={(preview.findings ?? []).filter(
-                        (finding) =>
-                          finding.section_id === section.id ||
-                          finding.section_index === index,
-                      )}
                       readOnly
                       showSectionNumber={false}
                     />
@@ -1439,53 +1277,6 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
                 </button>
               </div>
             </footer>
-          </section>
-        </div>
-      )}
-      {repairPreview && repairFinding && (
-        <div className={styles.previewBackdrop} role="presentation">
-          <section
-            aria-labelledby="repair-preview-title"
-            aria-modal="true"
-            className={styles.repairDialog}
-            role="dialog"
-          >
-            <h2 id="repair-preview-title">Review this claim repair</h2>
-            <p>{repairFinding.explanation}</p>
-            <div className={styles.repairComparison}>
-              <div>
-                <strong>Before</strong>
-                <p>{repairPreview.before}</p>
-              </div>
-              <div>
-                <strong>After</strong>
-                <p>{repairPreview.after}</p>
-              </div>
-            </div>
-            {repairPreview.classification === "unsupported" && (
-              <p role="alert">
-                The proposed wording still has an unsupported claim. You can
-                close this preview and edit manually.
-              </p>
-            )}
-            <div className={styles.findingActions}>
-              <button
-                className={styles.secondary}
-                onClick={() => {
-                  setRepairPreview(null);
-                  setRepairFinding(null);
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                className={styles.primary}
-                disabled={busy}
-                onClick={() => void run(applyFindingRepair)}
-              >
-                Apply to this paragraph
-              </button>
-            </div>
           </section>
         </div>
       )}

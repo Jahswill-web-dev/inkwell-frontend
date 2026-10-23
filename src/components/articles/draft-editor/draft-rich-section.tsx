@@ -27,8 +27,7 @@ import {
   type SerializedParagraphNode,
   type Spread,
 } from "lexical";
-import { useEffect, useId, type ReactNode } from "react";
-import type { DraftFinding } from "@/lib/consultant/client";
+import { useEffect, type ReactNode } from "react";
 import { normalizeEditorState, type DraftSection } from "./draft-editor-data";
 import styles from "./draft-editor.module.css";
 
@@ -129,129 +128,6 @@ class AnchoredParagraphNode extends ParagraphNode {
   }
 }
 
-type HighlightConstructor = new (...ranges: Range[]) => unknown;
-const findingHighlightRanges = new Map<
-  string,
-  { unsupported: Range[]; interpretation: Range[] }
->();
-
-function renderFindingHighlights() {
-  const registry = (CSS as unknown as { highlights?: Map<string, unknown> })
-    .highlights;
-  const HighlightClass = (
-    globalThis as unknown as { Highlight?: HighlightConstructor }
-  ).Highlight;
-  if (!registry || !HighlightClass) return;
-  const unsupported = [...findingHighlightRanges.values()].flatMap(
-    (item) => item.unsupported,
-  );
-  const interpretation = [...findingHighlightRanges.values()].flatMap(
-    (item) => item.interpretation,
-  );
-  registry.set("inkwell-unsupported", new HighlightClass(...unsupported));
-  registry.set("inkwell-interpretation", new HighlightClass(...interpretation));
-}
-
-function textRange(element: Element, claim: string): Range | null {
-  const whole = element.textContent ?? "";
-  const start = whole.indexOf(claim);
-  if (start < 0) return null;
-  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-  let consumed = 0;
-  let startNode: Node | null = null;
-  let endNode: Node | null = null;
-  let startOffset = 0;
-  let endOffset = 0;
-  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    const length = node.textContent?.length ?? 0;
-    if (!startNode && start <= consumed + length) {
-      startNode = node;
-      startOffset = start - consumed;
-    }
-    if (start + claim.length <= consumed + length) {
-      endNode = node;
-      endOffset = start + claim.length - consumed;
-      break;
-    }
-    consumed += length;
-  }
-  if (!startNode || !endNode) return null;
-  const range = document.createRange();
-  range.setStart(startNode, startOffset);
-  range.setEnd(endNode, endOffset);
-  return range;
-}
-
-function FindingHighlights({
-  findings,
-  scope,
-}: {
-  findings: DraftFinding[];
-  scope: string;
-}) {
-  const [editor] = useLexicalComposerContext();
-
-  useEffect(
-    () =>
-      editor.registerRootListener((root, previous) => {
-        for (const container of [previous, root]) {
-          container
-            ?.querySelectorAll("[data-fidelity-finding]")
-            .forEach((node) => {
-              node.removeAttribute("data-fidelity-finding");
-              node.removeAttribute("data-fidelity-classification");
-              node.removeAttribute("data-fidelity-exact");
-            });
-        }
-        const ranges = {
-          unsupported: [] as Range[],
-          interpretation: [] as Range[],
-        };
-        for (const finding of findings.filter(
-          (item) => item.status === "open",
-        )) {
-          const target = finding.paragraph_id
-            ? root?.querySelector(
-                `[data-paragraph-id="${CSS.escape(finding.paragraph_id)}"]`,
-              )
-            : root?.children.item(finding.paragraph_index ?? -1);
-          if (target instanceof HTMLElement) {
-            target.dataset.fidelityFinding = finding.id;
-            if (
-              target.dataset.fidelityClassification !== "unsupported" ||
-              finding.classification === "unsupported"
-            ) {
-              target.dataset.fidelityClassification = finding.classification;
-            }
-            target.title = finding.explanation;
-            const range = finding.claim_text
-              ? textRange(target, finding.claim_text)
-              : null;
-            if (range && finding.classification !== "supported") {
-              if (target.dataset.fidelityExact !== "false") {
-                target.dataset.fidelityExact = "true";
-              }
-              ranges[finding.classification].push(range);
-            } else {
-              target.dataset.fidelityExact = "false";
-            }
-          }
-        }
-        findingHighlightRanges.set(scope, ranges);
-        renderFindingHighlights();
-      }),
-    [editor, findings, scope],
-  );
-  useEffect(
-    () => () => {
-      findingHighlightRanges.delete(scope);
-      renderFindingHighlights();
-    },
-    [scope],
-  );
-  return null;
-}
-
 export function insertEditorImage(
   editor: LexicalEditor,
   src: string,
@@ -299,7 +175,6 @@ export function DraftRichSection({
   onSelection,
   showSectionNumber = true,
   temporaryContent,
-  findings = [],
 }: {
   section: DraftSection;
   index: number;
@@ -311,9 +186,7 @@ export function DraftRichSection({
   onSelection?: (sectionId: string, text: string) => void;
   showSectionNumber?: boolean;
   temporaryContent?: ReactNode;
-  findings?: DraftFinding[];
 }) {
-  const highlightScope = useId();
   const initialConfig = {
     namespace: `inkwell-draft-${section.id}-${readOnly ? "preview" : "editor"}`,
     editable: !readOnly,
@@ -384,7 +257,6 @@ export function DraftRichSection({
               }
               ErrorBoundary={({ children }) => children}
             />
-            <FindingHighlights findings={findings} scope={highlightScope} />
             {!readOnly ? (
               <>
                 <HistoryPlugin />

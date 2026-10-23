@@ -25,6 +25,13 @@ export type VoiceEndReason =
 
 type RealtimeInterviewOptions = {
   createSession?: typeof createVoiceInterviewSession;
+  approveCompletion?: (
+    sessionId: string,
+    reason: RealtimeCompletionReason,
+  ) => Promise<boolean>;
+  checkCompletion?: (
+    sessionId: string,
+  ) => Promise<RealtimeCompletionReason | null>;
   onComplete?: (reason: RealtimeCompletionReason) => void;
   onTranscriptTurn?: (turn: InterviewTranscriptTurn) => Promise<void>;
 };
@@ -97,6 +104,8 @@ export function useRealtimeInterview(
     onComplete,
     onTranscriptTurn,
     createSession,
+    approveCompletion,
+    checkCompletion,
   }: RealtimeInterviewOptions = {},
 ) {
   const createSessionRef = useRef(createSession);
@@ -109,6 +118,9 @@ export function useRealtimeInterview(
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const completionReasonRef = useRef<RealtimeCompletionReason | null>(null);
   const onCompleteRef = useRef(onComplete);
+  const approveCompletionRef = useRef(approveCompletion);
+  const checkCompletionRef = useRef(checkCompletion);
+  const completionCheckPendingRef = useRef(false);
   const onTranscriptTurnRef = useRef(onTranscriptTurn);
   const seenTranscriptItemsRef = useRef(new Set<string>());
   const transcriptBuffersRef = useRef(
@@ -191,6 +203,42 @@ export function useRealtimeInterview(
     }
   }, [token]);
 
+  const scheduleApprovedCompletion = useCallback(
+    (reason: RealtimeCompletionReason) => {
+      completionReasonRef.current = reason;
+      if (completionTimerRef.current !== null)
+        window.clearTimeout(completionTimerRef.current);
+      completionTimerRef.current = window.setTimeout(() => {
+        completionTimerRef.current = null;
+        const approvedReason = completionReasonRef.current;
+        completionReasonRef.current = null;
+        if (approvedReason && activeRef.current)
+          onCompleteRef.current?.(approvedReason);
+      }, FINAL_AUDIO_CLOSE_DELAY_MS);
+    },
+    [],
+  );
+
+  const checkServerCompletion = useCallback(() => {
+    const check = checkCompletionRef.current;
+    const sessionId = voiceSessionIdRef.current;
+    if (!check || !sessionId || completionCheckPendingRef.current) return;
+    completionCheckPendingRef.current = true;
+    void check(sessionId)
+      .then((reason) => {
+        if (
+          reason &&
+          activeRef.current &&
+          voiceSessionIdRef.current === sessionId
+        )
+          scheduleApprovedCompletion(reason);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        completionCheckPendingRef.current = false;
+      });
+  }, [scheduleApprovedCompletion]);
+
   const { startSession: startElevenSession, endSession: endElevenSession } =
     useConversation({
       clientTools: {
@@ -201,15 +249,7 @@ export function useRealtimeInterview(
           ) {
             return "invalid_completion_reason";
           }
-          completionReasonRef.current = parameters.reason;
-          if (completionTimerRef.current !== null)
-            window.clearTimeout(completionTimerRef.current);
-          completionTimerRef.current = window.setTimeout(() => {
-            completionTimerRef.current = null;
-            const reason = completionReasonRef.current;
-            completionReasonRef.current = null;
-            if (reason && activeRef.current) onCompleteRef.current?.(reason);
-          }, FINAL_AUDIO_CLOSE_DELAY_MS);
+          scheduleApprovedCompletion(parameters.reason);
           return "accepted";
         },
       },
@@ -299,6 +339,12 @@ export function useRealtimeInterview(
   useEffect(() => {
     onCompleteRef.current = onComplete;
   }, [onComplete]);
+  useEffect(() => {
+    approveCompletionRef.current = approveCompletion;
+  }, [approveCompletion]);
+  useEffect(() => {
+    checkCompletionRef.current = checkCompletion;
+  }, [checkCompletion]);
   useEffect(() => {
     onTranscriptTurnRef.current = onTranscriptTurn;
   }, [onTranscriptTurn]);
@@ -503,15 +549,17 @@ export function useRealtimeInterview(
             ].includes(liveEvent.type ?? "")
           )
             setActivity("speaking");
+          const outputAudioFinished = [
+            "session.output_audio.done",
+            "response.output_audio.done",
+            "output_audio_buffer.stopped",
+          ].includes(liveEvent.type ?? "");
           if (
-            [
-              "session.output_audio.done",
-              "response.output_audio.done",
-              "output_audio_buffer.stopped",
-              "input_audio_buffer.speech_started",
-            ].includes(liveEvent.type ?? "")
+            outputAudioFinished ||
+            liveEvent.type === "input_audio_buffer.speech_started"
           )
             setActivity("listening");
+          if (outputAudioFinished) checkServerCompletion();
           if (liveEvent.type === "error") {
             logVoiceDiagnostic("realtime_server_error", {
               callAttemptId: callAttemptIdRef.current,
@@ -664,16 +712,23 @@ export function useRealtimeInterview(
                 value.reason === "participant_finished" ||
                 value.reason === "questions_complete"
               ) {
-                completionReasonRef.current = value.reason;
-                if (completionTimerRef.current !== null)
-                  window.clearTimeout(completionTimerRef.current);
-                completionTimerRef.current = window.setTimeout(() => {
-                  completionTimerRef.current = null;
-                  const reason = completionReasonRef.current;
-                  completionReasonRef.current = null;
-                  if (reason && activeRef.current)
-                    onCompleteRef.current?.(reason);
-                }, FINAL_AUDIO_CLOSE_DELAY_MS);
+                const reason = value.reason;
+                const sessionId = voiceSessionIdRef.current;
+                void (async () => {
+                  const approve = approveCompletionRef.current;
+                  const approved =
+                    !approve ||
+                    (sessionId !== null &&
+                      (await approve(sessionId, reason).catch(() => false)));
+                  if (!approved) {
+                    logVoiceDiagnostic("interview_completion_rejected", {
+                      callAttemptId: callAttemptIdRef.current,
+                      source: "backend_phase_gate",
+                    });
+                    return;
+                  }
+                  scheduleApprovedCompletion(reason);
+                })();
               }
             } catch {
               // Keep the interview active on malformed tool input.
@@ -738,12 +793,14 @@ export function useRealtimeInterview(
       }
     },
     [
+      checkServerCompletion,
       clearTimers,
       closeTransport,
       persistOutbox,
       releaseMicrophone,
       scheduleReconnect,
       setInterviewStatus,
+      scheduleApprovedCompletion,
       token,
       transport,
       startElevenSession,
@@ -761,6 +818,7 @@ export function useRealtimeInterview(
     voiceSessionIdRef.current = null;
     externalSessionIdRef.current = null;
     completionReasonRef.current = null;
+    completionCheckPendingRef.current = false;
     reconnectAttemptRef.current = 0;
     seenTranscriptItemsRef.current.clear();
     logVoiceDiagnostic("voice_call_started", {
@@ -778,6 +836,7 @@ export function useRealtimeInterview(
       });
       activeRef.current = false;
       completionReasonRef.current = null;
+      completionCheckPendingRef.current = false;
       generationRef.current += 1;
       if (eventsRef.current?.readyState === "open") {
         eventsRef.current.send(JSON.stringify({ type: "session.close" }));

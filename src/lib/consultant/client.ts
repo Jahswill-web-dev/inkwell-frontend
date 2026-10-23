@@ -36,6 +36,15 @@ export type Interview = {
   title: string;
   description: string;
   state: string;
+  voice_phase:
+    | "awaiting_readiness"
+    | "awaiting_direction_confirmation"
+    | "framing"
+    | "adaptive_interview"
+    | "awaiting_final_contribution"
+    | "awaiting_recap_confirmation"
+    | "completed"
+    | null;
   questions: { id: string; text: string }[];
   turns: Turn[];
   corrections: Record<string, { text: string | null; excluded: boolean }>;

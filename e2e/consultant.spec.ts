@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 
-test("private generation performance shows jobs and an attempt timeline", async ({ page }, testInfo) => {
+test("private generation performance shows jobs and an attempt timeline", async ({
+  page,
+}, testInfo) => {
   const job = {
     id: "46a42280-6ad8-4bb6-a29c-1604adbf0c36",
     article_id: articleId,
@@ -20,26 +22,114 @@ test("private generation performance shows jobs and an attempt timeline", async 
     total_tokens: 4200,
     detailed_timing_available: true,
   };
-  await page.route("**/api/consultant/performance/jobs**", route => {
+  await page.route("**/api/consultant/performance/jobs**", (route) => {
     const path = new URL(route.request().url()).pathname;
-    if (path.endsWith(job.id)) return route.fulfill({ json: {
-      ...job, events: [
-        { id: "event-1", attempt: 0, kind: "queue", operation: null, model_id: null, started_at: "2026-10-21T10:00:00Z", ended_at: "2026-10-21T10:00:12Z", duration_ms: 12000, outcome: "completed", input_tokens: null, output_tokens: null, provider_request_id: null },
-        { id: "event-2", attempt: 1, kind: "call", operation: "write", model_id: "writer-model", started_at: "2026-10-21T10:00:14Z", ended_at: "2026-10-21T10:00:45Z", duration_ms: 31000, outcome: "succeeded", input_tokens: 1000, output_tokens: 2000, provider_request_id: "req-test" },
-        { id: "event-3", attempt: 1, kind: "wait", operation: "rate_limit", model_id: "checker-model", started_at: "2026-10-21T10:00:45Z", ended_at: "2026-10-21T10:01:50Z", duration_ms: 65000, outcome: "completed", input_tokens: null, output_tokens: null, provider_request_id: null },
-      ],
-    }});
-    return route.fulfill({ json: { items: [
-      job,
-      { ...job, id: "46a42280-6ad8-4bb6-a29c-1604adbf0c37", article_title: "A clearer opening", request_type: "ask_ai", total_seconds: 54, queue_seconds: 4, rate_limit_seconds: 0, models: ["writer-model"], total_tokens: 930 },
-      { ...job, id: "46a42280-6ad8-4bb6-a29c-1604adbf0c38", article_title: "Why ownership matters", status: "failed", total_seconds: 187, queue_seconds: 22, rate_limit_seconds: 65 },
-      { ...job, id: "46a42280-6ad8-4bb6-a29c-1604adbf0c39", article_title: "Lessons from client handoffs", total_seconds: 79, queue_seconds: 7, rate_limit_seconds: 0 },
-      { ...job, id: "46a42280-6ad8-4bb6-a29c-1604adbf0c40", article_title: "An earlier article", detailed_timing_available: false, total_seconds: 95, queue_seconds: null, rate_limit_seconds: null },
-    ], page: 1, page_size: 20, total: 5, median_seconds: 95, p95_seconds: 187 } });
+    if (path.endsWith(job.id))
+      return route.fulfill({
+        json: {
+          ...job,
+          events: [
+            {
+              id: "event-1",
+              attempt: 0,
+              kind: "queue",
+              operation: null,
+              model_id: null,
+              started_at: "2026-10-21T10:00:00Z",
+              ended_at: "2026-10-21T10:00:12Z",
+              duration_ms: 12000,
+              outcome: "completed",
+              input_tokens: null,
+              output_tokens: null,
+              provider_request_id: null,
+            },
+            {
+              id: "event-2",
+              attempt: 1,
+              kind: "call",
+              operation: "write",
+              model_id: "writer-model",
+              started_at: "2026-10-21T10:00:14Z",
+              ended_at: "2026-10-21T10:00:45Z",
+              duration_ms: 31000,
+              outcome: "succeeded",
+              input_tokens: 1000,
+              output_tokens: 2000,
+              provider_request_id: "req-test",
+            },
+            {
+              id: "event-3",
+              attempt: 1,
+              kind: "wait",
+              operation: "rate_limit",
+              model_id: "checker-model",
+              started_at: "2026-10-21T10:00:45Z",
+              ended_at: "2026-10-21T10:01:50Z",
+              duration_ms: 65000,
+              outcome: "completed",
+              input_tokens: null,
+              output_tokens: null,
+              provider_request_id: null,
+            },
+          ],
+        },
+      });
+    return route.fulfill({
+      json: {
+        items: [
+          job,
+          {
+            ...job,
+            id: "46a42280-6ad8-4bb6-a29c-1604adbf0c37",
+            article_title: "A clearer opening",
+            request_type: "ask_ai",
+            total_seconds: 54,
+            queue_seconds: 4,
+            rate_limit_seconds: 0,
+            models: ["writer-model"],
+            total_tokens: 930,
+          },
+          {
+            ...job,
+            id: "46a42280-6ad8-4bb6-a29c-1604adbf0c38",
+            article_title: "Why ownership matters",
+            status: "failed",
+            total_seconds: 187,
+            queue_seconds: 22,
+            rate_limit_seconds: 65,
+          },
+          {
+            ...job,
+            id: "46a42280-6ad8-4bb6-a29c-1604adbf0c39",
+            article_title: "Lessons from client handoffs",
+            total_seconds: 79,
+            queue_seconds: 7,
+            rate_limit_seconds: 0,
+          },
+          {
+            ...job,
+            id: "46a42280-6ad8-4bb6-a29c-1604adbf0c40",
+            article_title: "An earlier article",
+            detailed_timing_available: false,
+            total_seconds: 95,
+            queue_seconds: null,
+            rate_limit_seconds: null,
+          },
+        ],
+        page: 1,
+        page_size: 20,
+        total: 5,
+        median_seconds: 95,
+        p95_seconds: 187,
+      },
+    });
   });
-  if (testInfo.project.name === "chromium") await page.setViewportSize({ width: 1440, height: 1024 });
+  if (testInfo.project.name === "chromium")
+    await page.setViewportSize({ width: 1440, height: 1024 });
   await page.goto("/consultant/performance");
-  await expect(page.getByRole("heading", { name: "Generation performance" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Generation performance" }),
+  ).toBeVisible();
   await expect(page.getByText("Better handoffs")).toBeVisible();
   await expect(page.getByText("Detailed timing unavailable")).toBeVisible();
   await page.getByRole("button", { name: /Better handoffs/ }).click();
@@ -47,7 +137,10 @@ test("private generation performance shows jobs and an attempt timeline", async 
   await expect(page.getByText("req-test")).toBeVisible();
   await expect(page.getByText("Rate-limit wait")).toBeVisible();
   if (testInfo.project.name === "chromium")
-    await page.screenshot({ path: "test-results/performance-desktop.png", fullPage: true });
+    await page.screenshot({
+      path: "test-results/performance-desktop.png",
+      fullPage: true,
+    });
   await page.getByLabel("Request type").selectOption("ask_ai");
   await expect(page).toHaveURL(/performance/);
 });
@@ -192,7 +285,7 @@ test("article details panel supports cancel and save", async ({ page }) => {
   });
 });
 
-test("failed generation shows the draft checker's objections", async ({
+test("unsupported claims keep the draft visible with claim-level review", async ({
   page,
 }) => {
   const objection = "The example is not supported by the interview.";
@@ -208,18 +301,75 @@ test("failed generation shows the draft checker's objections", async ({
           id: articleId,
           title: "Better handoffs",
           description: "Why clear ownership matters",
-          status: "ready_to_draft",
+          status: "in_review",
           interviews: [{ id: interviewId, state: "completed" }],
-          sections: [],
+          sections: [
+            {
+              id: "8cbcf125-dac7-4c5a-9b09-918375bc3d8a",
+              outline_section_id: null,
+              title: "What AI can do",
+              goal: "Explain supported uses",
+              checklist: [],
+              editor_state: JSON.stringify({
+                root: {
+                  type: "root",
+                  version: 1,
+                  children: [
+                    {
+                      type: "anchored-paragraph",
+                      version: 1,
+                      paragraphId: "c0ee3c05-72f4-4349-84c0-48d37508b5d7",
+                      children: [
+                        {
+                          type: "text",
+                          version: 1,
+                          text: "AI can support predictions.",
+                        },
+                      ],
+                      direction: "ltr",
+                      format: "",
+                      indent: 0,
+                      textFormat: 0,
+                      textStyle: "",
+                    },
+                  ],
+                  direction: "ltr",
+                  format: "",
+                  indent: 0,
+                },
+              }),
+            },
+          ],
+          findings: [
+            {
+              id: "f81ff4a5-b686-4392-aa30-611b72a3b984",
+              classification: "unsupported",
+              category: "unsupported_prediction",
+              section_id: "8cbcf125-dac7-4c5a-9b09-918375bc3d8a",
+              section_index: 0,
+              paragraph_id: "c0ee3c05-72f4-4349-84c0-48d37508b5d7",
+              paragraph_index: 0,
+              claim_text: "AI can support predictions",
+              explanation: objection,
+              source_turn_ids: ["t40", "t42", "t44"],
+              external_source_ids: [],
+              suggested_replacement:
+                "AI can analyse large amounts of data and recognise patterns.",
+              status: "open",
+            },
+          ],
+          open_finding_count: 1,
           revisions: [],
-          draft_updated_at: null,
+          draft_updated_at: "2026-10-22T17:00:00Z",
           job: {
             id: "failed-job",
-            state: "failed",
-            stage: "check",
+            state: "succeeded",
+            stage: "complete",
             attempts: 1,
             instruction: "initial",
-            error: `We couldn't verify this draft against your interview. The draft checker flagged:\n1. ${objection}\nYour interview is saved. Please review these points before retrying.`,
+            error: null,
+            open_finding_count: 1,
+            review_status: "needs_attention",
           },
         },
       });
@@ -228,13 +378,11 @@ test("failed generation shows the draft checker's objections", async ({
 
   await page.goto(`/consultant/articles/${articleId}`);
   await expect(page.getByText(objection, { exact: false })).toBeVisible();
+  await expect(page.getByText("AI can support predictions.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Repair" })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Retry generation" }),
-  ).toBeVisible();
-  await expect(page.getByText(objection, { exact: false })).toHaveCSS(
-    "white-space",
-    "pre-line",
-  );
+  ).toHaveCount(0);
 });
 
 test("a style suggestion is shown as an optional note beside the saved article", async ({
@@ -625,7 +773,10 @@ test("draft proposals require explicit acceptance and export the accepted versio
   ).toHaveAttribute("href", "https://example.org/study");
   await preview.getByRole("button", { name: "Compare with current" }).click();
   await expect(
-    preview.getByRole("article").first().getByText("This is my original draft.", { exact: true }),
+    preview
+      .getByRole("article")
+      .first()
+      .getByText("This is my original draft.", { exact: true }),
   ).toBeVisible();
   await expect(preview.getByRole("article").last()).toContainText(
     "I call that expensive confusion.",

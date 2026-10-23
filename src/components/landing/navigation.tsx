@@ -64,7 +64,7 @@ export function Navigation() {
           >
             Sign in
           </a>
-          <a className={primaryButtonClass} href="/signup?experience=consultant">
+          <a className={primaryButtonClass} href="/signup">
             Start an article
           </a>
         </nav>
@@ -110,7 +110,7 @@ export function Navigation() {
         </a>
         <a
           className={`${primaryButtonClass} mt-2 w-full`}
-          href="/signup?experience=consultant"
+          href="/signup"
           onClick={closeMenu}
         >
           Start an article

@@ -147,6 +147,22 @@
   margin-top: 37px;
 }
 
+.googleUnavailable {
+  margin-top: 37px;
+}
+
+.googleUnavailable > button {
+  margin-top: 0;
+}
+
+.googleUnavailable p {
+  margin: 9px 0 0;
+  color: #5c6986;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
 .authForm {
   display: grid;
   gap: 27px;
@@ -283,6 +299,10 @@
   }
 
   .googleAction {
+    margin-top: 18px;
+  }
+
+  .googleUnavailable {
     margin-top: 18px;
   }
 

@@ -113,7 +113,7 @@ function Hero() {
             into a structured draft, and gives you the final say before you
             share it.
           </p>
-          <a className={styles.primaryButton} href="/signup?experience=consultant">
+          <a className={styles.primaryButton} href="/signup">
             Start an article <ArrowRight size={18} aria-hidden="true" />
           </a>
         </div>
@@ -207,7 +207,7 @@ function FinalCta() {
     <section className={styles.finalCta} aria-labelledby="final-cta-title">
       <p className={styles.eyebrow}>YOUR NEXT ARTICLE</p>
       <h2 id="final-cta-title">Your next article starts with a conversation.</h2>
-      <a className={styles.primaryButton} href="/signup?experience=consultant">
+      <a className={styles.primaryButton} href="/signup">
         Start an article <ArrowRight size={18} aria-hidden="true" />
       </a>
     </section>

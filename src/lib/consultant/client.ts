@@ -48,6 +48,22 @@ export type Section = {
   checklist: { id: string; label: string; completed: boolean }[];
   editor_state: string;
 };
+export type DraftFinding = {
+  id: string;
+  classification: "supported" | "interpretation" | "unsupported";
+  category: string;
+  section_id: string;
+  section_index: number;
+  paragraph_id: string | null;
+  paragraph_index: number | null;
+  claim_text: string;
+  explanation: string;
+  source_turn_ids: string[];
+  external_source_ids: string[];
+  suggested_replacement: string | null;
+  status: "open" | "resolved";
+  resolution_reason?: string | null;
+};
 export type Revision = {
   id: string;
   kind: string;
@@ -57,6 +73,7 @@ export type Revision = {
   request?: string;
   summary?: string;
   sources?: { id: string; title: string; url: string }[];
+  findings: DraftFinding[];
 };
 export type Article = {
   id: string;
@@ -74,8 +91,21 @@ export type Article = {
     request_kind?: "ask_ai" | "generation";
     clarification_question?: string | null;
     writing_suggestions?: { section: string; text: string }[];
+    review_status?: "needs_attention" | "clear" | null;
+    open_finding_count?: number;
   } | null;
   sections: Section[];
   draft_updated_at: string | null;
+  findings: DraftFinding[];
+  open_finding_count: number;
   revisions: Revision[];
+};
+
+export type FindingRepairPreview = {
+  finding_id: string;
+  before: string;
+  after: string;
+  classification: "supported" | "interpretation" | "unsupported";
+  findings: DraftFinding[];
+  target_version: string;
 };

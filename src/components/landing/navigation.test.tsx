@@ -21,7 +21,10 @@ describe("Navigation", () => {
     );
     expect(
       screen.getAllByRole("link", { name: "Start an article" })[0],
-    ).toHaveAttribute("href", "/signup?experience=consultant");
+    ).toHaveAttribute("href", "/signup");
+    expect(
+      screen.queryByRole("link", { name: "For consultants" }),
+    ).not.toBeInTheDocument();
   });
 
   it("opens, focuses, and closes the mobile navigation", async () => {

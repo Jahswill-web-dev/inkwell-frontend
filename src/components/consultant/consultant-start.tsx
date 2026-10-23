@@ -25,7 +25,7 @@ function articleSummary(status: string) {
     ready_to_draft: "Your interview is complete and ready to become a draft.",
     drafting: "Inkwell is turning your interview into a structured draft.",
     in_review: "Review and refine your draft before exporting it.",
-    ready_to_publish: "Your article is ready for a final check.",
+    ready_to_publish: "Your article is ready to edit, export, or publish.",
     published: "Your article is complete and ready to revisit anytime.",
   };
   return summaries[status] ?? "Continue working on your article.";
@@ -33,6 +33,7 @@ function articleSummary(status: string) {
 
 function articleActionLabel(status: string) {
   if (status === "in_review") return "Continue editing";
+  if (status === "ready_to_publish") return "Open article";
   if (status === "interview_in_progress") return "Resume interview";
   if (status === "setup") return "Start interview";
   if (status === "published") return "View article";

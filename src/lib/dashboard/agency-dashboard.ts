@@ -56,6 +56,6 @@ export const agencyStatusActions: Record<AgencyArticleStatus, string> = {
   ready_to_draft: "Start draft",
   drafting: "Continue drafting",
   in_review: "Review article",
-  ready_to_publish: "Prepare to publish",
+  ready_to_publish: "Open article",
   published: "View article",
 };

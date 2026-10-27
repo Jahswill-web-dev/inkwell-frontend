@@ -1,20 +1,26 @@
+import { fetchWithAccessRefresh } from "@/lib/auth/refresh-client";
+
 export async function consultantRequest<T>(
   path: string,
   method = "GET",
   data?: unknown,
   headers?: Record<string, string>,
 ): Promise<T> {
-  const response = await fetch(`/api/consultant/${path}`, {
+  const request: RequestInit = {
     method,
     credentials: "same-origin",
     cache: "no-store",
     headers: { "Content-Type": "application/json", ...headers },
     ...(data === undefined ? {} : { body: JSON.stringify(data) }),
-  });
-  const value = await response.json();
+  };
+  const response = await fetchWithAccessRefresh(
+    `/api/consultant/${path}`,
+    request,
+  );
+  const value = await response.json().catch(() => undefined);
   if (!response.ok)
     throw new Error(
-      value.error?.message ??
+      value?.error?.message ??
         "We couldn't complete that request. Please try again.",
     );
   return value as T;

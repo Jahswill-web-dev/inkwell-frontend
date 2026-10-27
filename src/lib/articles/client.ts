@@ -54,6 +54,7 @@ import {
   type AgencyClientPatch,
   type Workspace,
 } from "@/lib/agency/agency";
+import { fetchWithAccessRefresh } from "@/lib/auth/refresh-client";
 
 export class ArticleRequestError extends Error {
   constructor(
@@ -72,13 +73,14 @@ async function articleRequest<T>(
   init: RequestInit,
   parse: (value: unknown) => T,
 ): Promise<T> {
-  const response = await fetch(url, {
+  const request: RequestInit = {
     ...init,
     headers: {
       ...(init.body ? { "Content-Type": "application/json" } : {}),
       ...init.headers,
     },
-  });
+  };
+  const response = await fetchWithAccessRefresh(url, request);
 
   const payload =
     response.status === 204

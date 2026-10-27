@@ -21,6 +21,8 @@ vi.mock("axios", () => ({
 
 const backendSuccess = {
   access_token: "signed.jwt.token",
+  refresh_token: "r".repeat(64),
+  refresh_expires_at: "2026-11-26T12:00:00Z",
   token_type: "bearer",
   user: {
     id: "46a42280-6ad8-4bb6-a29c-1604adbf0c31",
@@ -132,8 +134,8 @@ describe("POST /api/auth/register", () => {
     expect(cookie).toContain("Path=/");
     expect(cookie).toContain("HttpOnly");
     expect(cookie).toContain("SameSite=lax");
-    expect(cookie).not.toContain("Max-Age");
-    expect(cookie).not.toContain("Expires");
+    expect(cookie).toContain("inkwell_refresh_token=");
+    expect(cookie).toContain("Max-Age");
   });
 
   it("marks the authentication cookie secure in production", async () => {

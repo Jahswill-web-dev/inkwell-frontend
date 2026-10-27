@@ -3,7 +3,11 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createAuthApiClient } from "./backend";
-import { AUTH_COOKIE_NAME, safeProtectedPath } from "./constants";
+import {
+  AUTH_COOKIE_NAME,
+  REFRESH_COOKIE_NAME,
+  safeProtectedPath,
+} from "./constants";
 import { publicUserSchema, type PublicUser } from "./registration";
 
 export type SessionResult =
@@ -68,6 +72,9 @@ export async function requireUser(returnTo: string): Promise<PublicUser> {
   if (session.status === "authenticated") return session.user;
   if (session.status === "unavailable") {
     redirect(`/auth/unavailable?next=${encodeURIComponent(safeReturnTo)}`);
+  }
+  if ((await cookies()).has(REFRESH_COOKIE_NAME)) {
+    redirect(`/auth/renew?next=${encodeURIComponent(safeReturnTo)}`);
   }
   redirect(`/login?next=${encodeURIComponent(safeReturnTo)}`);
 }

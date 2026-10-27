@@ -1,6 +1,7 @@
 import type { ResponseCookie } from "next/dist/compiled/@edge-runtime/cookies";
 
 export const AUTH_COOKIE_NAME = "inkwell_access_token";
+export const REFRESH_COOKIE_NAME = "inkwell_refresh_token";
 
 export function authCookieOptions(): Partial<ResponseCookie> {
   return {
@@ -8,6 +9,18 @@ export function authCookieOptions(): Partial<ResponseCookie> {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
+  };
+}
+
+export function refreshCookieOptions(
+  expiresAt: string,
+): Partial<ResponseCookie> {
+  return {
+    ...authCookieOptions(),
+    maxAge: Math.max(
+      0,
+      Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000),
+    ),
   };
 }
 

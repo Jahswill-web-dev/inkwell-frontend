@@ -54,8 +54,16 @@ export const publicUserSchema = z.object({
 
 export const backendRegistrationResponseSchema = z.object({
   access_token: z.string().min(1),
+  refresh_token: z.string().min(50),
+  refresh_expires_at: z.string().datetime({ offset: true }),
   token_type: z.literal("bearer"),
   user: publicUserSchema,
+});
+
+export const backendRefreshResponseSchema = z.object({
+  access_token: z.string().min(1),
+  refresh_token: z.string().min(50),
+  refresh_expires_at: z.string().datetime({ offset: true }),
 });
 
 export const authErrorDetailSchema = z.object({

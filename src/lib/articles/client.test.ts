@@ -82,6 +82,28 @@ const draft = {
 
 afterEach(() => vi.unstubAllGlobals());
 
+it("refreshes an expired access token and retries the article request once", async () => {
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce({ status: 401, ok: false })
+    .mockResolvedValueOnce({ status: 200, ok: true })
+    .mockResolvedValueOnce({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve(brief),
+    });
+  vi.stubGlobal("fetch", fetchMock);
+
+  await expect(getArticleBrief(articleId)).resolves.toMatchObject({
+    id: brief.id,
+  });
+  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+    `/api/articles/${articleId}/brief`,
+    "/api/auth/refresh",
+    `/api/articles/${articleId}/brief`,
+  ]);
+});
+
 describe("article brief client", () => {
   it("gets and generates through the frontend proxy", async () => {
     const fetchMock = vi.fn().mockResolvedValue({

@@ -1,8 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { AUTH_COOKIE_NAME } from "@/lib/auth/constants";
+import { AUTH_COOKIE_NAME, REFRESH_COOKIE_NAME } from "@/lib/auth/constants";
 
 export function proxy(request: NextRequest) {
-  if (request.cookies.has(AUTH_COOKIE_NAME)) return NextResponse.next();
+  if (
+    request.cookies.has(AUTH_COOKIE_NAME) ||
+    request.cookies.has(REFRESH_COOKIE_NAME)
+  ) {
+    return NextResponse.next();
+  }
 
   const loginUrl = new URL("/login", request.url);
   loginUrl.searchParams.set(

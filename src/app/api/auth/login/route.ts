@@ -4,7 +4,12 @@ import {
   AuthConfigurationError,
   createAuthApiClient,
 } from "@/lib/auth/backend";
-import { AUTH_COOKIE_NAME, authCookieOptions } from "@/lib/auth/constants";
+import {
+  AUTH_COOKIE_NAME,
+  REFRESH_COOKIE_NAME,
+  authCookieOptions,
+  refreshCookieOptions,
+} from "@/lib/auth/constants";
 import {
   authErrorResponseSchema,
   backendRegistrationResponseSchema,
@@ -81,6 +86,11 @@ export async function POST(request: Request) {
       AUTH_COOKIE_NAME,
       result.data.access_token,
       authCookieOptions(),
+    );
+    browserResponse.cookies.set(
+      REFRESH_COOKIE_NAME,
+      result.data.refresh_token,
+      refreshCookieOptions(result.data.refresh_expires_at),
     );
     return browserResponse;
   } catch (error) {

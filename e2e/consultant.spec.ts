@@ -722,6 +722,10 @@ test("draft proposals require explicit acceptance and export the accepted versio
         json: { id: "ai-job", state: "queued", stage: "understand" },
       });
     }
+    if (path.endsWith("/draft") && route.request().method() === "PUT") {
+      accepted = route.request().postDataJSON().sections;
+      return route.fulfill({ json: { saved: true } });
+    }
     return route.fulfill({
       json: {
         id: articleId,
@@ -800,6 +804,42 @@ test("draft proposals require explicit acceptance and export the accepted versio
   await expect(
     page.getByText("This is my original draft.", { exact: true }),
   ).toHaveCount(0);
+  const articlePreview = page.getByRole("region", {
+    name: "Article preview editor",
+  });
+  await expect(
+    page.getByRole("button", { name: "Preview", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  const articleTitle = articlePreview.getByRole("heading", {
+    name: "Better handoffs",
+    level: 1,
+  });
+  await expect(articleTitle).toBeVisible();
+  const titleBounds = await articleTitle.boundingBox();
+  const bodyBounds = await articlePreview
+    .getByText("I call that expensive confusion.", { exact: false })
+    .first()
+    .boundingBox();
+  expect(titleBounds).not.toBeNull();
+  expect(bodyBounds).not.toBeNull();
+  expect(bodyBounds!.y - (titleBounds!.y + titleBounds!.height)).toBeLessThan(
+    100,
+  );
+  await page.getByRole("button", { name: "Markdown", exact: true }).click();
+  const markdownView = page.getByRole("region", {
+    name: "Article Markdown view",
+  });
+  await expect(markdownView).toContainText("# Better handoffs");
+  await expect(markdownView).toContainText("## The handoff");
+  await expect(markdownView).toContainText(
+    "[Case study](https://example.org/study)",
+  );
+  await page.getByRole("button", { name: "Preview", exact: true }).click();
+  await expect(
+    articlePreview.getByText("I call that expensive confusion.", {
+      exact: false,
+    }),
+  ).toBeVisible();
   const askAiButton = page.getByRole("button", { name: "Ask AI", exact: true });
   await expect(askAiButton).toHaveCSS("background-color", "rgb(197, 0, 50)");
   await expect(askAiButton).toHaveCSS("white-space", "nowrap");
@@ -851,7 +891,7 @@ test("draft proposals require explicit acceptance and export the accepted versio
     await checkExportMenuBounds();
   }
   await expect(
-    exportMenu.getByText("Paste into Docs, Notion, or your CMS"),
+    exportMenu.getByText("Paste into Substack, Docs, or your CMS"),
   ).toBeVisible();
   await expect(
     exportMenu.getByText("Best for writing tools and publishing workflows"),
@@ -860,11 +900,29 @@ test("draft proposals require explicit acceptance and export the accepted versio
   await expect(exportMenu).toBeHidden();
   await page.getByRole("button", { name: "Export", exact: true }).click();
   await expect(exportMenu).toBeVisible();
-  await exportMenu.getByRole("menuitem", { name: /Copy to clipboard/ }).click();
+  await exportMenu
+    .getByRole("menuitem", { name: /Copy formatted article/ })
+    .click();
   await expect(exportMenu.getByText("Copied", { exact: true })).toBeVisible();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
-    "[Case study](https://example.org/study)",
+  const copied = await page.evaluate(async () => {
+    const [item] = await navigator.clipboard.read();
+    return {
+      types: item.types,
+      html: await (await item.getType("text/html")).text(),
+      plain: await (await item.getType("text/plain")).text(),
+    };
+  });
+  expect(copied.types).toEqual(
+    expect.arrayContaining(["text/html", "text/plain"]),
   );
+  expect(copied.html).toContain("<h1>Better handoffs</h1>");
+  expect(copied.html).toContain("<h2>The handoff</h2>");
+  expect(copied.html).toContain('<a href="https://example.org/study"');
+  expect(copied.plain.replaceAll("\r\n", "\n")).toContain(
+    "Better handoffs\n\nThe handoff",
+  );
+  expect(copied.plain).toContain("Case study (https://example.org/study)");
+  expect(copied.plain).not.toContain("## ");
   await page.screenshot({
     path: `test-results/consultant-export-open-${test.info().project.name}.png`,
     fullPage: true,
@@ -886,6 +944,51 @@ test("draft proposals require explicit acceptance and export the accepted versio
   expect(await readFile(await htmlFile.path(), "utf8")).toContain(
     '<a href="https://example.org/study"',
   );
+  if (test.info().project.name === "chromium") {
+    await page.evaluate(() => {
+      const rich = document.createElement("div");
+      rich.id = "rich-paste-target";
+      rich.contentEditable = "true";
+      rich.setAttribute("aria-label", "Rich paste target");
+      document.body.append(rich);
+      const plain = document.createElement("textarea");
+      plain.id = "plain-paste-target";
+      plain.setAttribute("aria-label", "Plain paste target");
+      document.body.append(plain);
+    });
+    const richTarget = page.getByLabel("Rich paste target");
+    await richTarget.click();
+    await page.keyboard.press("ControlOrMeta+V");
+    await expect(richTarget.locator("h1")).toHaveText("Better handoffs");
+    await expect(richTarget.locator("a")).toHaveAttribute(
+      "href",
+      "https://example.org/study",
+    );
+    const plainTarget = page.getByLabel("Plain paste target");
+    await plainTarget.click();
+    await page.keyboard.press("ControlOrMeta+V");
+    await expect(plainTarget).toHaveValue(/Better handoffs/);
+    await expect(plainTarget).not.toHaveValue(/## /);
+    await page.evaluate(() => {
+      document.getElementById("rich-paste-target")?.remove();
+      document.getElementById("plain-paste-target")?.remove();
+    });
+  }
+  const contentEditor = articlePreview.getByLabel("The handoff draft content");
+  await contentEditor.fill("Edited in Preview.");
+  await expect(
+    page.getByRole("button", { name: "Save changes" }),
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "Markdown", exact: true }).click();
+  await expect(markdownView).toContainText("Edited in Preview.");
+  await expect(markdownView).toContainText("# Better handoffs");
+  await page.getByRole("button", { name: "Preview", exact: true }).click();
+  await expect(contentEditor).toContainText("Edited in Preview.");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await page.reload();
+  await expect(
+    page.getByRole("region", { name: "Article preview editor" }),
+  ).toContainText("Edited in Preview.");
   await page.screenshot({
     path: `test-results/consultant-draft-${test.info().project.name}.png`,
     fullPage: true,

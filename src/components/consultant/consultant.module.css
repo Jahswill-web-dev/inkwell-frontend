@@ -1634,7 +1634,62 @@
   border: 1px solid var(--color-ink-line);
   border-radius: 16px;
   padding: 32px;
-  margin: 24px 0;
+  margin: 12px 0 24px;
+}
+.editor .articleTitle {
+  margin: 0 0 18px;
+}
+.articleViewSwitch {
+  display: inline-flex;
+  gap: 4px;
+  border: 1px solid var(--color-ink-line);
+  border-radius: 10px;
+  background: var(--color-ink-paper);
+  padding: 4px;
+}
+.articleViewSwitch button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-ink-muted);
+  padding: 8px 16px;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+.articleViewSwitch button[aria-pressed="true"] {
+  background: var(--color-ink-surface);
+  color: var(--color-ink-navy);
+  box-shadow: 0 1px 5px rgb(7 25 79 / 10%);
+}
+.articleViewSwitch button:focus-visible {
+  outline: 3px solid rgb(197 0 50 / 24%);
+  outline-offset: 2px;
+}
+.markdownHint {
+  margin: 0 0 14px;
+  color: var(--color-ink-muted);
+  font-size: 14px;
+}
+.markdownSource {
+  overflow-x: auto;
+  margin: 0;
+  color: var(--color-ink-navy);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 14px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }
 .grid {
   display: grid;

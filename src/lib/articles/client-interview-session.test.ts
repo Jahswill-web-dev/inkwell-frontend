@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  addFinalInterviewDetail,
   clientInterviewProgress,
   clientInterviewSessionSchema,
+  completeClientInterview,
   createClientInterviewSession,
   currentInterviewQuestion,
   pauseClientInterview,
@@ -36,7 +36,7 @@ describe("client interview session", () => {
     expect(currentInterviewQuestion(next)?.text).toContain("more specific");
   });
 
-  it("ends early once several detailed answers provide enough coverage", () => {
+  it("asks for a final contribution before completing normal coverage", () => {
     const detailed = Array.from(
       { length: 40 },
       (_, index) => "detail" + index,
@@ -45,22 +45,57 @@ describe("client interview session", () => {
     session = submitClientInterviewAnswer(session, detailed);
     session = submitClientInterviewAnswer(session, detailed);
     session = submitClientInterviewAnswer(session, detailed);
+    expect(session.state).toBe("active");
+    expect(currentInterviewQuestion(session)?.text).toBe(
+      "Is there anything else you'd like to add to the article?",
+    );
+    session = submitClientInterviewAnswer(
+      session,
+      "A practical example to include.",
+    );
     expect(session.state).toBe("completed");
-    expect(session.completionReason).toBe("sufficient");
+    expect(session.answers.at(-1)?.answer).toBe(
+      "A practical example to include.",
+    );
     expect(clientInterviewProgress(session)).toBe(100);
   });
 
-  it("allows one final detail after completion", () => {
-    const initial = createClientInterviewSession(token);
-    const reopened = addFinalInterviewDetail({
-      ...initial,
-      state: "completed",
-      completionReason: "participant_finished",
-    });
-    expect(currentInterviewQuestion(reopened)?.kind).toBe("final_detail");
-    const complete = submitClientInterviewAnswer(reopened, "One final fact.");
+  it("accepts no without adding an article source", () => {
+    const detailed = Array.from(
+      { length: 40 },
+      (_, index) => `detail${index}`,
+    ).join(" ");
+    let session = startClientInterview(createClientInterviewSession(token));
+    for (let index = 0; index < 3; index++) {
+      session = submitClientInterviewAnswer(session, detailed);
+    }
+    const complete = submitClientInterviewAnswer(session, "No, thank you.");
     expect(complete.state).toBe("completed");
     expect(complete.finalDetailAdded).toBe(true);
+    expect(complete.answers).toHaveLength(3);
+  });
+
+  it("asks the final question after the full question list when coverage stays thin", () => {
+    const answer = Array.from(
+      { length: 20 },
+      (_, index) => `word${index}`,
+    ).join(" ");
+    let session = startClientInterview(createClientInterviewSession(token));
+    for (let index = 0; index < 6; index++) {
+      session = submitClientInterviewAnswer(session, answer);
+    }
+    expect(session.state).toBe("active");
+    expect(currentInterviewQuestion(session)?.kind).toBe("final_detail");
+    expect(session.answers).toHaveLength(6);
+  });
+
+  it("ends immediately when the participant chooses to finish early", () => {
+    const active = startClientInterview(createClientInterviewSession(token));
+    const complete = completeClientInterview(active);
+    expect(complete.state).toBe("completed");
+    expect(
+      complete.questions.some((question) => question.kind === "final_detail"),
+    ).toBe(false);
   });
 
   it("accepts UTC offsets returned by the backend", () => {

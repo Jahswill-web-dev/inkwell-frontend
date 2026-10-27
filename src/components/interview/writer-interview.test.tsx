@@ -52,7 +52,7 @@ describe("WriterInterview", () => {
     });
   });
 
-  it("finishes early once enough useful material is collected", async () => {
+  it("asks for a final contribution before thanking the writer", async () => {
     render(
       <WriterInterview
         articleId={articleId}
@@ -68,7 +68,20 @@ describe("WriterInterview", () => {
       });
       await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     }
+    expect(
+      screen.getByRole("heading", {
+        name: "Is there anything else you'd like to add to the article?",
+      }),
+    ).toBeVisible();
+    fireEvent.change(screen.getByLabelText("Your answer"), {
+      target: { value: "Please include the customer handoff checklist." },
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(screen.getByText("Whole-article interview complete")).toBeVisible();
+    expect(screen.getByRole("heading", { name: /Thank you/ })).toBeVisible();
+    expect(
+      loadWriterInterviewMaterial(articleId)?.session.answers.at(-1)?.answer,
+    ).toBe("Please include the customer handoff checklist.");
     expect(
       screen.getByText(/saved separately as writer-supplied material/),
     ).toBeVisible();

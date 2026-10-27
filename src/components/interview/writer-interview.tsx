@@ -11,7 +11,6 @@ import {
   WarningCircle,
 } from "@phosphor-icons/react";
 import {
-  addFinalInterviewDetail,
   clientInterviewProgress,
   completeClientInterview,
   currentInterviewQuestion,
@@ -167,12 +166,6 @@ export function WriterInterview({
     persist(completeClientInterview(session));
   }
 
-  function addFinalDetail() {
-    const next = addFinalInterviewDetail(session);
-    setAnswer("");
-    persist(next);
-  }
-
   if (session.state === "welcome") {
     return (
       <main className={styles.page}>
@@ -237,18 +230,13 @@ export function WriterInterview({
         <section className={styles.thankYou}>
           <CheckCircle size={44} weight="fill" aria-hidden />
           <span>Whole-article interview complete</span>
-          <h1>Your perspective is ready</h1>
+          <h1>Thank you. Your perspective is ready</h1>
           <p>
             {session.answers.length} responses are saved separately as
             writer-supplied material. You’ll be able to approve or exclude them
             in source review before generation.
           </p>
           <Link href={workspaceHref}>Return to article workspace</Link>
-          {!session.finalDetailAdded ? (
-            <button onClick={addFinalDetail} type="button">
-              Add one final detail
-            </button>
-          ) : null}
         </section>
       </main>
     );
@@ -328,7 +316,7 @@ export function WriterInterview({
             Continue <ArrowRight size={18} aria-hidden />
           </button>
         </div>
-        {session.answers.length >= 2 ? (
+        {session.answers.length >= 2 && question.kind !== "final_detail" ? (
           <button
             className={styles.finishButton}
             onClick={finish}

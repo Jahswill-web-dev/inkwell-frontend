@@ -25,13 +25,6 @@ export type VoiceEndReason =
 
 type RealtimeInterviewOptions = {
   createSession?: typeof createVoiceInterviewSession;
-  approveCompletion?: (
-    sessionId: string,
-    reason: RealtimeCompletionReason,
-  ) => Promise<boolean>;
-  checkCompletion?: (
-    sessionId: string,
-  ) => Promise<RealtimeCompletionReason | null>;
   onComplete?: (reason: RealtimeCompletionReason) => void;
   onTranscriptTurn?: (turn: InterviewTranscriptTurn) => Promise<void>;
 };
@@ -104,8 +97,6 @@ export function useRealtimeInterview(
     onComplete,
     onTranscriptTurn,
     createSession,
-    approveCompletion,
-    checkCompletion,
   }: RealtimeInterviewOptions = {},
 ) {
   const createSessionRef = useRef(createSession);
@@ -117,10 +108,8 @@ export function useRealtimeInterview(
   const streamRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const completionReasonRef = useRef<RealtimeCompletionReason | null>(null);
+  const completionPendingRef = useRef(false);
   const onCompleteRef = useRef(onComplete);
-  const approveCompletionRef = useRef(approveCompletion);
-  const checkCompletionRef = useRef(checkCompletion);
-  const completionCheckPendingRef = useRef(false);
   const onTranscriptTurnRef = useRef(onTranscriptTurn);
   const seenTranscriptItemsRef = useRef(new Set<string>());
   const transcriptBuffersRef = useRef(
@@ -159,7 +148,7 @@ export function useRealtimeInterview(
     statusRef.current = next;
     setStatus(next);
   }, []);
-  const clearTimers = useCallback(() => {
+  const clearReconnectTimers = useCallback(() => {
     if (reconnectTimerRef.current !== null) {
       window.clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = null;
@@ -168,11 +157,14 @@ export function useRealtimeInterview(
       window.clearTimeout(disconnectedTimerRef.current);
       disconnectedTimerRef.current = null;
     }
+  }, []);
+  const clearTimers = useCallback(() => {
+    clearReconnectTimers();
     if (completionTimerRef.current !== null) {
       window.clearTimeout(completionTimerRef.current);
       completionTimerRef.current = null;
     }
-  }, []);
+  }, [clearReconnectTimers]);
   const closeTransport = useCallback(() => {
     const connection = connectionRef.current;
     connectionRef.current = null;
@@ -203,41 +195,22 @@ export function useRealtimeInterview(
     }
   }, [token]);
 
-  const scheduleApprovedCompletion = useCallback(
+  const scheduleCompletion = useCallback(
     (reason: RealtimeCompletionReason) => {
+      if (completionPendingRef.current || !activeRef.current) return;
+      completionPendingRef.current = true;
       completionReasonRef.current = reason;
-      if (completionTimerRef.current !== null)
-        window.clearTimeout(completionTimerRef.current);
+      clearReconnectTimers();
       completionTimerRef.current = window.setTimeout(() => {
         completionTimerRef.current = null;
-        const approvedReason = completionReasonRef.current;
+        const completionReason = completionReasonRef.current;
         completionReasonRef.current = null;
-        if (approvedReason && activeRef.current)
-          onCompleteRef.current?.(approvedReason);
+        if (completionReason && activeRef.current)
+          onCompleteRef.current?.(completionReason);
       }, FINAL_AUDIO_CLOSE_DELAY_MS);
     },
-    [],
+    [clearReconnectTimers],
   );
-
-  const checkServerCompletion = useCallback(() => {
-    const check = checkCompletionRef.current;
-    const sessionId = voiceSessionIdRef.current;
-    if (!check || !sessionId || completionCheckPendingRef.current) return;
-    completionCheckPendingRef.current = true;
-    void check(sessionId)
-      .then((reason) => {
-        if (
-          reason &&
-          activeRef.current &&
-          voiceSessionIdRef.current === sessionId
-        )
-          scheduleApprovedCompletion(reason);
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        completionCheckPendingRef.current = false;
-      });
-  }, [scheduleApprovedCompletion]);
 
   const { startSession: startElevenSession, endSession: endElevenSession } =
     useConversation({
@@ -249,7 +222,7 @@ export function useRealtimeInterview(
           ) {
             return "invalid_completion_reason";
           }
-          scheduleApprovedCompletion(parameters.reason);
+          scheduleCompletion(parameters.reason);
           return "accepted";
         },
       },
@@ -340,12 +313,6 @@ export function useRealtimeInterview(
     onCompleteRef.current = onComplete;
   }, [onComplete]);
   useEffect(() => {
-    approveCompletionRef.current = approveCompletion;
-  }, [approveCompletion]);
-  useEffect(() => {
-    checkCompletionRef.current = checkCompletion;
-  }, [checkCompletion]);
-  useEffect(() => {
     onTranscriptTurnRef.current = onTranscriptTurn;
   }, [onTranscriptTurn]);
   useEffect(() => {
@@ -357,7 +324,7 @@ export function useRealtimeInterview(
 
   const scheduleReconnect = useCallback(
     (message: string) => {
-      if (!activeRef.current) return;
+      if (!activeRef.current || completionPendingRef.current) return;
       clearTimers();
       closeTransport();
       if (transport === "elevenlabs_webrtc") endElevenSession();
@@ -474,7 +441,7 @@ export function useRealtimeInterview(
           if (generation !== generationRef.current || !activeRef.current)
             return;
           if (connection.connectionState === "connected") {
-            clearTimers();
+            clearReconnectTimers();
             reconnectAttemptRef.current = 0;
             setInterviewStatus("connected");
             void flushRef.current().catch(() => undefined);
@@ -559,7 +526,6 @@ export function useRealtimeInterview(
             liveEvent.type === "input_audio_buffer.speech_started"
           )
             setActivity("listening");
-          if (outputAudioFinished) checkServerCompletion();
           if (liveEvent.type === "error") {
             logVoiceDiagnostic("realtime_server_error", {
               callAttemptId: callAttemptIdRef.current,
@@ -712,23 +678,7 @@ export function useRealtimeInterview(
                 value.reason === "participant_finished" ||
                 value.reason === "questions_complete"
               ) {
-                const reason = value.reason;
-                const sessionId = voiceSessionIdRef.current;
-                void (async () => {
-                  const approve = approveCompletionRef.current;
-                  const approved =
-                    !approve ||
-                    (sessionId !== null &&
-                      (await approve(sessionId, reason).catch(() => false)));
-                  if (!approved) {
-                    logVoiceDiagnostic("interview_completion_rejected", {
-                      callAttemptId: callAttemptIdRef.current,
-                      source: "backend_phase_gate",
-                    });
-                    return;
-                  }
-                  scheduleApprovedCompletion(reason);
-                })();
+                scheduleCompletion(value.reason);
               }
             } catch {
               // Keep the interview active on malformed tool input.
@@ -793,14 +743,14 @@ export function useRealtimeInterview(
       }
     },
     [
-      checkServerCompletion,
       clearTimers,
+      clearReconnectTimers,
       closeTransport,
       persistOutbox,
       releaseMicrophone,
       scheduleReconnect,
       setInterviewStatus,
-      scheduleApprovedCompletion,
+      scheduleCompletion,
       token,
       transport,
       startElevenSession,
@@ -818,7 +768,7 @@ export function useRealtimeInterview(
     voiceSessionIdRef.current = null;
     externalSessionIdRef.current = null;
     completionReasonRef.current = null;
-    completionCheckPendingRef.current = false;
+    completionPendingRef.current = false;
     reconnectAttemptRef.current = 0;
     seenTranscriptItemsRef.current.clear();
     logVoiceDiagnostic("voice_call_started", {
@@ -836,7 +786,7 @@ export function useRealtimeInterview(
       });
       activeRef.current = false;
       completionReasonRef.current = null;
-      completionCheckPendingRef.current = false;
+      completionPendingRef.current = false;
       generationRef.current += 1;
       if (eventsRef.current?.readyState === "open") {
         eventsRef.current.send(JSON.stringify({ type: "session.close" }));

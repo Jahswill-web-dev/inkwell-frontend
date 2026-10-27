@@ -1988,13 +1988,13 @@
   background: linear-gradient(90deg, rgba(201, 151, 34, 0.08), transparent 65%);
 }
 
-::highlight(inkwell-unsupported) {
+.editorContent::highlight(inkwell-unsupported) {
   color: inherit;
   background: #ffd2dc;
   text-decoration: underline wavy #c81745 1.5px;
 }
 
-::highlight(inkwell-interpretation) {
+.editorContent::highlight(inkwell-interpretation) {
   color: inherit;
   background: #fff0b8;
 }

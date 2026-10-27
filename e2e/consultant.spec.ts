@@ -822,6 +822,34 @@ test("draft proposals require explicit acceptance and export the accepted versio
   await page.getByRole("button", { name: "Export", exact: true }).click();
   const exportMenu = page.getByRole("menu", { name: "Export article" });
   await expect(exportMenu).toBeVisible();
+  const checkExportMenuBounds = async () => {
+    const bounds = await exportMenu.boundingBox();
+    const viewport = page.viewportSize();
+    expect(bounds).not.toBeNull();
+    expect(viewport).not.toBeNull();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport!.width + 1);
+    expect(bounds!.y).toBeGreaterThanOrEqual(0);
+    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(
+      viewport!.height + 1,
+    );
+    const triggerBounds = await page
+      .getByRole("button", { name: "Export", exact: true })
+      .boundingBox();
+    expect(triggerBounds).not.toBeNull();
+    expect(
+      bounds!.y >= triggerBounds!.y + triggerBounds!.height ||
+        bounds!.y + bounds!.height <= triggerBounds!.y,
+    ).toBe(true);
+  };
+  await checkExportMenuBounds();
+  const originalViewport = page.viewportSize()!;
+  if (originalViewport.width > 640) {
+    await page.setViewportSize({ width: 720, height: 700 });
+    await checkExportMenuBounds();
+    await page.setViewportSize(originalViewport);
+    await checkExportMenuBounds();
+  }
   await expect(
     exportMenu.getByText("Paste into Docs, Notion, or your CMS"),
   ).toBeVisible();

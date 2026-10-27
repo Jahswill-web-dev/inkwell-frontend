@@ -24,6 +24,10 @@ import {
   type Revision,
   type Section,
 } from "@/lib/consultant/client";
+import {
+  escapeHtml,
+  serializeConsultantArticle,
+} from "@/lib/consultant/article-export";
 import { DraftRichSection } from "@/components/articles/draft-editor/draft-rich-section";
 import styles from "./consultant.module.css";
 type ExportNode = {
@@ -32,58 +36,6 @@ type ExportNode = {
   url?: string;
   children?: ExportNode[];
 };
-function safeSourceUrl(url: string | undefined): string | null {
-  if (!url) return null;
-  try {
-    const parsed = new URL(url);
-    return ["http:", "https:"].includes(parsed.protocol) ? parsed.href : null;
-  } catch {
-    return null;
-  }
-}
-function markdownNode(node: ExportNode): string {
-  const content =
-    (node.children ?? []).map(markdownNode).join("") || node.text || "";
-  if (node.type === "link") {
-    const url = safeSourceUrl(node.url);
-    return url ? `[${content}](${url})` : content;
-  }
-  return ["paragraph", "anchored-paragraph"].includes(node.type ?? "")
-    ? `${content}\n\n`
-    : content;
-}
-function htmlNode(node: ExportNode): string {
-  const content =
-    (node.children ?? []).map(htmlNode).join("") || escapeHtml(node.text || "");
-  if (node.type === "link") {
-    const url = safeSourceUrl(node.url);
-    return url
-      ? `<a href="${escapeHtml(url)}" rel="noopener noreferrer">${content}</a>`
-      : content;
-  }
-  return ["paragraph", "anchored-paragraph"].includes(node.type ?? "")
-    ? `<p>${content}</p>`
-    : content;
-}
-function markdown(title: string, sections: Section[]) {
-  return (
-    `# ${title}\n\n` +
-    sections
-      .map(
-        (s) =>
-          `## ${s.title}\n\n${markdownNode(JSON.parse(s.editor_state).root).trim()}`,
-      )
-      .join("\n\n")
-  );
-}
-function escapeHtml(text: string) {
-  return text
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
 function withoutHeadingNumber(title: string) {
   return title.replace(/^\s*\d+[.)]\s+/, "");
 }
@@ -170,6 +122,9 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
   const router = useRouter();
   const [article, setArticle] = useState<Article | null>(null);
   const [sections, setSections] = useState<Section[]>([]);
+  const [articleView, setArticleView] = useState<"preview" | "markdown">(
+    "preview",
+  );
   const [dirty, setDirty] = useState(false);
   const dirtyRef = useRef(false);
   const [error, setError] = useState("");
@@ -417,22 +372,39 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
   async function exportDraft(format: "copy" | "markdown" | "html") {
     if (!article) return;
     if (dirty) await save();
-    const md = markdown(article.title, sections);
+    const exported = serializeConsultantArticle(article.title, sections);
     if (format === "copy") {
-      await navigator.clipboard.writeText(md);
+      let copiedAsPlainText = false;
+      if (navigator.clipboard.write && typeof ClipboardItem !== "undefined") {
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              "text/html": new Blob([exported.html], { type: "text/html" }),
+              "text/plain": new Blob([exported.plain], {
+                type: "text/plain",
+              }),
+            }),
+          ]);
+        } catch {
+          await navigator.clipboard.writeText(exported.plain);
+          copiedAsPlainText = true;
+        }
+      } else {
+        await navigator.clipboard.writeText(exported.plain);
+        copiedAsPlainText = true;
+      }
       setCopied(true);
-      setNotice("Article copied to clipboard.");
+      setNotice(
+        copiedAsPlainText
+          ? "Article copied as plain text. Rich formatting is unavailable in this browser."
+          : "Formatted article copied to clipboard.",
+      );
       return;
     }
     const content =
       format === "markdown"
-        ? md
-        : `<!doctype html><html lang="en"><meta charset="utf-8"><title>${escapeHtml(article.title)}</title><body><h1>${escapeHtml(article.title)}</h1>${sections
-            .map(
-              (s) =>
-                `<h2>${escapeHtml(s.title)}</h2>${htmlNode(JSON.parse(s.editor_state).root)}`,
-            )
-            .join("")}</body></html>`;
+        ? exported.markdown
+        : `<!doctype html><html lang="en"><meta charset="utf-8"><title>${escapeHtml(article.title)}</title><body>${exported.html}</body></html>`;
     const url = URL.createObjectURL(
       new Blob([content], {
         type:
@@ -489,7 +461,7 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
   return (
     <>
       <p className={styles.eyebrow}>My article</p>
-      <h1>{article.title}</h1>
+      {sections.length === 0 && <h1>{article.title}</h1>}
       <div className={styles.articleDetails}>
         <button
           aria-controls="article-details-panel"
@@ -751,8 +723,8 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
                   >
                     <Copy aria-hidden="true" size={24} />
                     <span>
-                      <strong>Copy to clipboard</strong>
-                      <small>Paste into Docs, Notion, or your CMS</small>
+                      <strong>Copy formatted article</strong>
+                      <small>Paste into Substack, Docs, or your CMS</small>
                     </span>
                     {copied && (
                       <span className={styles.exportSuccess} role="status">
@@ -800,42 +772,94 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
               ? "You have unsaved changes. Save before leaving this page."
               : "Your accepted draft is saved."}
           </p>
-          <div className={styles.editor}>
-            {sections.map((s, index) => (
-              <div key={`${editorVersion}:${s.id}`}>
-                <DraftRichSection
-                  key={`${editorVersion}:${s.id}`}
-                  section={{
-                    ...s,
-                    outlineSectionId: s.outline_section_id,
-                    editorState: s.editor_state,
-                  }}
-                  index={index}
-                  onTitleChange={(id, title) => {
-                    setSections((current) =>
-                      current.map((section) =>
-                        section.id === id
-                          ? { ...section, title: withoutHeadingNumber(title) }
-                          : section,
-                      ),
-                    );
-                    dirtyRef.current = true;
-                    setDirty(true);
-                  }}
-                  showSectionNumber={false}
-                  onChange={(id, state) => {
-                    setSections((current) => {
-                      const next = current.map((s) =>
-                        s.id === id ? { ...s, editor_state: state } : s,
-                      );
-                      return next;
-                    });
-                    dirtyRef.current = true;
-                    setDirty(true);
-                  }}
-                />
-              </div>
-            ))}
+          <div
+            className={styles.articleViewSwitch}
+            role="group"
+            aria-label="Article view"
+          >
+            <button
+              aria-pressed={articleView === "preview"}
+              onClick={() => setArticleView("preview")}
+              type="button"
+            >
+              Preview
+            </button>
+            <button
+              aria-pressed={articleView === "markdown"}
+              onClick={() => setArticleView("markdown")}
+              type="button"
+            >
+              Markdown
+            </button>
+          </div>
+          <div
+            aria-label={
+              articleView === "preview"
+                ? "Article preview editor"
+                : "Article Markdown view"
+            }
+            className={styles.editor}
+            role="region"
+          >
+            {articleView === "preview" ? (
+              <>
+                <h1 className={styles.articleTitle}>{article.title}</h1>
+                {sections.map((s, index) => (
+                  <div key={`${editorVersion}:${s.id}`}>
+                    <DraftRichSection
+                      key={`${editorVersion}:${s.id}`}
+                      section={{
+                        ...s,
+                        outlineSectionId: s.outline_section_id,
+                        editorState: s.editor_state,
+                      }}
+                      index={index}
+                      onTitleChange={(id, title) => {
+                        setSections((current) =>
+                          current.map((section) =>
+                            section.id === id
+                              ? {
+                                  ...section,
+                                  title: withoutHeadingNumber(title),
+                                }
+                              : section,
+                          ),
+                        );
+                        dirtyRef.current = true;
+                        setDirty(true);
+                      }}
+                      showSectionNumber={false}
+                      onChange={(id, state) => {
+                        setSections((current) =>
+                          current.map((item) =>
+                            item.id === id
+                              ? { ...item, editor_state: state }
+                              : item,
+                          ),
+                        );
+                        dirtyRef.current = true;
+                        setDirty(true);
+                      }}
+                    />
+                  </div>
+                ))}
+              </>
+            ) : (
+              <section aria-label="Article Markdown source">
+                <h1 className={styles.visuallyHidden}>{article.title}</h1>
+                <p className={styles.markdownHint}>
+                  Read-only Markdown. Switch to Preview to edit your article.
+                </p>
+                <pre className={styles.markdownSource}>
+                  <code>
+                    {
+                      serializeConsultantArticle(article.title, sections)
+                        .markdown
+                    }
+                  </code>
+                </pre>
+              </section>
+            )}
           </div>
           <p className={styles.muted}>
             Ask AI to improve this article. You will review the full suggestion

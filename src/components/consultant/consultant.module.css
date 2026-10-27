@@ -824,35 +824,25 @@
   transform: rotate(180deg);
 }
 .exportPopover {
-  position: absolute;
-  top: calc(100% + 12px);
-  right: 0;
+  position: fixed;
   z-index: 20;
   width: min(600px, calc(100vw - 32px));
-  overflow: hidden;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
   border: 1px solid var(--color-ink-line);
   border-radius: 16px;
   background: var(--color-ink-surface);
   box-shadow: 0 22px 65px rgb(3 11 36 / 18%);
 }
-.exportPopover::before {
-  position: absolute;
-  top: -7px;
-  right: 30px;
-  width: 12px;
-  height: 12px;
-  border-top: 1px solid var(--color-ink-line);
-  border-left: 1px solid var(--color-ink-line);
-  background: var(--color-ink-surface);
-  content: "";
-  transform: rotate(45deg);
+.exportPopover[data-positioned="false"] {
+  visibility: hidden;
 }
 .exportHeader {
-  padding: 28px 28px 18px;
+  padding: 20px 22px 12px;
 }
 .exportHeader h2 {
   margin: 0 0 5px;
-  font-size: 32px;
+  font-size: 26px;
 }
 .exportHeader p {
   margin: 0;
@@ -870,7 +860,7 @@
   border-top: 1px solid var(--color-ink-line);
   background: transparent;
   color: var(--color-ink-navy);
-  padding: 20px 14px;
+  padding: 14px;
   text-align: left;
   cursor: pointer;
 }
@@ -1815,19 +1805,6 @@
   .row {
     align-items: flex-start;
     flex-direction: column;
-  }
-  .exportMenu {
-    position: static;
-  }
-  .exportPopover {
-    top: auto;
-    right: 16px;
-    left: 16px;
-    width: auto;
-    margin-top: 12px;
-  }
-  .exportPopover::before {
-    display: none;
   }
   .exportHeader {
     padding: 20px 18px 13px;

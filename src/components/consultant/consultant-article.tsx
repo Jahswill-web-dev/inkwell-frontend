@@ -10,7 +10,13 @@ import {
   Sparkle,
   X,
 } from "@phosphor-icons/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   consultantRequest as api,
@@ -173,12 +179,19 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
   const [detailTitle, setDetailTitle] = useState("");
   const [detailDescription, setDetailDescription] = useState("");
   const [exportOpen, setExportOpen] = useState(false);
+  const [exportPosition, setExportPosition] = useState<{
+    top: number;
+    left: number;
+    maxHeight: number;
+  } | null>(null);
   const [copied, setCopied] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [instruction, setInstruction] = useState("");
   const assistantInputRef = useRef<HTMLTextAreaElement>(null);
   const assistantTriggerRef = useRef<HTMLButtonElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const exportTriggerRef = useRef<HTMLButtonElement>(null);
+  const exportPopoverRef = useRef<HTMLElement>(null);
   const [preview, setPreview] = useState<Revision | null>(null);
   const [previewMode, setPreviewMode] = useState<"version" | "compare">(
     "version",
@@ -235,6 +248,50 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
     return () => {
       document.removeEventListener("mousedown", closeOnOutsideClick);
       document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [exportOpen]);
+  useLayoutEffect(() => {
+    if (!exportOpen) return;
+
+    const positionPopover = () => {
+      const trigger = exportTriggerRef.current;
+      const popover = exportPopoverRef.current;
+      if (!trigger || !popover) return;
+      const gutter = 16;
+      const width = Math.min(600, window.innerWidth - gutter * 2);
+      const triggerRect = trigger.getBoundingClientRect();
+      const popoverHeight = popover.scrollHeight + 2;
+      const left =
+        window.innerWidth <= 640
+          ? gutter
+          : triggerRect.left + width <= window.innerWidth - gutter
+            ? triggerRect.left
+            : triggerRect.right - width >= gutter
+              ? triggerRect.right - width
+              : Math.max(
+                  gutter,
+                  Math.min(
+                    triggerRect.left,
+                    window.innerWidth - gutter - width,
+                  ),
+                );
+      const spaceBelow = window.innerHeight - triggerRect.bottom - gutter - 12;
+      const spaceAbove = triggerRect.top - gutter - 12;
+      const showAbove = spaceBelow < popoverHeight && spaceAbove > spaceBelow;
+      const maxHeight = Math.max(0, showAbove ? spaceAbove : spaceBelow);
+      const top = showAbove
+        ? triggerRect.top - 12 - Math.min(popoverHeight, maxHeight)
+        : triggerRect.bottom + 12;
+
+      setExportPosition({ top, left, maxHeight });
+    };
+
+    positionPopover();
+    window.addEventListener("resize", positionPopover);
+    window.addEventListener("scroll", positionPopover, true);
+    return () => {
+      window.removeEventListener("resize", positionPopover);
+      window.removeEventListener("scroll", positionPopover, true);
     };
   }, [exportOpen]);
   useEffect(() => {
@@ -659,6 +716,7 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
                 aria-haspopup="menu"
                 className={styles.exportTrigger}
                 disabled={busy}
+                ref={exportTriggerRef}
                 onClick={() => {
                   setCopied(false);
                   setExportOpen((open) => !open);
@@ -676,7 +734,10 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
                 <section
                   aria-label="Export article"
                   className={styles.exportPopover}
+                  data-positioned={exportPosition !== null}
+                  ref={exportPopoverRef}
                   role="menu"
+                  style={exportPosition ?? undefined}
                 >
                   <header className={styles.exportHeader}>
                     <h2>Export article</h2>

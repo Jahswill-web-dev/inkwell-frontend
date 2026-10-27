@@ -22,6 +22,13 @@ describe("authentication proxy", () => {
     expect(response.headers.get("x-middleware-next")).toBe("1");
   });
 
+  it("lets a returning browser renew with only its persistent cookie", () => {
+    const request = new NextRequest("http://localhost/dashboard", {
+      headers: { cookie: "inkwell_refresh_token=refresh-credential" },
+    });
+    expect(proxy(request).status).toBe(200);
+  });
+
   it("keeps guest interview links outside the authentication matcher", () => {
     expect(config.matcher).not.toContain("/interview/:path*");
   });

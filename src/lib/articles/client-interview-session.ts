@@ -64,6 +64,18 @@ const coreQuestions = [
   },
 ];
 
+const finalContributionQuestion = {
+  id: "final-detail",
+  text: "Is there anything else you'd like to add to the article?",
+  kind: "final_detail" as const,
+};
+
+function hasNoFinalContribution(answer: string) {
+  return /^(?:no|nope|nothing|none|not really|nothing else|no[,]? thanks|no[,]? thank you)[.!\s]*$/i.test(
+    answer.trim(),
+  );
+}
+
 export function createClientInterviewSession(
   token: string,
   now = new Date(),
@@ -131,22 +143,18 @@ export function submitClientInterviewAnswer(
   if (question.kind === "final_detail") {
     return {
       ...session,
-      answers,
+      answers: hasNoFinalContribution(normalizedAnswer)
+        ? session.answers
+        : answers,
       state: "completed",
-      completionReason: "participant_finished",
+      completionReason: "sufficient",
+      finalDetailAdded: true,
       draftAnswer: "",
       updatedAt: now.toISOString(),
     };
   }
   if (hasEnoughInterviewCoverage(answers)) {
-    return {
-      ...session,
-      answers,
-      state: "completed",
-      completionReason: "sufficient",
-      draftAnswer: "",
-      updatedAt: now.toISOString(),
-    };
+    return addFinalInterviewDetail({ ...session, answers }, now);
   }
 
   const questions = [...session.questions];
@@ -165,15 +173,7 @@ export function submitClientInterviewAnswer(
   }
   const currentQuestionIndex = session.currentQuestionIndex + 1;
   if (!questions[currentQuestionIndex]) {
-    return {
-      ...session,
-      answers,
-      questions,
-      state: "completed",
-      completionReason: "question_limit",
-      draftAnswer: "",
-      updatedAt: now.toISOString(),
-    };
+    return addFinalInterviewDetail({ ...session, answers, questions }, now);
   }
   return {
     ...session,
@@ -217,14 +217,11 @@ export function addFinalInterviewDetail(
   session: ClientInterviewSession,
   now = new Date(),
 ): ClientInterviewSession {
-  const questions = [
-    ...session.questions,
-    {
-      id: "final-detail",
-      text: "What final detail would you like the writer to know?",
-      kind: "final_detail" as const,
-    },
-  ];
+  const questions = session.questions.some(
+    (question) => question.kind === "final_detail",
+  )
+    ? session.questions
+    : [...session.questions, finalContributionQuestion];
   return {
     ...session,
     questions,

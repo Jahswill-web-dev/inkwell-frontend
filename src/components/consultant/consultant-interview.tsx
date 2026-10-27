@@ -63,23 +63,6 @@ function ConsultantInterviewContent({ interviewId }: { interviewId: string }) {
           "POST",
           { sdp },
         ),
-      approveCompletion: async (sessionId, reason) => {
-        const result = await api<{ approved: boolean }>(
-          `interviews/${interviewId}/voice/sessions/${sessionId}/completion-approval`,
-          "POST",
-          { reason },
-        );
-        return result.approved;
-      },
-      checkCompletion: async (sessionId) => {
-        const result = await api<{
-          approved: boolean;
-          reason: "participant_finished" | "questions_complete" | null;
-        }>(
-          `interviews/${interviewId}/voice/sessions/${sessionId}/completion-status`,
-        );
-        return result.approved ? result.reason : null;
-      },
       onTranscriptTurn: async (turn) => {
         const saved = {
           item_id: turn.itemId,

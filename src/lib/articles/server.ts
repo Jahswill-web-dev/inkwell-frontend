@@ -2,7 +2,7 @@ import axios from "axios";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createAuthApiClient } from "@/lib/auth/backend";
-import { AUTH_COOKIE_NAME, authCookieOptions } from "@/lib/auth/constants";
+import { AUTH_COOKIE_NAME } from "@/lib/auth/constants";
 import { articleApiErrorSchema } from "./article";
 
 export const ARTICLE_GENERATION_TIMEOUT_MS = 120_000;
@@ -52,14 +52,7 @@ export function articleUpstreamError(error: unknown): NextResponse {
         status === 504) &&
       parsed.success
     ) {
-      const response = NextResponse.json(parsed.data, { status });
-      if (status === 401) {
-        response.cookies.set(AUTH_COOKIE_NAME, "", {
-          ...authCookieOptions(),
-          maxAge: 0,
-        });
-      }
-      return response;
+      return NextResponse.json(parsed.data, { status });
     }
     console.error("Article service request failed.", {
       code: error.code,

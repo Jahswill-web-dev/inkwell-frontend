@@ -19,6 +19,7 @@ import {
 import type { VoiceSessionResponse } from "@/lib/articles/client-interview-api";
 import { useRealtimeInterview } from "@/components/interview/use-realtime-interview";
 import styles from "./consultant.module.css";
+import { ConsultantInterviewPreparation } from "./consultant-interview-preparation";
 export function ConsultantInterviewScreen({
   interviewId,
 }: {
@@ -149,32 +150,15 @@ function ConsultantInterviewContent({ interviewId }: { interviewId: string }) {
   return (
     <>
       {!started ? (
-        <>
-          <h1>{interview.title}</h1>
-          {(error || voice.error) && (
-            <p role="alert" className={styles.error}>
-              {error || voice.error}
-            </p>
-          )}
-          <section className={styles.card}>
-            <h2>Let’s talk through your idea.</h2>
-            <p>
-              Inkwell will ask about your perspective, examples, and practical
-              advice. Allow about 10–15 minutes.
-            </p>
-            <div className={styles.actions}>
-              <button
-                className={styles.primary}
-                onClick={() => {
-                  setStarted(true);
-                  voice.start();
-                }}
-              >
-                Start conversation
-              </button>
-            </div>
-          </section>
-        </>
+        <ConsultantInterviewPreparation
+          articleId={interview.article_id}
+          title={interview.title}
+          error={error || voice.error || undefined}
+          onStart={() => {
+            setStarted(true);
+            voice.start();
+          }}
+        />
       ) : (
         <section
           className={styles.voiceExperience}

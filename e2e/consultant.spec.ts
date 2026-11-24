@@ -194,16 +194,17 @@ test("consultant dashboard presents articles as a responsive workspace", async (
 
   await page.goto("/consultant");
   await expect(
-    page.getByRole("heading", { name: "What’s on your mind?" }),
+    page.getByRole("heading", { name: "My articles", level: 1 }),
   ).toBeVisible();
-  await expect(page.getByText("1 article", { exact: true })).toBeVisible();
-  await expect(page.getByText("In Review", { exact: true })).toBeVisible();
   await expect(
-    page.getByText("Review and refine your draft before exporting it."),
+    page.getByText("1 article shown", { exact: true }),
+  ).toBeAttached();
+  await expect(
+    page.getByText("Ready to edit", { exact: true }).last(),
   ).toBeVisible();
   await expect(
     page.getByRole("link", {
-      name: "Continue editing: How to write better articles",
+      name: "Open article: How to write better articles",
     }),
   ).toHaveAttribute("href", `/consultant/articles/${articleId}`);
   await expect(page.getByRole("link", { name: "New article" })).toHaveAttribute(

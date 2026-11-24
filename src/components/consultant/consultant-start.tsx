@@ -1,5 +1,11 @@
 "use client";
-import { ArrowRight, CaretDown, FileText, Plus } from "@phosphor-icons/react";
+import {
+  ArrowRight,
+  CaretDown,
+  FileText,
+  MagnifyingGlass,
+  Plus,
+} from "@phosphor-icons/react";
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -10,29 +16,24 @@ import {
 import styles from "./consultant.module.css";
 
 function articleStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    setup: "Idea saved",
+    waiting_for_client: "Awaiting interview",
+    interview_in_progress: "Interview in progress",
+    ready_to_draft: "Ready to draft",
+    drafting: "Drafting",
+    in_review: "Ready to edit",
+    ready_to_publish: "Ready to edit",
+    published: "Published",
+  };
+  if (labels[status]) return labels[status];
   return status
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function articleSummary(status: string) {
-  const summaries: Record<string, string> = {
-    setup: "Add the context Inkwell needs to begin your interview.",
-    waiting_for_client:
-      "Waiting for the interview responses that shape this article.",
-    interview_in_progress:
-      "Continue the conversation that will shape this article.",
-    ready_to_draft: "Your interview is complete and ready to become a draft.",
-    drafting: "Inkwell is turning your interview into a structured draft.",
-    in_review: "Review and refine your draft before exporting it.",
-    ready_to_publish: "Your article is ready to edit, export, or publish.",
-    published: "Your article is complete and ready to revisit anytime.",
-  };
-  return summaries[status] ?? "Continue working on your article.";
-}
-
 function articleActionLabel(status: string) {
-  if (status === "in_review") return "Continue editing";
+  if (status === "in_review") return "Open article";
   if (status === "ready_to_publish") return "Open article";
   if (status === "interview_in_progress") return "Resume interview";
   if (status === "setup") return "Start interview";
@@ -46,10 +47,22 @@ export function ConsultantDashboard() {
     { id: string; title: string; status: string; updated_at: string }[] | null
   >(null);
   const [error, setError] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [query, setQuery] = useState("");
   useEffect(() => {
     Promise.all([
       api<Profile>("profile"),
-      api<{ items: NonNullable<typeof articles> }>("articles"),
+      (async () => {
+        const items: NonNullable<typeof articles> = [];
+        let page;
+        do {
+          page = await api<{ items: NonNullable<typeof articles> }>(
+            `articles?offset=${items.length}&limit=100`,
+          );
+          items.push(...page.items);
+        } while (page.items.length === 100);
+        return { items };
+      })(),
     ])
       .then(([p, a]) => {
         if (!p.onboarding_complete) router.replace("/consultant/onboarding");
@@ -57,16 +70,25 @@ export function ConsultantDashboard() {
       })
       .catch((e) => setError(e.message));
   }, [router]);
+  const visibleArticles = articles?.filter((article) => {
+    const ready = ["in_review", "ready_to_publish"].includes(article.status);
+    const matchesFilter =
+      filter === "all" ||
+      (filter === "ready" ? ready : !ready && article.status !== "published");
+    return (
+      matchesFilter &&
+      article.title
+        .toLocaleLowerCase()
+        .includes(query.trim().toLocaleLowerCase())
+    );
+  });
   return (
     <>
       <header className={styles.dashboardHero}>
         <div className={styles.dashboardIntro}>
           <p className={styles.eyebrow}>Your ideas, in your voice</p>
-          <h1>What’s on your mind?</h1>
-          <p>
-            Talk through your ideas. Get a structured article that sounds like
-            you.
-          </p>
+          <h1 id="consultant-articles-title">My articles</h1>
+          <p>Your ideas, shaped into articles in your voice.</p>
         </div>
         <Link
           className={`${styles.primary} ${styles.newArticleButton}`}
@@ -85,15 +107,45 @@ export function ConsultantDashboard() {
         aria-labelledby="consultant-articles-title"
         className={styles.articleLibrary}
       >
-        <header className={styles.articleLibraryHeader}>
-          <h2 id="consultant-articles-title">My articles</h2>
-          {articles && (
-            <span>
-              {articles.length} {articles.length === 1 ? "article" : "articles"}
-            </span>
-          )}
-        </header>
-        {!articles ? (
+        <div className={styles.libraryToolbar}>
+          <div
+            className={styles.libraryFilters}
+            role="group"
+            aria-label="Filter articles"
+          >
+            {[
+              ["all", "All articles"],
+              ["progress", "In progress"],
+              ["ready", "Ready to edit"],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={filter === value}
+                onClick={() => setFilter(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <label className={styles.librarySearch}>
+            <MagnifyingGlass size={21} aria-hidden="true" />
+            <span className={styles.visuallyHidden}>Search your articles</span>
+            <input
+              type="search"
+              placeholder="Search your articles"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
+        </div>
+        {error && !articles ? (
+          <div className={styles.articleLibraryState}>
+            <p>
+              Your articles could not be loaded. Refresh the page to try again.
+            </p>
+          </div>
+        ) : !articles ? (
           <div className={styles.articleLibraryState}>
             <p role="status">Loading your articles…</p>
           </div>
@@ -105,10 +157,28 @@ export function ConsultantDashboard() {
               <p>Share an idea and Inkwell will help you shape the draft.</p>
             </div>
           </div>
+        ) : visibleArticles?.length === 0 ? (
+          <div className={styles.articleLibraryState} role="status">
+            <MagnifyingGlass size={28} aria-hidden="true" />
+            <div>
+              <strong>No matching articles</strong>
+              <p>Try another search or choose a different filter.</p>
+            </div>
+            <button
+              className={styles.resetFilters}
+              type="button"
+              onClick={() => {
+                setQuery("");
+                setFilter("all");
+              }}
+            >
+              Clear filters
+            </button>
+          </div>
         ) : (
           <>
             <div className={styles.articleList}>
-              {articles.map((article) => {
+              {visibleArticles?.map((article) => {
                 const actionLabel = articleActionLabel(article.status);
                 return (
                   <Link
@@ -122,13 +192,6 @@ export function ConsultantDashboard() {
                     </span>
                     <span className={styles.articleIdentity}>
                       <strong>{article.title}</strong>
-                      <span>{articleSummary(article.status)}</span>
-                    </span>
-                    <span className={styles.articleMeta}>
-                      <span className={styles.articleStatus}>
-                        <span aria-hidden="true" />
-                        {articleStatusLabel(article.status)}
-                      </span>
                       <time dateTime={article.updated_at}>
                         Updated{" "}
                         {new Date(article.updated_at).toLocaleDateString(
@@ -136,10 +199,18 @@ export function ConsultantDashboard() {
                           {
                             month: "short",
                             day: "numeric",
-                            year: "numeric",
+                            ...(new Date(article.updated_at).getFullYear() !==
+                            new Date().getFullYear()
+                              ? { year: "numeric" as const }
+                              : {}),
                           },
                         )}
                       </time>
+                    </span>
+                    <span className={styles.articleMeta}>
+                      <span className={styles.articleStatus}>
+                        {articleStatusLabel(article.status)}
+                      </span>
                     </span>
                     <span className={styles.articleAction}>
                       {actionLabel}
@@ -149,8 +220,9 @@ export function ConsultantDashboard() {
                 );
               })}
             </div>
-            <p className={styles.articleLibraryHint}>
-              Open any article to continue where you left off.
+            <p className={styles.visuallyHidden} role="status">
+              {visibleArticles?.length}{" "}
+              {visibleArticles?.length === 1 ? "article" : "articles"} shown
             </p>
           </>
         )}

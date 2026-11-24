@@ -1,59 +1,67 @@
-# Consultant article library design QA
+# Consultant new article design QA
 
 final result: passed
 
-## Visual target and evidence
+## Target and evidence
 
-- Approved target: `design-evidence/consultant-library/approved-option-1.png`, the first displayed ImageGen result selected by the user.
-- Live implementation: `http://localhost:3000/consultant`, existing signed-in Chrome session, real API data.
-- Final screenshot: `design-evidence/consultant-library/desktop-final.png` (1366 × 768 OS/browser capture).
-- Content-only screenshot: `design-evidence/consultant-library/implementation-content.png` (1366 × 680). Browser chrome above y=86 was removed for comparison.
-- Source pixels: 1487 × 1058. Source normalized proportionally to 1366px wide; its first 680px were compared with the implementation's content viewport. This is a width-normalized comparison, not a claim of pixel-identical browser rendering of the generated bitmap.
-- Full-view comparison: `design-evidence/consultant-library/comparison.png`, approved target on the left, implementation on the right.
-- Focused first-row comparison: `design-evidence/consultant-library/comparison-row.png`, same left/right ordering, covering title wrapping, status, date and action.
-- Mobile: `design-evidence/consultant-library/mobile.png`, Chrome responsive emulation at 390 × 844 CSS pixels, fit-to-window display. The screenshot includes the surrounding browser and DevTools; it is evidence of responsive layout, not a 1:1 mobile raster comparison.
+- Selected layout: third displayed full-page mockup, Writing Canvas, saved at `design-evidence/consultant-new/approved-option-3.png`.
+- User's additional requirement: five length choices, with the supplemental approved menu saved at `design-evidence/consultant-new/approved-length-menu.png`. This menu is a shared control detail, not a fourth layout choice.
+- Implementation: `http://localhost:3000/consultant/new` in the existing signed-in Chrome session.
+- Desktop captures: `desktop-final.png`, `desktop-footer.png`, and `length-menu.png` under `design-evidence/consultant-new/`.
+- Source bitmap: 1487 × 1058. Native browser capture: 1366 × 768; content viewport is 1366 × 680 after removing 86px of browser chrome. Density was normalized by proportionally resizing the reference to 1366px wide.
+- Combined full-page comparison: `design-evidence/consultant-new/comparison.png`, reference left and implementation right. Implementation is stitched from actual top and footer captures at a 316px scroll offset, using the top 680px plus the final 316px of the footer capture. It is not a single browser full-page raster. Cursor highlights and development indicators remain screenshot artifacts.
+- Focused field comparison: `design-evidence/consultant-new/comparison-fields.png`, reference left, implementation right. Both show empty required fields and the same placeholder copy.
+- Responsive evidence: `mobile-top.png` and `mobile-footer.png`, captured with Chrome responsive emulation at 390 × 844 CSS pixels and fit-to-window scaling. These show content reflow and the reachable primary action, not a 1:1 mobile bitmap comparison.
 
-## State and intentional differences
+## Fidelity review
 
-The mock contains three sample articles; the live account has one. No sample data was added to the user's account. Both comparison sides show All articles with an empty query and the same first article title. The existing owner-only Generation performance navigation link and existing experience switcher remain available. The UI does not label an interview paused because the listing API only exposes interview-in-progress, not a verified pause state.
+No actionable P0/P1/P2 mismatches remain.
 
-## Findings and comparison history
+- Fonts: actual Inkwell Newsreader headings/title input and Manrope interface/body text are retained. Title and description are real editable fields with persistent labels and explicit required indicators.
+- Layout: centered open canvas, back link, editorial heading, underlined title input, spacious unboxed description, collapsed optional disclosure, quiet next-step explanation and one crimson continuation action follow the approved structure. The form scrolls naturally on shorter desktop and mobile viewports.
+- Color: existing paper, navy, crimson, muted and divider tokens are used. Borders and focus treatments stay restrained. Native select option highlights follow the operating system instead of the generated menu's custom blush highlight; this intentionally preserves native keyboard and mobile select behavior.
+- Assets: no raster illustration assets are required in this layout. Existing wordmark and Phosphor arrow/chevron icons are reused. The mockup is reference material, not a screenshot substituted for the interface.
+- Copy: heading, helper, placeholders, optional disclosure and continuation label match the selected direction. The optional summary reflects the selected length. Reader takeaway remains available as an existing field even though the supplemental menu crop does not show it.
+- Existing owner-only Generation performance navigation and experience switcher remain available. The selected mock depicts ordinary navigation; the app preserves this existing owner capability.
 
-No actionable P0/P1/P2 differences remain in the scoped library.
+## Interaction verification
 
-- Initial intermediate-width inspection showed the search field competing for horizontal space with filters. The toolbar now stacks at widths up to 1050px. Mobile verification shows a full-width search input, readable filters and a full article title with visible action text.
-- The first desktop capture inherited the existing primary-button shadow through CSS specificity. A dashboard-specific `.primary.newArticleButton` rule removes it. The final desktop capture confirms the flat button treatment.
-- Final combined comparison confirms the open divided list, heading hierarchy, single crimson creation button, search/filter arrangement, full title wrapping, neutral state badge and right-aligned article action. The real account's shorter list leaves more whitespace intentionally.
+- Live browser: opened optional preferences, inspected all five select options, selected In-depth and observed the summary update. Collapsed preferences and checked the responsive layout at 390 × 844, including the full-width continuation button below the form. Restored desktop, refreshed to Standard/empty inputs, and left the new article screen open.
+- No article was created in the user's account and no microphone session or paid model generation was started during manual QA.
+- Form tests exercise saved title/description/audience/length, direct navigation to interview preparation, and retry after interview-creation failure without creating a duplicate article. Required fields and selected length use real form controls.
+- Browser console inspection showed development HMR messages and extension initialization; no application error was observed in the inspected console.
 
-## Required fidelity surfaces
+## Backend completion
 
-- Typography: actual existing Newsreader and Manrope variables are used, with readable serif article titles and no title ellipsis. The generated image is an approximate depiction of fonts; the application fonts are authoritative.
-- Spacing and layout: centered wide canvas, airy intro, right-aligned primary action, toolbar and simple row rules match the selected structure. Minor vertical and text-size differences from the generated bitmap are P3 polish only.
-- Colors: existing paper, navy, crimson, muted and divider tokens are retained; badges use a quiet neutral tint. No new visual theme was introduced.
-- Assets: no raster illustration assets are present in the selected UI. Existing lowercase wordmark and Phosphor document/search/plus/arrow icons are used. The selected image is saved for reference, not rendered as the functioning interface.
-- Copy: title, description and filter labels match the selected direction. Live dates/statuses come from article data. Existing functionality remains reachable.
+- API accepts short, standard, long, extended and in_depth.
+- Additive migration `20261124_0022` was applied to the local development database. New lengths are allowed only for consultant articles. Downgrade refuses while longer articles exist rather than rewriting user data.
+- Longer lengths are persisted and included in queued generation snapshots, verified with the isolated PostgreSQL test database.
+- Direct drafting instructions include all five target ranges and preserve source fidelity over padding. Extended/In-depth have larger writing/editing/repair output budgets and a minimum 240-second request timeout for larger model responses.
+- Existing rate-limit changes in the working tree were preserved. Optional metrics guards were made explicit for type checking. An existing integration fixture username was corrected from an invalid hyphenated name to an underscore name.
+- Restart an already-running consultant worker to load the changed Python code. Uvicorn reload handles the API when running in development mode. Actual paid-model output lengths and latency were not measured; word ranges are targets rather than guarantees.
 
-## Interaction and validation
+## Validation
 
-- Manually verified in the signed-in browser: In progress excludes the ready article, unmatched search shows an empty result, Clear filters restores the article, New article opens `/consultant/new`, and Open article opens the existing article editor. Returned the browser to `/consultant` after checks.
-- Console inspection: only extension initialization and Next development/HMR messages in the inspected console; no application errors observed.
-- TypeScript check passed.
-- Scoped ESLint check passed.
-- Focused Vitest suite passed: 3 tests cover combined search/status filters and reset, searching beyond the first API page, and loading failure recovery.
-- Existing dashboard E2E expectations were updated for the new heading, status and link labels. Playwright E2E was not executed; navigation and responsive verification used the live browser instead.
-- Git whitespace check passed.
+- Frontend TypeScript: passed.
+- Frontend scoped ESLint: passed.
+- Frontend focused Vitest: 7 passed.
+- Backend scoped Ruff: passed.
+- Backend mypy on writer and consultant schema: passed.
+- Backend consultant unit, length, rate-limit and integration tests: 55 passed.
+- Whitespace checks: passed.
+- Existing E2E expectations were updated for the native length select and direct interview-preparation handoff. Playwright E2E was not executed.
+- The isolated test database was stopped after verification. Development database and application remain running.
 
-## Follow-up polish
+## Comparison history and follow-up
 
-- P3: generated mock UI text and the production font rendering differ slightly in size and vertical rhythm. The implemented screen preserves the approved hierarchy and actual product typography.
-- Keyboard/screen-reader testing across a broader device/browser matrix was not performed. Search has a visible focus ring, filters expose pressed state, navigation exposes current page, and result counts are announced.
+The combined visual comparison and focused field view found the approved structure intact, with no required visual fixes. The stitched capture overlap was corrected before accepting comparison evidence. Small differences in generated type proportions, interface text size and vertical rhythm are P3 refinements; production uses the actual product fonts. Native select styling is an intentional implementation choice rather than a custom-menu fidelity claim.
 
 ## Implementation checklist
 
-- [x] Approved design implemented in the existing consultant library.
-- [x] Real article data and existing destinations preserved.
-- [x] Search and status filtering functional across fetched pages.
-- [x] Empty, loading, error and no-result states handled.
-- [x] Desktop, intermediate and mobile layouts inspected.
-- [x] Combined visual comparison and focused row comparison inspected.
-- [x] Relevant checks passed; local app remains running.
+- [x] Third displayed page layout implemented.
+- [x] Five functional length choices included.
+- [x] Database, API, prompt and model budgets updated together.
+- [x] Retry does not duplicate a saved article.
+- [x] Desktop/mobile and expanded/collapsed states inspected.
+- [x] Combined visual comparison reviewed.
+- [x] Relevant tests and type/lint checks passed.

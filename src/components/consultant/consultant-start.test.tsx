@@ -6,10 +6,10 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { ConsultantDashboard } from "./consultant-start";
+import { ConsultantDashboard, ConsultantNewArticle } from "./consultant-start";
 import { consultantRequest } from "@/lib/consultant/client";
 
-const router = vi.hoisted(() => ({ replace: vi.fn() }));
+const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("@/lib/consultant/client", () => ({ consultantRequest: vi.fn() }));
 const api = vi.mocked(consultantRequest);
@@ -41,6 +41,82 @@ beforeEach(() =>
 afterEach(() => {
   cleanup();
   vi.resetAllMocks();
+});
+
+it.each(["standard", "extended", "in_depth"])(
+  "saves the %s length and opens interview preparation",
+  async (length) => {
+    api.mockImplementation(async (path) => {
+      if (path === "profile") return { audience: "Founders" };
+      return { id: path === "articles" ? "new-article" : "new-interview" };
+    });
+    render(<ConsultantNewArticle />);
+    await waitFor(() =>
+      expect(screen.getByLabelText("Intended reader")).toHaveValue("Founders"),
+    );
+    const preferences = screen.getByText("Shape the draft").closest("details")!;
+    expect(preferences).not.toHaveAttribute("open");
+    fireEvent.click(screen.getByText("Shape the draft"));
+    expect(screen.getAllByRole("option")).toHaveLength(5);
+    fireEvent.change(screen.getByLabelText("Length"), {
+      target: { value: length },
+    });
+    fireEvent.change(screen.getByLabelText("Working title"), {
+      target: { value: "Better handoffs" },
+    });
+    fireEvent.change(screen.getByLabelText("What is it about?"), {
+      target: { value: "Why ownership matters" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Continue to interview" }),
+    );
+    await waitFor(() =>
+      expect(router.push).toHaveBeenCalledWith(
+        "/consultant/interviews/new-interview",
+      ),
+    );
+    expect(api).toHaveBeenCalledWith("articles", "POST", {
+      title: "Better handoffs",
+      description: "Why ownership matters",
+      audience: "Founders",
+      takeaway: "",
+      length,
+    });
+  },
+);
+
+it("retries interview preparation without creating a duplicate article", async () => {
+  let attempts = 0;
+  api.mockImplementation(async (path) => {
+    if (path === "profile") return { audience: "" };
+    if (path === "articles") return { id: "saved-article" };
+    if (attempts++ === 0) throw new Error("Temporary connection failure");
+    return { id: "recovered-interview" };
+  });
+  render(<ConsultantNewArticle />);
+  fireEvent.change(screen.getByLabelText("Working title"), {
+    target: { value: "An idea" },
+  });
+  fireEvent.change(screen.getByLabelText("What is it about?"), {
+    target: { value: "My perspective" },
+  });
+  fireEvent.click(
+    screen.getByRole("button", { name: "Continue to interview" }),
+  );
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Your idea is saved",
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Continue to interview" }),
+  );
+  await waitFor(() =>
+    expect(router.push).toHaveBeenCalledWith(
+      "/consultant/interviews/recovered-interview",
+    ),
+  );
+  expect(api.mock.calls.filter(([path]) => path === "articles")).toHaveLength(
+    1,
+  );
 });
 
 it("combines title search with status filters and can reset an empty result", async () => {

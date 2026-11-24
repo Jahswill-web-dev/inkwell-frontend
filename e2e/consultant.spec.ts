@@ -551,19 +551,18 @@ test("minimal article opens a voice-only interview and queues its draft", async 
     return route.fulfill({ json: {} });
   });
   await page.goto("/consultant/new");
-  await expect(page.getByRole("heading", { name: "Your idea" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "What would you like to write about?" }),
+  ).toBeVisible();
   await expect(
     page.getByText("Shape the draft", { exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("radio", { name: /Standard.*800–1,200 words/ }),
-  ).toBeChecked();
+  await expect(page.getByLabel("Length")).toHaveValue("standard");
   await page.getByLabel("Working title").fill("Better handoffs");
   await page
     .getByLabel("What is it about?")
     .fill("Tools cannot solve unclear ownership.");
-  await page.getByRole("button", { name: "Start my interview" }).click();
-  await page.getByRole("button", { name: "Prepare my interview" }).click();
+  await page.getByRole("button", { name: "Continue to interview" }).click();
   await expect(
     page.getByRole("button", { name: "Check microphone" }),
   ).toHaveCount(0);

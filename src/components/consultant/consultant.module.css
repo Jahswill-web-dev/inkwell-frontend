@@ -356,253 +356,227 @@
   color: var(--color-ink-crimson);
   box-shadow: inset 0 -3px var(--color-ink-crimson);
 }
+.main:has(.newArticlePage) {
+  max-width: 1440px;
+  padding: 42px 7vw 64px;
+}
 .newArticlePage {
-  width: min(100%, 900px);
+  width: min(100%, 1040px);
   margin: 0 auto;
 }
+.newArticleBack {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--color-ink-navy);
+  text-decoration: none;
+  font-size: 15px;
+  margin-bottom: 44px;
+}
+.newArticleBack svg {
+  color: var(--color-ink-crimson);
+}
+.newArticleBack:hover {
+  color: var(--color-ink-crimson);
+}
 .newArticleIntro {
-  margin-bottom: 26px;
+  margin-bottom: 42px;
 }
 .newArticleIntro .eyebrow {
-  margin: 0;
+  margin: 0 0 18px;
 }
 .newArticleIntro h1 {
-  margin-bottom: 10px;
+  margin: 0 0 12px;
+  font-size: clamp(32px, 3.5vw, 48px);
+  letter-spacing: -1px;
 }
 .newArticleIntro > p:last-child {
   margin: 0;
   color: var(--color-ink-muted);
-  font-size: 16px;
+  font-size: 19px;
 }
-.newArticleForm {
-  display: block;
-}
-.newArticleSurface {
-  overflow: hidden;
-  border: 1px solid var(--color-ink-line);
-  border-radius: 18px;
-  background: var(--color-ink-surface);
-  box-shadow: 0 8px 28px rgb(7 25 79 / 5%);
-}
-.briefSection {
-  padding: 26px 32px 30px;
-}
-.briefSectionHeader {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 22px;
-}
-.briefSectionHeader h2 {
+.ideaFields {
+  min-width: 0;
   margin: 0;
-  font-size: 28px;
-  font-weight: 600;
+  padding: 0;
+  border: 0;
 }
-.briefSectionNumber {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  flex: 0 0 34px;
-  border-radius: 50%;
-  background: #f4f1ee;
-  color: var(--color-ink-navy);
-  font-size: 14px;
-  font-weight: 750;
-}
-.briefSectionTag {
-  display: inline-flex;
-  align-items: center;
-  min-height: 25px;
-  border-radius: 999px;
-  background: #f4f1ee;
-  color: var(--color-ink-muted);
-  padding: 4px 10px;
-  font-size: 12px;
-  font-weight: 600;
-}
-.briefFields,
-.briefPreferenceFields {
-  display: grid;
-  gap: 20px;
-}
-.briefField {
-  display: grid;
-  gap: 8px;
-}
-.briefField > label,
-.briefLabelRow label,
-.lengthChoices legend {
-  color: var(--color-ink-navy);
-  font-size: 14px;
-  font-weight: 700;
+.canvasField {
+  margin-bottom: 30px;
 }
 .briefLabelRow {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 18px;
+  gap: 24px;
+  margin-bottom: 12px;
+}
+.briefLabelRow label {
+  color: var(--color-ink-navy);
+  font-size: 16px;
+  font-weight: 700;
 }
 .briefLabelRow > span {
+  font-size: 14px;
   color: var(--color-ink-muted);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
 }
-.briefField input,
-.briefField textarea {
+.canvasField input,
+.canvasField textarea {
   width: 100%;
-  border: 1px solid var(--color-ink-line);
-  border-radius: 9px;
-  background: var(--color-ink-surface);
+  padding: 8px 0 16px;
+  border: 0;
+  border-bottom: 1px solid var(--color-ink-line);
+  border-radius: 0;
+  background: transparent;
   color: var(--color-ink-navy);
-  padding: 13px 14px;
   font: inherit;
-  line-height: 1.5;
-  transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+  outline-offset: 5px;
 }
-.briefField textarea {
-  min-height: 118px;
+.canvasField input {
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: clamp(24px, 2.5vw, 34px);
+  line-height: 1.3;
+}
+.canvasField textarea {
+  min-height: 150px;
   resize: vertical;
+  font-size: 18px;
+  line-height: 1.65;
 }
-.briefPreferenceFields .briefField textarea {
-  min-height: 82px;
-}
-.briefField input::placeholder,
-.briefField textarea::placeholder {
+.canvasField input::placeholder,
+.canvasField textarea::placeholder {
   color: var(--color-ink-muted);
+  opacity: 1;
 }
-.briefField input:focus,
-.briefField textarea:focus {
+.canvasField input:focus,
+.canvasField textarea:focus {
+  outline: none;
   border-color: var(--color-ink-crimson);
-  box-shadow: 0 0 0 3px rgb(197 0 50 / 10%);
-  outline: 0;
+  box-shadow: 0 1px var(--color-ink-crimson);
+}
+.ideaDescription {
+  margin-bottom: 34px;
 }
 .briefPreferences {
   border-top: 1px solid var(--color-ink-line);
+  border-bottom: 1px solid var(--color-ink-line);
 }
 .briefPreferences > summary {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 22px 32px;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 0;
   cursor: pointer;
   list-style: none;
 }
 .briefPreferences > summary::-webkit-details-marker {
   display: none;
 }
-.briefPreferences > summary:hover {
-  background: #fffcfa;
-}
-.briefPreferences > summary:focus-visible {
-  outline: 3px solid rgb(197 0 50 / 18%);
-  outline-offset: -3px;
-}
 .briefPreferencesTitle {
+  display: grid;
+  gap: 3px;
+}
+.briefPreferencesTitle > span {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  align-items: baseline;
+  gap: 24px;
 }
 .briefPreferencesTitle strong {
   font-family: var(--font-newsreader), Georgia, serif;
   font-size: 27px;
   font-weight: 600;
 }
+.optionalLabel {
+  color: var(--color-ink-muted);
+  font-size: 14px;
+}
+.briefPreferencesTitle small {
+  color: var(--color-ink-muted);
+  font-size: 14px;
+}
 .briefPreferencesCaret {
+  flex-shrink: 0;
   transition: transform 160ms ease;
 }
 .briefPreferences[open] .briefPreferencesCaret {
   transform: rotate(180deg);
 }
 .briefPreferenceFields {
-  padding: 0 32px 30px 78px;
-}
-.lengthChoices {
-  min-width: 0;
-  border: 0;
-  padding: 0;
-  margin: 0;
-}
-.lengthChoices legend {
-  margin-bottom: 8px;
-}
-.lengthChoices > div {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 22px;
+  padding: 6px 0 28px;
+  max-width: 680px;
 }
-.lengthChoice {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.briefField {
+  display: grid;
+  gap: 8px;
+}
+.briefField > label {
+  font-size: 15px;
+  font-weight: 700;
+}
+.briefField input,
+.briefField textarea,
+.briefField select {
+  width: 100%;
   min-width: 0;
   border: 1px solid var(--color-ink-line);
-  border-radius: 10px;
-  padding: 12px 14px;
-  cursor: pointer;
-  transition:
-    border-color 160ms ease,
-    background 160ms ease,
-    box-shadow 160ms ease;
+  border-radius: 9px;
+  background: var(--color-ink-surface);
+  color: var(--color-ink-navy);
+  padding: 13px 14px;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.5;
 }
-.lengthChoice:hover {
-  border-color: #d8b7bd;
+.briefField textarea {
+  min-height: 84px;
+  resize: vertical;
 }
-.lengthChoiceSelected {
-  border-color: var(--color-ink-crimson);
-  background: #fff7f8;
-  box-shadow: 0 0 0 2px rgb(197 0 50 / 8%);
-}
-.lengthChoice > span {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-}
-.lengthChoice strong {
-  font-size: 14px;
-}
-.lengthChoice small {
-  overflow: hidden;
+.briefField input::placeholder,
+.briefField textarea::placeholder {
   color: var(--color-ink-muted);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
-.lengthChoice input {
-  width: 16px;
-  height: 16px;
-  flex: 0 0 16px;
-  accent-color: var(--color-ink-crimson);
+.briefField input:focus,
+.briefField textarea:focus,
+.briefField select:focus {
+  outline: 2px solid var(--color-ink-crimson);
+  outline-offset: 3px;
+}
+.briefPreferences > summary:focus-visible,
+.newArticleBack:focus-visible {
+  outline: 2px solid var(--color-ink-crimson);
+  outline-offset: 5px;
 }
 .briefHelp {
-  margin: -4px 0 0;
+  margin: 2px 0 0;
   color: var(--color-ink-muted);
   font-size: 13px;
-}
-.newArticleError {
-  margin: 0 32px 20px;
 }
 .newArticleFooter {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  border-top: 1px solid var(--color-ink-line);
-  padding: 16px 32px;
+  padding: 34px 0 0;
 }
 .newArticleFooter p {
   margin: 0;
+  font-size: 14px;
   color: var(--color-ink-muted);
-  font-size: 13px;
 }
 .newArticleFooter .primary {
-  flex: 0 0 auto;
-  min-width: 190px;
+  min-height: 54px;
+  padding-inline: 24px;
+  box-shadow: none;
+  white-space: nowrap;
+}
+.shell:has(.newArticlePage) .nav {
+  min-height: 84px;
+  padding-block: 0;
+}
+.shell:has(.newArticlePage) .links a {
+  padding-block: 25px;
 }
 .eyebrow {
   text-transform: uppercase;
@@ -1857,57 +1831,51 @@
     padding-block: 8px;
     font-size: 14px;
   }
+  .main:has(.newArticlePage) {
+    padding: 28px 20px 48px;
+  }
+  .newArticleBack {
+    margin-bottom: 30px;
+    font-size: 14px;
+  }
   .newArticleIntro {
-    margin-bottom: 22px;
+    margin-bottom: 30px;
   }
-  .newArticleSurface {
-    border-radius: 14px;
+  .newArticleIntro > p:last-child {
+    font-size: 16px;
   }
-  .briefSection {
-    padding: 22px 20px 24px;
+  .briefLabelRow {
+    gap: 16px;
   }
-  .briefSectionHeader {
-    gap: 10px;
-    margin-bottom: 20px;
+  .canvasField textarea {
+    min-height: 150px;
+    font-size: 16px;
   }
-  .briefSectionHeader h2,
   .briefPreferencesTitle strong {
     font-size: 24px;
   }
-  .briefSectionNumber {
-    width: 30px;
-    height: 30px;
-    flex-basis: 30px;
-  }
-  .briefPreferences > summary {
-    grid-template-columns: 30px minmax(0, 1fr) auto;
-    gap: 10px;
-    padding: 20px;
-  }
-  .briefPreferencesTitle {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 5px;
-  }
-  .briefPreferenceFields {
-    padding: 0 20px 24px;
-  }
-  .lengthChoices > div {
-    grid-template-columns: 1fr;
-  }
-  .lengthChoice small {
-    white-space: normal;
-  }
-  .newArticleError {
-    margin-inline: 20px;
+  .briefPreferencesTitle > span {
+    gap: 16px;
   }
   .newArticleFooter {
-    align-items: stretch;
     flex-direction: column;
-    padding: 18px 20px 20px;
+    align-items: stretch;
+    padding-top: 26px;
+    gap: 18px;
   }
   .newArticleFooter .primary {
     width: 100%;
+  }
+  .shell:has(.newArticlePage) .nav {
+    gap: 10px 20px;
+    padding: 12px 20px;
+  }
+  .shell:has(.newArticlePage) .links {
+    gap: 18px;
+  }
+  .shell:has(.newArticlePage) .links a {
+    padding-block: 8px;
+    font-size: 14px;
   }
   .card,
   .editor {

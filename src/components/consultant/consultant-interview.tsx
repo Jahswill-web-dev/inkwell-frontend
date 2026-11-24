@@ -3,15 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import { ConversationProvider } from "@elevenlabs/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
-import {
-  Microphone,
-  MicrophoneSlash,
-  Pause,
-  Play,
-  Stop,
-  Waveform,
-} from "@phosphor-icons/react";
 import {
   consultantRequest as api,
   type Interview,
@@ -20,6 +11,8 @@ import type { VoiceSessionResponse } from "@/lib/articles/client-interview-api";
 import { useRealtimeInterview } from "@/components/interview/use-realtime-interview";
 import styles from "./consultant.module.css";
 import { ConsultantInterviewPreparation } from "./consultant-interview-preparation";
+import { ConsultantInterviewLive } from "./consultant-interview-live";
+import { useConsultantConversation } from "./use-consultant-conversation";
 export function ConsultantInterviewScreen({
   interviewId,
 }: {
@@ -36,9 +29,14 @@ function ConsultantInterviewContent({ interviewId }: { interviewId: string }) {
   const [interview, setInterview] = useState<Interview | null>(null);
   const [error, setError] = useState("");
   const [started, setStarted] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"pause" | "finish" | null>(null);
   const [seconds, setSeconds] = useState(0);
   const finishing = useRef(false);
+  const conversation = useConsultantConversation(
+    interviewId,
+    interview,
+    started,
+  );
   async function reload() {
     const next = await api<Interview>(`interviews/${interviewId}`);
     setInterview(next);
@@ -58,6 +56,10 @@ function ConsultantInterviewContent({ interviewId }: { interviewId: string }) {
     `consultant:${interviewId}`,
     "openai_webrtc",
     {
+      observePlayback: true,
+      onEvent: conversation.onEvent,
+      onTranscriptChange: conversation.onTranscriptChange,
+      onPlayback: conversation.onPlayback,
       createSession: (_token, sdp) =>
         api<VoiceSessionResponse>(
           `interviews/${interviewId}/voice/session`,
@@ -91,18 +93,21 @@ function ConsultantInterviewContent({ interviewId }: { interviewId: string }) {
   async function finish() {
     if (finishing.current) return;
     finishing.current = true;
-    setBusy(true);
+    setBusy("finish");
     setError("");
     try {
+      conversation.interrupt();
       voice.stop("manual_end_button");
       await voice.flushTranscript();
+      await conversation.flushDelivery();
       await api(`interviews/${interviewId}/finish`, "POST");
+      conversation.disconnect();
       const current = interview ?? (await reload());
       router.push(`/consultant/articles/${current.article_id}`);
     } catch (e) {
       setError((e as Error).message);
     } finally {
-      setBusy(false);
+      setBusy(null);
       finishing.current = false;
     }
   }
@@ -137,8 +142,8 @@ function ConsultantInterviewContent({ interviewId }: { interviewId: string }) {
         : voice.activity
       : voice.status;
   const voiceLabel = {
-    saving: "Creating your draft",
-    listening: "Inkwell is listening",
+    saving: busy === "pause" ? "Pausing conversation…" : "Creating your draft",
+    listening: "Listening to you",
     speaking: "Inkwell is speaking",
     muted: "Microphone muted",
     idle: "Conversation paused",
@@ -147,6 +152,27 @@ function ConsultantInterviewContent({ interviewId }: { interviewId: string }) {
     error: "Connection lost",
   }[voiceState];
   const elapsed = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  const paused = voice.status === "idle" || voice.status === "error";
+  async function togglePause() {
+    if (paused) {
+      voice.start();
+      return;
+    }
+    setBusy("pause");
+    setError("");
+    conversation.interrupt();
+    voice.stop();
+    try {
+      await voice.flushTranscript();
+      await conversation.flushDelivery();
+      await api(`interviews/${interviewId}/pause`, "POST");
+      conversation.disconnect();
+    } catch (caught) {
+      setError((caught as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
   return (
     <>
       {!started ? (
@@ -160,97 +186,30 @@ function ConsultantInterviewContent({ interviewId }: { interviewId: string }) {
           }}
         />
       ) : (
-        <section
-          className={styles.voiceExperience}
-          data-voice-state={voiceState}
-        >
-          <div className={styles.voiceHeading}>
-            <h1>{interview.title}</h1>
-          </div>
-          {(error || voice.error) && (
-            <p role="alert" className={styles.error}>
-              {error || voice.error}
-            </p>
-          )}
-          <div className={styles.voiceStage}>
-            <Image
-              alt=""
-              aria-hidden="true"
-              className={styles.voiceOrbImage}
-              src="/images/consultant/voice-orb.png"
-              width={640}
-              height={640}
-              priority
-            />
-            <div
-              className={styles.voiceOrbContent}
-              role="status"
-              aria-live="polite"
-            >
-              <h2>{voiceLabel}</h2>
-              <Waveform aria-hidden="true" size={40} weight="bold" />
-            </div>
-          </div>
-          <time className={styles.voiceElapsed} aria-label="Interview duration">
-            {elapsed}
-          </time>
-          <div className={styles.voiceControls}>
-            <button
-              className={styles.voiceControl}
-              type="button"
-              aria-pressed={voice.muted}
-              disabled={busy || voice.status !== "connected"}
-              onClick={voice.toggleMute}
-            >
-              {voice.muted ? (
-                <MicrophoneSlash aria-hidden="true" size={22} weight="bold" />
-              ) : (
-                <Microphone aria-hidden="true" size={22} weight="bold" />
-              )}
-              {voice.muted ? "Unmute" : "Mute"}
-            </button>
-            <button
-              className={styles.voiceControl}
-              type="button"
-              disabled={
-                busy ||
-                voice.status === "connecting" ||
-                voice.status === "reconnecting"
-              }
-              onClick={async () => {
-                if (voice.status === "idle" || voice.status === "error")
-                  voice.start();
-                else {
-                  voice.stop();
-                  try {
-                    await voice.flushTranscript();
-                    await api(`interviews/${interviewId}/pause`, "POST");
-                  } catch (e) {
-                    setError((e as Error).message);
-                  }
-                }
-              }}
-            >
-              {voice.status === "idle" || voice.status === "error" ? (
-                <Play aria-hidden="true" size={22} weight="fill" />
-              ) : (
-                <Pause aria-hidden="true" size={22} weight="fill" />
-              )}
-              {voice.status === "idle" || voice.status === "error"
-                ? "Resume"
-                : "Pause"}
-            </button>
-            <button
-              className={styles.voiceFinish}
-              type="button"
-              disabled={busy}
-              onClick={() => void finish()}
-            >
-              <Stop aria-hidden="true" size={20} weight="fill" />
-              {busy ? "Saving…" : "Finish and create draft"}
-            </button>
-          </div>
-        </section>
+        <ConsultantInterviewLive
+          title={interview.title}
+          elapsed={elapsed}
+          voiceState={voiceState ?? "idle"}
+          voiceLabel={voiceLabel ?? "Connecting…"}
+          question={conversation.question?.text ?? null}
+          turns={conversation.turns}
+          saveStatus={voice.saveStatus ?? "idle"}
+          error={error || voice.error}
+          questionError={conversation.questionError}
+          audioBlocked={voice.audioBlocked ?? false}
+          muted={voice.muted}
+          paused={paused}
+          busy={Boolean(busy)}
+          canMute={voice.status === "connected"}
+          canPause={
+            voice.status !== "connecting" && voice.status !== "reconnecting"
+          }
+          onMute={voice.toggleMute}
+          onPause={() => void togglePause()}
+          onFinish={() => void finish()}
+          onResumeAudio={() => void voice.resumeAudio()}
+          onRetryQuestion={() => void conversation.refresh()}
+        />
       )}
     </>
   );

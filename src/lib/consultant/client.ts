@@ -1,5 +1,16 @@
 import { fetchWithAccessRefresh } from "@/lib/auth/refresh-client";
 
+export class ConsultantRequestError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public code?: string,
+  ) {
+    super(message);
+    this.name = "ConsultantRequestError";
+  }
+}
+
 export async function consultantRequest<T>(
   path: string,
   method = "GET",
@@ -19,9 +30,11 @@ export async function consultantRequest<T>(
   );
   const value = await response.json().catch(() => undefined);
   if (!response.ok)
-    throw new Error(
+    throw new ConsultantRequestError(
       value?.error?.message ??
         "We couldn't complete that request. Please try again.",
+      response.status,
+      value?.error?.code,
     );
   return value as T;
 }
@@ -35,6 +48,22 @@ export type Turn = {
   item_id: string;
   speaker: "participant" | "interviewer";
   text: string;
+  voice_session_id?: string;
+};
+export type VoiceQuestion = {
+  id: string;
+  voice_session_id: string;
+  sequence: number;
+  text: string;
+  kind: "question" | "follow_up" | "clarification" | "final";
+  status: "pending" | "delivered" | "interrupted" | "superseded";
+  created_at: string;
+  delivered_at: string | null;
+  transcript_item_ids: string[];
+};
+export type VoiceQuestionState = {
+  current_question: VoiceQuestion | null;
+  pending_question: VoiceQuestion | null;
 };
 export type Interview = {
   id: string;
@@ -54,6 +83,8 @@ export type Interview = {
   questions: { id: string; text: string }[];
   turns: Turn[];
   corrections: Record<string, { text: string | null; excluded: boolean }>;
+  current_question?: VoiceQuestion | null;
+  pending_question?: VoiceQuestion | null;
 };
 export type Section = {
   id: string;

@@ -1,12 +1,13 @@
 "use client";
 import {
+  ArrowLeft,
   CaretDown,
   CheckCircle,
   Code,
   Copy,
   DownloadSimple,
   Export,
-  PencilSimple,
+  FileText,
   Sparkle,
   X,
 } from "@phosphor-icons/react";
@@ -18,6 +19,7 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   consultantRequest as api,
   type Article,
@@ -30,6 +32,8 @@ import {
 } from "@/lib/consultant/article-export";
 import { DraftRichSection } from "@/components/articles/draft-editor/draft-rich-section";
 import styles from "./consultant.module.css";
+import workspaceStyles from "./consultant-article.module.css";
+import { ConsultantGeneration } from "./consultant-generation";
 type ExportNode = {
   type?: string;
   text?: string;
@@ -458,30 +462,198 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
     setDetailDescription(savedDetailDescription);
   }
 
+  if (
+    !sections.length &&
+    article.job &&
+    !aiJob &&
+    (generating || article.job.state === "failed")
+  ) {
+    return (
+      <ConsultantGeneration
+        title={article.title}
+        job={article.job}
+        error={error}
+        busy={busy}
+        onRefresh={() => void run(reload)}
+        onRetry={() =>
+          void run(async () => {
+            await api(`jobs/${article.job!.id}/retry`, "POST");
+            await reload();
+          })
+        }
+      />
+    );
+  }
+
+  const articleDetailsTrigger = (
+    <button
+      aria-label="Article details"
+      aria-controls="article-details-panel"
+      aria-expanded={detailsOpen}
+      className={`${styles.articleDetailsTrigger} ${workspaceStyles.detailsTrigger}`}
+      onClick={() => {
+        resetArticleDetails();
+        setDetailsOpen((open) => !open);
+      }}
+      type="button"
+    >
+      <FileText aria-hidden="true" size={20} />
+      <span className={workspaceStyles.desktopDetails}>Article details</span>
+      <span className={workspaceStyles.mobileDetails}>Details</span>
+      <CaretDown
+        aria-hidden="true"
+        className={detailsOpen ? styles.articleDetailsCaretOpen : ""}
+        size={16}
+        weight="bold"
+      />
+    </button>
+  );
   return (
-    <>
-      <p className={styles.eyebrow}>My article</p>
-      {sections.length === 0 && <h1>{article.title}</h1>}
-      <div className={styles.articleDetails}>
-        <button
-          aria-controls="article-details-panel"
-          aria-expanded={detailsOpen}
-          className={styles.articleDetailsTrigger}
-          onClick={() => {
-            resetArticleDetails();
-            setDetailsOpen((open) => !open);
-          }}
-          type="button"
-        >
-          <PencilSimple aria-hidden="true" size={19} weight="bold" />
-          <span>Article details</span>
-          <CaretDown
-            aria-hidden="true"
-            className={detailsOpen ? styles.articleDetailsCaretOpen : ""}
-            size={16}
-            weight="bold"
-          />
-        </button>
+    <div
+      className={sections.length ? workspaceStyles.workspace : undefined}
+      data-consultant-article={sections.length ? true : undefined}
+    >
+      {sections.length > 0 && (
+        <header className={workspaceStyles.toolbar} aria-label="Article tools">
+          <Link className={workspaceStyles.back} href="/consultant">
+            <ArrowLeft aria-hidden="true" size={23} />
+            My articles
+          </Link>
+          <div className={workspaceStyles.toolbarActions}>
+            <div className={workspaceStyles.saveGroup}>
+              <span className={workspaceStyles.saveStatus} role="status">
+                {!dirty && (
+                  <CheckCircle aria-hidden="true" size={25} weight="light" />
+                )}
+                {dirty ? "Unsaved changes" : "Saved"}
+              </span>
+              {dirty && (
+                <button
+                  className={workspaceStyles.saveButton}
+                  disabled={busy}
+                  onClick={() => void run(save)}
+                  type="button"
+                >
+                  Save changes
+                </button>
+              )}
+            </div>
+            {articleDetailsTrigger}
+
+            <button
+              aria-controls="consultant-ai-drawer"
+              aria-expanded={assistantOpen}
+              className={`${styles.primary} ${styles.assistantTrigger}`}
+              onClick={() => setAssistantOpen((open) => !open)}
+              ref={assistantTriggerRef}
+              type="button"
+            >
+              <Sparkle aria-hidden="true" size={18} weight="fill" />
+              {proposal
+                ? "Review AI suggestion"
+                : generating && aiJob
+                  ? "AI is working"
+                  : "Ask AI"}
+            </button>
+            <div className={styles.exportMenu} ref={exportMenuRef}>
+              <button
+                aria-expanded={exportOpen}
+                aria-haspopup="menu"
+                className={styles.exportTrigger}
+                disabled={busy}
+                ref={exportTriggerRef}
+                onClick={() => {
+                  setCopied(false);
+                  setExportOpen((open) => !open);
+                }}
+              >
+                <Export aria-hidden="true" size={20} />
+                Export
+                <CaretDown
+                  aria-hidden="true"
+                  className={exportOpen ? styles.exportCaretOpen : ""}
+                  size={16}
+                />
+              </button>
+              {exportOpen && (
+                <section
+                  aria-label="Export article"
+                  className={styles.exportPopover}
+                  data-positioned={exportPosition !== null}
+                  ref={exportPopoverRef}
+                  role="menu"
+                  style={exportPosition ?? undefined}
+                >
+                  <header className={styles.exportHeader}>
+                    <h2>Export article</h2>
+                    <p>Choose how you’d like to use your draft.</p>
+                  </header>
+                  <button
+                    className={`${styles.exportOption} ${styles.exportOptionPrimary}`}
+                    disabled={busy}
+                    onClick={() => void run(() => exportDraft("copy"))}
+                    role="menuitem"
+                  >
+                    <Copy aria-hidden="true" size={24} />
+                    <span>
+                      <strong>Copy formatted article</strong>
+                      <small>Paste into Substack, Docs, or your CMS</small>
+                    </span>
+                    {copied && (
+                      <span className={styles.exportSuccess} role="status">
+                        <CheckCircle
+                          aria-hidden="true"
+                          size={20}
+                          weight="fill"
+                        />
+                        Copied
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    className={styles.exportOption}
+                    disabled={busy}
+                    onClick={() => void run(() => exportDraft("markdown"))}
+                    role="menuitem"
+                  >
+                    <DownloadSimple aria-hidden="true" size={24} />
+                    <span>
+                      <strong>Download Markdown</strong>
+                      <small>
+                        Best for writing tools and publishing workflows
+                      </small>
+                    </span>
+                  </button>
+                  <button
+                    className={styles.exportOption}
+                    disabled={busy}
+                    onClick={() => void run(() => exportDraft("html"))}
+                    role="menuitem"
+                  >
+                    <Code aria-hidden="true" size={24} />
+                    <span>
+                      <strong>Download HTML</strong>
+                      <small>Ready for websites and email editors</small>
+                    </span>
+                  </button>
+                </section>
+              )}
+            </div>
+          </div>
+        </header>
+      )}
+      {sections.length === 0 && (
+        <>
+          <p className={styles.eyebrow}>My article</p>
+          <h1>{article.title}</h1>
+        </>
+      )}
+      <div
+        className={
+          sections.length ? workspaceStyles.detailsPanel : styles.articleDetails
+        }
+      >
+        {sections.length === 0 && articleDetailsTrigger}
         {detailsOpen && (
           <form
             className={styles.articleDetailsPanel}
@@ -659,121 +831,13 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
       )}
       {sections.length > 0 && (
         <>
-          <div className={styles.actions}>
-            <button
-              className={styles.primary}
-              disabled={busy || !dirty}
-              onClick={() => void run(save)}
-            >
-              {dirty ? "Save changes" : "Saved"}
-            </button>
-            <button
-              aria-controls="consultant-ai-drawer"
-              aria-expanded={assistantOpen}
-              className={`${styles.primary} ${styles.assistantTrigger}`}
-              onClick={() => setAssistantOpen((open) => !open)}
-              ref={assistantTriggerRef}
-              type="button"
-            >
-              <Sparkle aria-hidden="true" size={18} weight="fill" />
-              {proposal
-                ? "Review AI suggestion"
-                : generating && aiJob
-                  ? "AI is working"
-                  : "Ask AI"}
-            </button>
-            <div className={styles.exportMenu} ref={exportMenuRef}>
-              <button
-                aria-expanded={exportOpen}
-                aria-haspopup="menu"
-                className={styles.exportTrigger}
-                disabled={busy}
-                ref={exportTriggerRef}
-                onClick={() => {
-                  setCopied(false);
-                  setExportOpen((open) => !open);
-                }}
-              >
-                <Export aria-hidden="true" size={20} />
-                Export
-                <CaretDown
-                  aria-hidden="true"
-                  className={exportOpen ? styles.exportCaretOpen : ""}
-                  size={16}
-                />
-              </button>
-              {exportOpen && (
-                <section
-                  aria-label="Export article"
-                  className={styles.exportPopover}
-                  data-positioned={exportPosition !== null}
-                  ref={exportPopoverRef}
-                  role="menu"
-                  style={exportPosition ?? undefined}
-                >
-                  <header className={styles.exportHeader}>
-                    <h2>Export article</h2>
-                    <p>Choose how you’d like to use your draft.</p>
-                  </header>
-                  <button
-                    className={`${styles.exportOption} ${styles.exportOptionPrimary}`}
-                    disabled={busy}
-                    onClick={() => void run(() => exportDraft("copy"))}
-                    role="menuitem"
-                  >
-                    <Copy aria-hidden="true" size={24} />
-                    <span>
-                      <strong>Copy formatted article</strong>
-                      <small>Paste into Substack, Docs, or your CMS</small>
-                    </span>
-                    {copied && (
-                      <span className={styles.exportSuccess} role="status">
-                        <CheckCircle
-                          aria-hidden="true"
-                          size={20}
-                          weight="fill"
-                        />
-                        Copied
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    className={styles.exportOption}
-                    disabled={busy}
-                    onClick={() => void run(() => exportDraft("markdown"))}
-                    role="menuitem"
-                  >
-                    <DownloadSimple aria-hidden="true" size={24} />
-                    <span>
-                      <strong>Download Markdown</strong>
-                      <small>
-                        Best for writing tools and publishing workflows
-                      </small>
-                    </span>
-                  </button>
-                  <button
-                    className={styles.exportOption}
-                    disabled={busy}
-                    onClick={() => void run(() => exportDraft("html"))}
-                    role="menuitem"
-                  >
-                    <Code aria-hidden="true" size={24} />
-                    <span>
-                      <strong>Download HTML</strong>
-                      <small>Ready for websites and email editors</small>
-                    </span>
-                  </button>
-                </section>
-              )}
-            </div>
-          </div>
-          <p className={styles.muted}>
+          <p className={styles.visuallyHidden}>
             {dirty
               ? "You have unsaved changes. Save before leaving this page."
               : "Your accepted draft is saved."}
           </p>
           <div
-            className={styles.articleViewSwitch}
+            className={workspaceStyles.viewSwitch}
             role="group"
             aria-label="Article view"
           >
@@ -782,28 +846,37 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
               onClick={() => setArticleView("preview")}
               type="button"
             >
-              Preview
+              Article
             </button>
             <button
               aria-pressed={articleView === "markdown"}
               onClick={() => setArticleView("markdown")}
               type="button"
             >
-              Markdown
+              Markdown{" "}
+              <CaretDown
+                aria-hidden="true"
+                size={16}
+                className={
+                  articleView === "markdown"
+                    ? workspaceStyles.sourceOpen
+                    : undefined
+                }
+              />
             </button>
           </div>
           <div
             aria-label={
               articleView === "preview"
-                ? "Article preview editor"
+                ? "Article editor"
                 : "Article Markdown view"
             }
-            className={styles.editor}
+            className={workspaceStyles.document}
             role="region"
           >
             {articleView === "preview" ? (
               <>
-                <h1 className={styles.articleTitle}>{article.title}</h1>
+                <h1 className={workspaceStyles.title}>{article.title}</h1>
                 {sections.map((s, index) => (
                   <div key={`${editorVersion}:${s.id}`}>
                     <DraftRichSection
@@ -829,6 +902,7 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
                         setDirty(true);
                       }}
                       showSectionNumber={false}
+                      appearance="editorial"
                       onChange={(id, state) => {
                         setSections((current) =>
                           current.map((item) =>
@@ -848,7 +922,7 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
               <section aria-label="Article Markdown source">
                 <h1 className={styles.visuallyHidden}>{article.title}</h1>
                 <p className={styles.markdownHint}>
-                  Read-only Markdown. Switch to Preview to edit your article.
+                  Read-only Markdown. Switch to Article to edit your draft.
                 </p>
                 <pre className={styles.markdownSource}>
                   <code>
@@ -861,10 +935,6 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
               </section>
             )}
           </div>
-          <p className={styles.muted}>
-            Ask AI to improve this article. You will review the full suggestion
-            before it replaces your draft.
-          </p>
         </>
       )}
       {assistantOpen && sections.length > 0 && (
@@ -1365,6 +1435,6 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
           </section>
         </div>
       )}
-    </>
+    </div>
   );
 }

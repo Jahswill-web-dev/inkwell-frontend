@@ -1,45 +1,54 @@
-# Consultant live interview — approved option 3
+# Generated article workspace — approved option 1
 
 final result: passed
 
-## Source and rendered evidence
+## Source and final evidence
 
-Source: `design-evidence/consultant-live/approved-option-3.png` (1487 × 1058). The exact approved image supplies the centered orb, listening status, large current question, collapsed transcript, compact article header, elapsed/save state and three bottom actions.
+Source visual truth: `design-evidence/consultant-article/approved-option-1.png`, the first displayed mockup from the article workspace ideation set. It is the open centered editorial canvas with the compact toolbar and closed AI panel.
 
-`comparison-full.png` and `comparison-focused.png` show source left and implementation right, inspected together. Chrome used a 1487 × 1058 CSS viewport fitted to the native window. The rendered region (744 × 529 display pixels at 20,154) and source were normalized to identical dimensions. Both show Listening to you with the transcript closed. This is a composition comparison at reduced display density, not a pixel-exact unscaled capture. The implementation uses a real test article, real elapsed time and real question; its Saving status reflects transcript writes. These dynamic differences are intentional.
+Implementation: the real `ConsultantArticleScreen` and `DraftRichSection` inside the existing consultant shell. Browser verification used a temporary development-only harness with the same synthetic article text as the source and isolated in-memory API responses for that harness's article ID. This exercised the real editor and request client without modifying stored user articles or making paid AI calls. Both harness files were removed after verification, and its browser tab was closed.
 
-`desktop-final.png` is the native 1366 × 768 paused handoff, with all three actions visible. `desktop-content.png` excludes browser chrome. `mobile.png` shows the 390 × 844 CSS viewport fitted to 274 × 591 display pixels; `mobile-actions.png` shows the lower portion after normal vertical scrolling. `mobile-transcript.png` shows the working expanded transcript. `console-errors.png` records the empty Chrome console with the level:error filter after the real call.
+Source and final desktop capture (`desktop-final.png`) are both 1487 × 1058 pixels, captured with an explicit matching viewport clip at 1x density. `comparison-final.png` pairs source left and implementation right, equally downsampled to 744 × 529 each. `comparison-focused.png` pairs matching title/intro/section crops at the same scale. `comparison-toolbar.png` pairs matching toolbar crops at native scale. All three combined comparisons were opened and inspected together.
 
-Earlier preparation QA is preserved in `design-evidence/consultant-live/previous-preparation-qa.md`. `actual-live-desktop.png` records the initial successful live call before the final typography correction.
+Additional evidence in the same directory: `laptop-final.png` (1366 × 768), `tablet.png` (834 × 1194), `mobile-final.png` (375 × 1773 full content from a 390 × 844 viewport with a 15px scrollbar), `mobile-360-final.png` (360 × 800 clip), `mobile-320.png` (320 × 800 clip), `mobile-unsaved.png`, `details-mobile.png`, `export-desktop.png`, `export-mobile.png`, and `ask-ai-mobile.png`. Responsive screenshots show different interaction states and content heights, not same-size source comparisons.
 
-## Visual findings
+Previous generation-screen QA is preserved as `previous-generation-qa.md`.
 
-Resolved P2: the shared `.main h2` selector initially overrode the current question's display typography. Scoped the live-stage question selector, then recaptured desktop, tall desktop and mobile evidence. The question is now the dominant content element.
+## Findings and iteration history
 
-No outstanding P0/P1/P2 findings. The layout keeps the approved hierarchy, uncluttered empty space, divider placement and crimson finish action. Laptop spacing reduces the orb and type enough to retain the controls. Mobile stacks metadata and actions, wraps the question, and permits normal vertical scrolling. The expanded transcript has a bounded scrollable area.
+- Resolved P2: the first headline wrapped with “broken” on the first line, changing the source hierarchy. Increased the display size to 62px, adjusted line height and toolbar spacing, then recaptured the desktop state. The final title wraps before “broken handoffs,” matching the source.
+- Resolved P2: initial article prose and section spacing pushed later sections lower than the source. Tuned the scoped editorial body to 22px with explicit paragraph line height, and adjusted heading spacing. Final full and focused comparisons show the intended reading rhythm.
+- Resolved P2: long editable section headings were clipped in a single-line field on mobile. The consultant's editorial appearance now uses a wrapping textarea that resizes with its content and viewport. A long synthetic heading was edited and saved in the browser without horizontal overflow. Other editor appearances retain their existing controls.
+- Resolved P2: the initial narrow-phone toolbar wrapped the back link and crowded the Details control. Adjusted the grid, button spacing and compact metadata label; added a stacked fallback below 340px. Post-fix 360px and 320px captures confirm reachable controls. The accessible metadata label remains “Article details.”
+- Initial evidence: `desktop-first.png`, `mobile-first.png`, `comparison-initial.png`. Intermediate desktop comparison: `desktop-revised.png` and `comparison-revised.png`. Final evidence supersedes these.
+- No actionable P0/P1/P2 findings remain.
 
-Fonts and assets: existing Newsreader and Manrope, Inkwell paper/navy/crimson/muted/divider tokens, the existing voice-orb raster and Phosphor icons are reused. The reference is not embedded in the product. Existing navigation is retained; its font scale and spacing differ from the generated mock. P3: the existing orb artwork and real fonts have slightly different glow, weight and rasterization from Image Gen; this does not impair the selected composition. P3: the transcript disclosure retains its Show transcript label while open; its chevron and native expanded state communicate the toggle.
+## Required fidelity surfaces
 
-## Behavior and backend connection
+Typography: existing Newsreader and Manrope are retained. The centered 850px article has the selected two-line title, generous serif prose and prominent section headings. Controls use compact Manrope. The unchanged product navigation has a slightly smaller scale than the generated image; this is intentional consistency with the existing application.
 
-The real authenticated voice test succeeded. The server registered a pending question, the matching spoken transcript and browser audio activity allowed the client to acknowledge delivery, and the backend stored a delivered current question with its voice session and saved transcript item IDs. A subsequent resumed call displayed the saved question and then updated it to a new follow-up. Pausing stopped microphone capture and retained the question. No draft generation was started by these smoke tests. Two clearly named local QA articles remain available; existing user articles were preserved.
+Spacing/layout: the raised document card and stacked toolbar are replaced with the source's open paper surface, one compact action row, collapsed metadata and quiet Article/Markdown controls. The article occupies the central reading column. Mobile stacks the layout and keeps section headings fully visible.
 
-The frontend polls current-question state while the interview is active, uses exact backend question text, checks matching interviewer fragments from the same voice session, and waits for successful transcript persistence before delivery acknowledgement. It handles interrupted/blocked playback, stale sessions and temporary acknowledgement failures. It exposes actual save state, audio recovery, transcript disclosure, mute, pause/resume and finish controls. Pause uses a pausing label rather than a draft-creation label.
+Colors/tokens: existing paper, navy, crimson, muted text, divider and hover tokens are used. Saved is a neutral checkmarked status, not a disabled primary action. The save action appears when there are unsaved edits. No autosave claim is introduced.
 
-Playback observation uses Web Audio samples from the remote MediaStream while retaining the HTML audio element for normal audible output. It is a client playback observation combined with matching saved words, not proof that a listener heard every word or that OS volume was audible. Brief silence is not by itself treated as sufficient transcript evidence. No provider-supplied deterministic per-question playback-complete event is available in the existing Live event flow.
+Assets/icons: the source contains no raster artwork needing generation. Existing wordmark and Phosphor ArrowLeft, FileText, CheckCircle, Sparkle, Export and CaretDown icons are used. No screenshot is embedded in the product and no custom replacement artwork is drawn.
 
-## Validation
+Copy/content: Article names the editable view; Markdown is explicitly read-only. The source's hierarchy and action labels are retained. Existing article text remains data-driven. The synthetic comparison article corrects punctuation errors in the generated bitmap. Existing AI review-before-apply and export formats are preserved.
 
-- 13 frontend tests passed across the consultant conversation hook, interview screen, audio observer and realtime hook. Coverage includes playback plus saved evidence before acknowledgement, interrupted/blocked/stale observations, retry, ordered fragments, remote audio attachment, quiet-triggered transcript flushing, explicit microphone start and completion behavior.
-- TypeScript, targeted ESLint, Prettier and git whitespace checks passed.
-- Browser checks covered actual connected/listening, paused, transcript closed/open, laptop, tall desktop and mobile states. No visible application console errors remained after the final call.
-- Backend `/health` returned ok and `/ready` returned ready. PostgreSQL container is healthy; API and consultant worker processes are running. Database migrations are at head. Earlier backend validation passed 72 focused tests plus Ruff and mypy; backend source was not changed during this UI pass.
+P3 follow-up: small differences in font rasterization, icon geometry and navigation scale remain. These do not change hierarchy or behavior.
 
-## Completion checklist
+## Behavior and validation
 
-- [x] Implement the selected live-screen layout using existing brand assets.
-- [x] Connect exact current-question state to the realtime interview.
-- [x] Verify a real approved microphone call and persisted delivery.
-- [x] Check responsive and transcript states, compare source and render together.
-- [x] Resolve P2 typography and pass focused automated checks.
-- [x] Leave local services running with the microphone stopped.
+- 15 focused integration tests passed: seven article-workspace tests and eight generation-flow tests. They cover saved/unsaved status, editing and versioned save, failed save recovery, source switching without losing edits, metadata updates, copy/export options, AI preview requests, Escape/focus restoration, and preservation of the preceding generation flow.
+- Browser checks exercised the real Lexical editor, Article/Markdown switching, successful saving, wrapping/editing long section headings, metadata disclosure/cancel, the AI panel, and the export menu. An actual downloaded Markdown file was read and confirmed to contain the synthetic edited text. Request persistence in these browser checks is in-memory fixture persistence; backend contracts are covered by integration mocks. No new live model generation was triggered.
+- Desktop, laptop, tablet, standard mobile and narrow mobile were inspected. Post-fix measured content widths did not exceed viewport widths. Mobile export remained within the viewport.
+- Final browser error logs were empty. TypeScript, targeted ESLint, formatting and whitespace checks passed. Existing Playwright labels were updated for Article and Article editor; the Playwright CLI suite was not run.
+- The new editorial appearance is opt-in for consultant articles; the generic rich editor retains its default appearance elsewhere. Backend source and API contracts are unchanged.
+
+## Checklist
+
+- [x] Implement the exact first displayed mockup.
+- [x] Preserve direct editing, manual save, metadata, AI review and export.
+- [x] Verify interactions and inspect responsive states in the browser.
+- [x] Compare source/render together and resolve P2 findings.
+- [x] Pass focused checks and remove the temporary visual harness.

@@ -128,6 +128,24 @@
   color: var(--color-ink-navy);
   font-family: var(--font-newsreader), Georgia, serif;
 }
+.main:has([data-consultant-generation]) {
+  max-width: 1440px;
+  padding: 42px 4.4vw 80px;
+}
+.main:has([data-consultant-article]) {
+  max-width: 1600px;
+  padding: 16px 4.4vw 80px;
+}
+@media (max-width: 640px) {
+  .main:has([data-consultant-article]) {
+    padding: 24px 22px 48px;
+  }
+}
+@media (max-width: 640px) {
+  .main:has([data-consultant-generation]) {
+    padding: 28px 22px 48px;
+  }
+}
 .main p {
   line-height: 1.65;
 }

@@ -805,10 +805,10 @@ test("draft proposals require explicit acceptance and export the accepted versio
     page.getByText("This is my original draft.", { exact: true }),
   ).toHaveCount(0);
   const articlePreview = page.getByRole("region", {
-    name: "Article preview editor",
+    name: "Article editor",
   });
   await expect(
-    page.getByRole("button", { name: "Preview", exact: true }),
+    page.getByRole("button", { name: "Article", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   const articleTitle = articlePreview.getByRole("heading", {
     name: "Better handoffs",
@@ -834,7 +834,7 @@ test("draft proposals require explicit acceptance and export the accepted versio
   await expect(markdownView).toContainText(
     "[Case study](https://example.org/study)",
   );
-  await page.getByRole("button", { name: "Preview", exact: true }).click();
+  await page.getByRole("button", { name: "Article", exact: true }).click();
   await expect(
     articlePreview.getByText("I call that expensive confusion.", {
       exact: false,
@@ -982,12 +982,12 @@ test("draft proposals require explicit acceptance and export the accepted versio
   await page.getByRole("button", { name: "Markdown", exact: true }).click();
   await expect(markdownView).toContainText("Edited in Preview.");
   await expect(markdownView).toContainText("# Better handoffs");
-  await page.getByRole("button", { name: "Preview", exact: true }).click();
+  await page.getByRole("button", { name: "Article", exact: true }).click();
   await expect(contentEditor).toContainText("Edited in Preview.");
   await page.getByRole("button", { name: "Save changes" }).click();
   await page.reload();
   await expect(
-    page.getByRole("region", { name: "Article preview editor" }),
+    page.getByRole("region", { name: "Article editor" }),
   ).toContainText("Edited in Preview.");
   await page.screenshot({
     path: `test-results/consultant-draft-${test.info().project.name}.png`,

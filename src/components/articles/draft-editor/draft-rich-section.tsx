@@ -27,7 +27,7 @@ import {
   type SerializedParagraphNode,
   type Spread,
 } from "lexical";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { normalizeEditorState, type DraftSection } from "./draft-editor-data";
 import styles from "./draft-editor.module.css";
 
@@ -174,6 +174,7 @@ export function DraftRichSection({
   onEditor,
   onSelection,
   showSectionNumber = true,
+  appearance = "default",
   temporaryContent,
 }: {
   section: DraftSection;
@@ -185,8 +186,21 @@ export function DraftRichSection({
   onEditor?: (sectionId: string, editor: LexicalEditor) => void;
   onSelection?: (sectionId: string, text: string) => void;
   showSectionNumber?: boolean;
+  appearance?: "default" | "editorial";
   temporaryContent?: ReactNode;
 }) {
+  const editorialHeadingRef = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const heading = editorialHeadingRef.current;
+    if (!heading) return;
+    const resize = () => {
+      heading.style.height = "auto";
+      heading.style.height = `${heading.scrollHeight + 2}px`;
+    };
+    resize();
+    window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
+  }, [appearance, section.title]);
   const initialConfig = {
     namespace: `inkwell-draft-${section.id}-${readOnly ? "preview" : "editor"}`,
     editable: !readOnly,
@@ -219,7 +233,7 @@ export function DraftRichSection({
 
   return (
     <section
-      className={styles.articleSection}
+      className={`${styles.articleSection} ${appearance === "editorial" ? styles.editorialSection : ""}`}
       data-section-id={section.id}
       id={`draft-section-${section.id}`}
     >
@@ -229,6 +243,25 @@ export function DraftRichSection({
             {showSectionNumber ? `${index}. ` : ""}
             {section.title}
           </h2>
+        ) : appearance === "editorial" ? (
+          <textarea
+            ref={editorialHeadingRef}
+            rows={1}
+            aria-current={isActive ? "location" : undefined}
+            aria-label={`Section heading: ${section.title}`}
+            className={styles.sectionTitleInput}
+            maxLength={300}
+            onChange={(event) =>
+              onTitleChange(
+                section.id,
+                event.target.value.replace(/\r?\n/g, " "),
+              )
+            }
+            onKeyDown={(event) => {
+              if (event.key === "Enter") event.preventDefault();
+            }}
+            value={section.title}
+          />
         ) : (
           <input
             aria-current={isActive ? "location" : undefined}

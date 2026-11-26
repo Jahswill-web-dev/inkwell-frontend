@@ -7,7 +7,7 @@ export const registrationMessages = {
 } as const;
 
 export const registrationSchema = z.object({
-  experience: z.enum(["marketing", "consultant"]).optional(),
+  experience: z.enum(["marketing", "consultant"]).default("consultant"),
   email: z
     .string()
     .trim()

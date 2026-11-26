@@ -25,6 +25,7 @@ const backendSuccess = {
   refresh_expires_at: "2026-11-26T12:00:00Z",
   token_type: "bearer",
   user: {
+    preferred_experience: "consultant",
     id: "46a42280-6ad8-4bb6-a29c-1604adbf0c31",
     email: "writer@example.com",
     username: "writer_01",
@@ -121,6 +122,7 @@ describe("POST /api/auth/register", () => {
       headers: { "Content-Type": "application/json" },
     });
     expect(postMock).toHaveBeenCalledWith("/api/v1/auth/register", {
+      experience: "consultant",
       email: "writer@example.com",
       username: "writer_01",
       password: "thoughtful-password",
@@ -144,6 +146,39 @@ describe("POST /api/auth/register", () => {
     const response = await POST(registrationRequest());
 
     expect(response.headers.get("set-cookie")).toContain("Secure");
+  });
+
+  it("forwards an explicit marketing experience", async () => {
+    await POST(
+      registrationRequest({
+        email: "writer@example.com",
+        username: "writer_01",
+        password: "thoughtful-password",
+        experience: "marketing",
+      }),
+    );
+    expect(postMock).toHaveBeenCalledWith(
+      "/api/v1/auth/register",
+      expect.objectContaining({ experience: "marketing" }),
+    );
+  });
+
+  it("preserves disabled consultant signup without creating a session or retrying marketing", async () => {
+    const data = {
+      error: {
+        code: "consultant_disabled",
+        message: "Consultant signup is not available yet.",
+      },
+    };
+    postMock.mockRejectedValue({
+      isAxiosError: true,
+      response: { status: 503, data },
+    });
+    const response = await POST(registrationRequest());
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual(data);
+    expect(response.headers.get("set-cookie")).toBeNull();
+    expect(postMock).toHaveBeenCalledOnce();
   });
 
   it.each([

@@ -6,6 +6,11 @@ describe("safeProtectedPath", () => {
     ["/dashboard", "/dashboard"],
     ["/articles/new?mode=notes", "/articles/new?mode=notes"],
     ["/onboarding", "/onboarding"],
+    ["/consultant", "/consultant"],
+    [
+      "/consultant/articles/example?view=article",
+      "/consultant/articles/example?view=article",
+    ],
     ["https://evil.example/steal", "/dashboard"],
     ["//evil.example/steal", "/dashboard"],
     ["/login", "/dashboard"],

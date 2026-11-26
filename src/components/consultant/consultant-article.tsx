@@ -36,12 +36,7 @@ import styles from "./consultant.module.css";
 import workspaceStyles from "./consultant-article.module.css";
 import assistantStyles from "./consultant-assistant.module.css";
 import { ConsultantGeneration } from "./consultant-generation";
-type ExportNode = {
-  type?: string;
-  text?: string;
-  url?: string;
-  children?: ExportNode[];
-};
+import { ConsultantReview } from "./consultant-review";
 function withoutHeadingNumber(title: string) {
   return title.replace(/^\s*\d+[.)]\s+/, "");
 }
@@ -59,69 +54,6 @@ function normalizeArticleHeadings(article: Article): Article {
       sections: revision.sections.map(normalize),
     })),
   };
-}
-
-function revisionLabel(kind: string) {
-  if (kind === "proposal") return "Rewrite proposal";
-  if (kind === "generated") return "Generated draft";
-  return `${kind.charAt(0).toUpperCase()}${kind.slice(1)} draft`;
-}
-
-function sectionsMatch(left: Section[], right: Section[]) {
-  return (
-    left.length === right.length &&
-    left.every(
-      (section, index) =>
-        section.title === right[index]?.title &&
-        section.editor_state === right[index]?.editor_state,
-    )
-  );
-}
-
-function sectionText(section: Section): string {
-  const walk = (node: ExportNode): string =>
-    (node.text ?? "") +
-    (node.children ?? []).map(walk).join(node.type === "root" ? "\n" : "");
-  return walk(JSON.parse(section.editor_state).root);
-}
-
-function wordChanges(before: string, after: string) {
-  const left = before.match(/\s+|\S+/g) ?? [];
-  const right = after.match(/\s+|\S+/g) ?? [];
-  const rows = Array.from({ length: left.length + 1 }, () =>
-    Array<number>(right.length + 1).fill(0),
-  );
-  for (let i = left.length - 1; i >= 0; i--) {
-    for (let j = right.length - 1; j >= 0; j--) {
-      rows[i][j] =
-        left[i] === right[j]
-          ? rows[i + 1][j + 1] + 1
-          : Math.max(rows[i + 1][j], rows[i][j + 1]);
-    }
-  }
-  if (rows[0][0] < Math.max(left.length, right.length) * 0.35) {
-    return [
-      { kind: "removed_block", text: before },
-      { kind: "added_block", text: after },
-    ];
-  }
-  const changes: { kind: "same" | "added" | "removed"; text: string }[] = [];
-  let i = 0;
-  let j = 0;
-  while (i < left.length || j < right.length) {
-    if (i < left.length && j < right.length && left[i] === right[j]) {
-      changes.push({ kind: "same", text: left[i++] });
-      j++;
-    } else if (
-      j < right.length &&
-      (i === left.length || rows[i][j + 1] >= rows[i + 1][j])
-    ) {
-      changes.push({ kind: "added", text: right[j++] });
-    } else {
-      changes.push({ kind: "removed", text: left[i++] });
-    }
-  }
-  return changes;
 }
 
 export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
@@ -156,9 +88,6 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
   const exportTriggerRef = useRef<HTMLButtonElement>(null);
   const exportPopoverRef = useRef<HTMLElement>(null);
   const [preview, setPreview] = useState<Revision | null>(null);
-  const [previewMode, setPreviewMode] = useState<"version" | "compare">(
-    "version",
-  );
   const previewDialogRef = useRef<HTMLElement>(null);
   const previewCloseButtonRef = useRef<HTMLButtonElement>(null);
   const previewTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -340,6 +269,7 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
       if (event.key === "Escape") {
         event.preventDefault();
         setPreview(null);
+        setAssistantOpen(false);
         return;
       }
       if (event.key !== "Tab") return;
@@ -374,12 +304,12 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
 
   function openPreview(revision: Revision, trigger: HTMLButtonElement) {
     previewTriggerRef.current = trigger;
-    setPreviewMode("compare");
     setPreview(revision);
   }
 
   function closePreview() {
     setPreview(null);
+    setAssistantOpen(false);
   }
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
@@ -506,9 +436,7 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
   const activeStage = generationSteps.findIndex(
     (step) => step.id === article.job?.stage,
   );
-  const previewHasDifferences = preview
-    ? !sectionsMatch(sections, preview.sections)
-    : false;
+
   const savedDetailTitle = article.title;
   const savedDetailDescription = article.description;
   const detailsDirty =
@@ -1257,282 +1185,48 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
         </div>
       )}
       {preview && (
-        <div
-          className={styles.previewBackdrop}
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) closePreview();
-          }}
-        >
-          <section
-            aria-labelledby="consultant-version-preview-title"
-            aria-modal="true"
-            className={styles.previewDialog}
-            ref={previewDialogRef}
-            role="dialog"
-          >
-            <header className={styles.previewHeader}>
-              <div>
-                <p className={styles.eyebrow}>Suggested rewrite</p>
-                <h2 id="consultant-version-preview-title">
-                  Preview suggested rewrite
-                </h2>
-                <div className={styles.previewMetadata}>
-                  <span>{preview.request || revisionLabel(preview.kind)}</span>
-                  <span aria-hidden="true">·</span>
-                  <time dateTime={preview.created_at}>
-                    {new Date(preview.created_at).toLocaleString()}
-                  </time>
-                </div>
-              </div>
-              <button
-                aria-label="Close rewrite preview"
-                className={styles.previewClose}
-                onClick={closePreview}
-                ref={previewCloseButtonRef}
-              >
-                <X aria-hidden="true" size={22} />
-              </button>
-            </header>
-
-            {error && (
-              <p className={assistantStyles.previewError} role="alert">
-                {error}
-              </p>
-            )}
-            {(preview.summary || (preview.sources?.length ?? 0) > 0) && (
-              <div className={styles.previewSummary}>
-                {preview.summary && <p>{preview.summary}</p>}
-                {(preview.sources?.length ?? 0) > 0 && (
-                  <p>
-                    Sources:{" "}
-                    {preview.sources?.map((source, index) => (
-                      <span key={source.id}>
-                        {index > 0 ? " · " : ""}
-                        <a
-                          href={source.url}
-                          rel="noopener noreferrer"
-                          target="_blank"
-                        >
-                          {source.title}
-                        </a>
-                      </span>
-                    ))}
-                  </p>
-                )}
-              </div>
-            )}
-            {previewHasDifferences && (
-              <div
-                aria-label="Rewrite preview view"
-                className={styles.previewToggle}
-                role="group"
-              >
-                <button
-                  aria-pressed={previewMode === "version"}
-                  className={previewMode === "version" ? styles.active : ""}
-                  onClick={() => setPreviewMode("version")}
-                >
-                  Rewrite only
-                </button>
-                <button
-                  aria-pressed={previewMode === "compare"}
-                  className={previewMode === "compare" ? styles.active : ""}
-                  onClick={() => setPreviewMode("compare")}
-                >
-                  Compare with current
-                </button>
-              </div>
-            )}
-
-            <div className={styles.previewBody}>
-              {previewMode === "compare" && previewHasDifferences ? (
-                <div className={styles.comparisonGrid}>
-                  <article className={styles.comparisonPane}>
-                    <h3>Current draft</h3>
-                    {sections.map((section, index) => (
-                      <DraftRichSection
-                        key={`current:${section.id}`}
-                        section={{
-                          ...section,
-                          outlineSectionId: section.outline_section_id,
-                          editorState: section.editor_state,
-                        }}
-                        index={index}
-                        readOnly
-                        showSectionNumber={false}
-                      />
-                    ))}
-                  </article>
-                  <article
-                    className={`${styles.comparisonPane} ${styles.proposedPane}`}
-                  >
-                    <h3>Suggested rewrite</h3>
-                    {preview.sections.map((section, index) => {
-                      const original = sections.find(
-                        (item) => item.id === section.id,
-                      );
-                      const originalIndex = sections.findIndex(
-                        (item) => item.id === section.id,
-                      );
-                      const moved =
-                        originalIndex >= 0 && originalIndex !== index;
-                      const changed =
-                        !original ||
-                        original.title !== section.title ||
-                        original.editor_state !== section.editor_state;
-                      return (
-                        <div
-                          className={
-                            changed || moved ? styles.changedSection : ""
-                          }
-                          key={`compare:${preview.id}:${section.id}`}
-                        >
-                          {(changed || moved) && (
-                            <span className={styles.changeLabel}>
-                              {moved
-                                ? `Moved from section ${originalIndex + 1}`
-                                : "Edited"}
-                            </span>
-                          )}
-                          <DraftRichSection
-                            section={{
-                              ...section,
-                              outlineSectionId: section.outline_section_id,
-                              editorState: section.editor_state,
-                            }}
-                            index={index}
-                            readOnly
-                            showSectionNumber={false}
-                          />
-                          {original && changed && (
-                            <div
-                              className={styles.wordChanges}
-                              aria-label={`Text changes in ${section.title}`}
-                            >
-                              <strong>Exact text changes</strong>
-                              <p>
-                                {wordChanges(
-                                  original.title === section.title
-                                    ? sectionText(original)
-                                    : `${original.title}\n${sectionText(original)}`,
-                                  original.title === section.title
-                                    ? sectionText(section)
-                                    : `${section.title}\n${sectionText(section)}`,
-                                ).map((part, partIndex) =>
-                                  part.kind === "added" ||
-                                  part.kind === "added_block" ? (
-                                    <ins
-                                      className={
-                                        part.kind === "added_block"
-                                          ? styles.changeBlock
-                                          : ""
-                                      }
-                                      key={partIndex}
-                                    >
-                                      {part.text}
-                                    </ins>
-                                  ) : part.kind === "removed" ||
-                                    part.kind === "removed_block" ? (
-                                    <del
-                                      className={
-                                        part.kind === "removed_block"
-                                          ? styles.changeBlock
-                                          : ""
-                                      }
-                                      key={partIndex}
-                                    >
-                                      {part.text}
-                                    </del>
-                                  ) : (
-                                    <span key={partIndex}>{part.text}</span>
-                                  ),
-                                )}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </article>
-                </div>
-              ) : (
-                <article className={styles.versionPreview}>
-                  {preview.sections.map((section, index) => (
-                    <DraftRichSection
-                      key={`preview:${preview.id}:${section.id}`}
-                      section={{
-                        ...section,
-                        outlineSectionId: section.outline_section_id,
-                        editorState: section.editor_state,
-                      }}
-                      index={index}
-                      readOnly
-                      showSectionNumber={false}
-                    />
-                  ))}
-                </article>
-              )}
-            </div>
-
-            <footer className={styles.previewFooter}>
-              <div>
-                <strong>Ready to switch?</strong>
-                <span>This will replace your current draft.</span>
-                {dirty && (
-                  <span className={styles.previewWarning}>
-                    Save your current changes before applying this version.
-                  </span>
-                )}
-              </div>
-              <div className={styles.previewActions}>
-                <button
-                  className={styles.secondary}
-                  disabled={busy}
-                  onClick={() =>
-                    void run(async () => {
-                      await api(
-                        `articles/${articleId}/revisions/${preview.id}`,
-                        "DELETE",
-                      );
-                      await reload();
-                      setPreview(null);
-                      setInstruction("");
-                      setNotice(
-                        "Suggestion rejected. Your draft is unchanged.",
-                      );
-                    })
-                  }
-                >
-                  Reject change
-                </button>
-                <button
-                  className={styles.primary}
-                  disabled={busy || dirty}
-                  onClick={() =>
-                    void run(async () => {
-                      await api(
-                        `articles/${articleId}/revisions/${preview.id}/apply`,
-                        "POST",
-                        undefined,
-                        {
-                          "If-Unmodified-Since": article.draft_updated_at ?? "",
-                        },
-                      );
-                      await reload();
-                      setEditorVersion((v) => v + 1);
-                      setPreview(null);
-                      setAssistantOpen(false);
-                      setInstruction("");
-                      setNotice("Draft updated with the suggested rewrite.");
-                    })
-                  }
-                >
-                  Use this version
-                </button>
-              </div>
-            </footer>
-          </section>
-        </div>
+        <ConsultantReview
+          title={article.title}
+          current={sections}
+          revision={preview}
+          dirty={dirty}
+          busy={busy}
+          error={error}
+          dialogRef={previewDialogRef}
+          backRef={previewCloseButtonRef}
+          onClose={closePreview}
+          onReject={() =>
+            void run(async () => {
+              await api(
+                `articles/${articleId}/revisions/${preview.id}`,
+                "DELETE",
+              );
+              await reload();
+              setPreview(null);
+              setAssistantOpen(false);
+              setInstruction("");
+              setNotice("Suggestion rejected. Your draft is unchanged.");
+            })
+          }
+          onApply={() =>
+            void run(async () => {
+              await api(
+                `articles/${articleId}/revisions/${preview.id}/apply`,
+                "POST",
+                undefined,
+                {
+                  "If-Unmodified-Since": article.draft_updated_at ?? "",
+                },
+              );
+              await reload();
+              setEditorVersion((v) => v + 1);
+              setPreview(null);
+              setAssistantOpen(false);
+              setInstruction("");
+              setNotice("Draft updated with the suggested rewrite.");
+            })
+          }
+        />
       )}
     </div>
   );

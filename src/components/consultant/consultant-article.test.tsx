@@ -394,7 +394,7 @@ it("keeps a failed approval visible in the preview without changing the draft", 
   );
   fireEvent.click(screen.getByRole("button", { name: "Use this version" }));
   const preview = screen.getByRole("dialog", {
-    name: "Preview suggested rewrite",
+    name: "Review AI suggestion",
   });
   expect(await within(preview).findByRole("alert")).toHaveTextContent(
     "This draft changed.",
@@ -402,4 +402,33 @@ it("keeps a failed approval visible in the preview without changing the draft", 
   expect(article.sections[0].editor_state).toContain(
     "A decision needs an owner.",
   );
+});
+
+it("returns to the article without applying or discarding the suggestion", async () => {
+  article.revisions = [
+    {
+      id: "proposal",
+      kind: "proposal",
+      sections: [
+        {
+          ...article.sections[0],
+          editor_state: editorState("A proposed opening."),
+        },
+      ],
+      gaps: [],
+      findings: [],
+      created_at: "2026-11-26T12:01:00Z",
+    },
+  ];
+  await openArticle();
+  const trigger = screen.getByRole("button", { name: "Review AI suggestion" });
+  fireEvent.click(trigger);
+  fireEvent.click(screen.getByRole("button", { name: "Review full article" }));
+  fireEvent.click(screen.getByRole("button", { name: "Back to article" }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(article.revisions).toHaveLength(1);
+  expect(screen.getByLabelText("Edit body")).toHaveValue(
+    "A decision needs an owner.",
+  );
+  await waitFor(() => expect(trigger).toHaveFocus());
 });

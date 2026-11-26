@@ -764,7 +764,7 @@ test("draft proposals require explicit acceptance and export the accepted versio
   await page.getByRole("button", { name: "Review AI suggestion" }).click();
   await page.getByRole("button", { name: "Review full article" }).click();
   const preview = page.getByRole("dialog", {
-    name: "Preview suggested rewrite",
+    name: "Review AI suggestion",
   });
   await expect(preview).toBeVisible();
   await expect(preview.getByRole("article").last()).toContainText(
@@ -775,7 +775,12 @@ test("draft proposals require explicit acceptance and export the accepted versio
   await expect(
     preview.getByRole("link", { name: "Case study" }).first(),
   ).toHaveAttribute("href", "https://example.org/study");
-  await preview.getByRole("button", { name: "Compare with current" }).click();
+  await preview.getByRole("switch", { name: "Show changes" }).uncheck();
+  await expect(preview.locator("ins, del")).toHaveCount(0);
+  await expect(preview.getByRole("article")).toContainText(
+    "I call that expensive confusion.",
+  );
+  await preview.getByRole("switch", { name: "Show changes" }).check();
   await expect(
     preview
       .getByRole("article")
@@ -790,7 +795,7 @@ test("draft proposals require explicit acceptance and export the accepted versio
     fullPage: true,
   });
   await expect(
-    preview.getByRole("button", { name: "Reject change" }),
+    preview.getByRole("button", { name: "Reject suggestion" }),
   ).toBeInViewport();
   await expect(
     preview.getByRole("button", { name: "Use this version" }),
@@ -1067,11 +1072,11 @@ test("rejecting an AI suggestion keeps the current draft", async ({ page }) => {
   await page.getByRole("button", { name: "Review AI suggestion" }).click();
   await page.getByRole("button", { name: "Review full article" }).click();
   await page
-    .getByRole("dialog", { name: "Preview suggested rewrite" })
-    .getByRole("button", { name: "Reject change" })
+    .getByRole("dialog", { name: "Review AI suggestion" })
+    .getByRole("button", { name: "Reject suggestion" })
     .click();
   await expect(
-    page.getByRole("dialog", { name: "Preview suggested rewrite" }),
+    page.getByRole("dialog", { name: "Review AI suggestion" }),
   ).toBeHidden();
   await expect(page.getByText("Keep my draft.")).toBeVisible();
   await expect(
@@ -1220,7 +1225,7 @@ test("comparison identifies moved sections by identity", async ({ page }) => {
   await page.getByRole("button", { name: "Review AI suggestion" }).click();
   await page.getByRole("button", { name: "Review full article" }).click();
   const dialog = page.getByRole("dialog", {
-    name: "Preview suggested rewrite",
+    name: "Review AI suggestion",
   });
   await expect(dialog.getByText("Moved from section 2")).toBeVisible();
   await expect(dialog.getByText("Moved from section 1")).toBeVisible();

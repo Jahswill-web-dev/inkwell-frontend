@@ -1,46 +1,51 @@
-# Ask AI — approved option 2
+# AI suggestion review — approved option 2
 
 final result: passed
 
 ## Findings and fixes
 
-- Resolved P2, typography: the first browser render inherited Manrope for the modal heading because the proposed display variable was not a runtime CSS variable. Bound the heading to the existing Newsreader variable and tuned the type sizes against the approved image. Final combined comparisons confirm the serif heading and readable input, context, and actions.
-- Resolved P2, keyboard return: applying a proposal removed the review trigger and initially left focus on the document body. Added a connected-trigger fallback to the toolbar Ask AI control. A subsequent browser approval returned focus to that control and restored scrolling; the integration test also asserts this.
-- Resolved P2, recovery: submission and approval errors must be visible inside the active modal rather than behind its backdrop. Added inline error feedback to both request and review surfaces. Integration tests cover failures while preserving the request and saved draft.
-- No actionable P0/P1/P2 visual findings remain. P3: minor icon shape and font rasterization differences from the generated image remain acceptable. The existing centered article, navigation, and account control are intentionally retained rather than repositioning the surrounding workspace to follow incidental background changes in the generated mockup.
+- Resolved P2, reading hierarchy: the initial title included “broken” on the first line and inherited paragraph line height made the tracked content substantially taller than the source. Constrained the title measure, set explicit review prose line height, and adjusted legend spacing. `desktop-first.jpg` / `comparison-first.png` show the initial state; `desktop-final.jpg`, `comparison-final.png`, and `comparison-reading.png` show the corrected render.
+- Resolved P2, return behavior: the former preview close reopened the Ask AI modal. “Back to article” and Escape now close both review and assistant, preserve the proposal, restore scrolling and focus the article toolbar trigger. Browser verification and an integration test cover this behavior.
+- Resolved P2, error visibility: approval errors rendered at the top of the reading content could be missed after scrolling. Errors now stay in the fixed footer beside the decision controls. `conflict-mobile.jpg` shows a stale-draft error with both actions reachable; the alert was measured within the 390 × 844 viewport.
+- Resolved P2, narrow controls: reduced compact control sizes below 360px so Back to article and Show changes share one row and neither approval label wraps. `mobile-small.jpg` and `mobile-small-scrolled.jpg` show the 320 × 568 view at the start and end of the article, with the action bar fixed in place.
+- No actionable P0/P1/P2 findings remain.
 
 ## Source and comparison evidence
 
-Selected source: `design-evidence/consultant-ask-ai/approved-option-2.png`, the second displayed generated image from the latest Ask AI ideation set. The source is a centered white modal on the existing article workspace.
+Source: `design-evidence/consultant-review/approved-option-2.png`, the second displayed mockup in the latest review ideation set, with a full-page reading surface and inline change markers.
 
-Final desktop: `desktop-final.jpg`, 1487 × 1058 pixels at a matching 1487 × 1058 CSS viewport and 1x density. `comparison-full.png` places the source left and implementation right, both equally reduced to 744 × 529. `comparison-modal.png` places identical 701 × 650 crops together at native size. Both combined comparisons were opened and inspected after the final typography refinement.
+The source and final desktop render are each 1487 × 1058 pixels, at a matching CSS viewport and 1x density. `comparison-final.png` pairs source left and implementation right at equal 744 × 529 reductions. `comparison-reading.png` pairs corresponding 900 × 680 article crops at equal 675 × 510 reductions. Both combined comparisons were opened and inspected. The initial comparison is retained as `comparison-first.png`.
 
-Responsive evidence: `mobile.jpg` (390 × 844), `mobile-small.jpg` (320 × 568), and `tablet.jpg` (834 × 1194). The short mobile viewport scrolls the form body while preserving reachable header and footer controls; measured document width was 320px at the 320px viewport. Additional states: `progress.jpg`, `review.jpg`, `clarification-mobile.jpg`, `failure-mobile.jpg`.
+Other evidence: `clean-view.jpg`, `mobile.jpg` (390 × 844), `tablet.jpg` (834 × 1194), `mobile-small.jpg` and `mobile-small-scrolled.jpg` (320 × 568), and `conflict-mobile.jpg`. The final narrow captures used a fresh preview tab at the target viewport after an earlier resized-browser capture contained compositor artifacts. The fresh capture and DOM measurements agree: content width 320px, footer entirely inside the viewport, and article body scrolls independently.
 
-Previous article-workspace QA is archived as `previous-article-qa.md`.
+Previous Ask AI modal QA is archived as `previous-ask-ai-qa.md`.
 
 ## Required fidelity surfaces
 
-- Typography: existing Newsreader for Ask AI; Manrope for controls and request content. The article retains its editorial typography. Explicit responsive sizes keep mobile inputs at 16px.
-- Spacing/layout: a centered 700px modal, 34px desktop content gutters, large request field, lightweight prompt pills, one divider and a clear footer action. On mobile the dialog fits the viewport with 16px outer gutters, a scrollable body and stacked footer.
-- Colors/tokens: existing navy, crimson, paper, white, muted and divider tokens. Subtle neutral backdrop, restrained shadow, crimson focus treatment and primary action.
-- Assets/icons: no raster artwork is required or embedded in the application. Existing Phosphor Sparkle, FileText, Microphone and X icons replace generated approximations. The approved bitmap is retained only as design evidence.
-- Copy/content: concise source labels and reassurance are implemented. Short prompt labels still submit the original supported backend instructions. The context line explains use of the draft and interview. Progress reflects plan, optional research, writing and preview preparation; it no longer advertises an independent accuracy review.
+Typography: existing Newsreader and Manrope. The editorial title wraps before “broken handoffs”; serif prose and section headings retain the selected hierarchy. Explicit line height prevents surrounding application styles from changing the reading rhythm. Mobile scales the title and controls without horizontal overflow.
+
+Spacing/layout: full-page review surface, existing brand/navigation language, compact review toolbar, centered reading column, one Show changes switch, and a fixed footer. The body scrolls while Back to article and approval actions stay accessible. No duplicate current/proposed article panels or boxed diff summaries remain.
+
+Colors/tokens: existing navy, crimson, warm paper, white, muted and divider tokens. Removed text has rose highlighting and strikethrough; added text has pale green highlighting. Text labels and screen-reader annotations communicate the changes independently of color.
+
+Assets/icons: no bitmap artwork or generated screenshot is embedded in the interface. The existing wordmark, Phosphor ArrowLeft and standard form controls are used. Source bitmap is design evidence only.
+
+Copy/content: request and summary are data-driven. Both original and proposed content are preserved in the change view; the clean view contains only the proposal. The real second-paragraph edit removes more words than the illustrative mock shows, so its mark is intentionally longer. Full rewrites, section deletion, additions and moves remain reviewable. Source links, lists and inline formatting are preserved. The footer describes approval accurately, and its actions apply or reject the complete proposal.
+
+P3 differences: small font-rasterization/icon and navigation-spacing differences remain; the precise change spans follow the actual source/proposal rather than copying incomplete marks from the generated bitmap. These do not change hierarchy or behavior.
 
 ## Behavior and validation
 
-The request, polling, proposal, sources, comparison, rejection and approval contracts remain connected to the existing backend. The saved draft changes only on approval. This change adds no conversational memory, scope selector or independent fact-checking feature.
+The real ConsultantArticleScreen now hosts ConsultantReview. Existing apply/reject endpoints and version headers are retained. Applying is blocked when there are unsaved edits. Closing preserves the suggestion; rejection preserves the current draft; approval replaces the complete draft. Background content remains inert and focus returns to the article control.
 
-Browser verification used the real ConsultantArticleScreen and Lexical editor with an isolated, development-only sample article and in-memory API responses. It exercised submit/progress, review comparison, close/return, rejection without draft mutation, approval, clarification, failure/retry, mobile and tablet layouts. The background becomes inert, keyboard focus stays within the active modal, Escape restores focus, and scrolling is restored on close. Final browser error logs were empty. No live AI call or stored user-article mutation was made.
+Browser interaction verification used a temporary development-only sample article with isolated in-memory API responses through the real request client and article component. It exercised opening, tracked/clean toggle, closing, Escape, rejection, approval on a narrow screen, restored focus/scrolling, and a simulated stale-draft response. A second temporary render of the actual review component was used solely to obtain a clean narrow-viewport visual capture and verify scrolling. Both temporary preview files were removed. No stored user article or live model call was changed or triggered. Final browser error logs were empty.
 
-19 focused tests passed across article and generation components. The article tests cover request submission, focus/scroll behavior, retained requests, inline request and approval failures, versioned approval, and the existing article editing/export behaviors. TypeScript and targeted ESLint checks passed. Existing Playwright selectors were updated for the new labels; the Playwright CLI suite was not run.
-
-The temporary preview page was removed after verification. No authentication rules or production API routes were changed. The frontend dev server remains available on port 3000.
+26 focused tests passed: 12 article integration tests, 6 review tests and 8 generation tests. Review coverage includes rich links/formatting, unsafe URL handling, complete section deletions/full rewrites with new IDs, moves without false text changes, clean-view content, dirty-state approval protection, and long rewrite preservation. Long sections use a bounded block comparison instead of the previous unbounded word-level matrix. TypeScript and targeted ESLint passed. Existing Playwright labels/selectors were updated; the Playwright CLI suite was not run.
 
 ## Checklist
 
-- [x] Implement the exact second displayed design.
-- [x] Preserve existing AI request and review-before-apply behavior.
-- [x] Match source and render in full and focused combined comparisons.
-- [x] Inspect responsive, keyboard and recovery states.
-- [x] Preserve user data and remove the sample preview route.
+- [x] Build the exact second displayed review concept.
+- [x] Preserve the existing backend proposal and approval contracts.
+- [x] Compare source and render together at matching dimensions.
+- [x] Verify tracked/clean views, complete removals, responsive controls and recovery.
+- [x] Preserve user data and remove temporary preview routes.

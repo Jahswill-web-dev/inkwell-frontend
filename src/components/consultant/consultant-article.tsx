@@ -8,6 +8,7 @@ import {
   DownloadSimple,
   Export,
   FileText,
+  Microphone,
   Sparkle,
   X,
 } from "@phosphor-icons/react";
@@ -33,6 +34,7 @@ import {
 import { DraftRichSection } from "@/components/articles/draft-editor/draft-rich-section";
 import styles from "./consultant.module.css";
 import workspaceStyles from "./consultant-article.module.css";
+import assistantStyles from "./consultant-assistant.module.css";
 import { ConsultantGeneration } from "./consultant-generation";
 type ExportNode = {
   type?: string;
@@ -147,6 +149,8 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [instruction, setInstruction] = useState("");
   const assistantInputRef = useRef<HTMLTextAreaElement>(null);
+  const assistantDialogRef = useRef<HTMLElement>(null);
+  const assistantCloseRef = useRef<HTMLButtonElement>(null);
   const assistantTriggerRef = useRef<HTMLButtonElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const exportTriggerRef = useRef<HTMLButtonElement>(null);
@@ -255,15 +259,64 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
   }, [exportOpen]);
   useEffect(() => {
     if (!assistantOpen || preview) return;
-    assistantInputRef.current?.focus();
-    const onEscape = (event: KeyboardEvent) => {
+    if (!assistantDialogRef.current?.contains(document.activeElement)) {
+      (assistantInputRef.current ?? assistantCloseRef.current)?.focus();
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        event.preventDefault();
         setAssistantOpen(false);
         assistantTriggerRef.current?.focus();
       }
+      if (event.key !== "Tab") return;
+      const focusable =
+        assistantDialogRef.current?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], textarea:not([disabled]), [tabindex="0"]',
+        );
+      if (!focusable?.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!assistantDialogRef.current?.contains(document.activeElement)) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
-    window.addEventListener("keydown", onEscape);
-    return () => window.removeEventListener("keydown", onEscape);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [assistantOpen, preview, article?.job?.state]);
+  useEffect(() => {
+    if (!assistantOpen && !preview) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const inertElements: { element: HTMLElement; previous: boolean }[] = [];
+    let activeSurface = (preview ? previewDialogRef : assistantDialogRef)
+      .current?.parentElement;
+    while (activeSurface && activeSurface !== document.body) {
+      for (const sibling of Array.from(
+        activeSurface.parentElement?.children ?? [],
+      )) {
+        if (
+          sibling === activeSurface ||
+          !(sibling instanceof HTMLElement) ||
+          ["SCRIPT", "STYLE", "LINK"].includes(sibling.tagName)
+        )
+          continue;
+        inertElements.push({ element: sibling, previous: sibling.inert });
+        sibling.inert = true;
+      }
+      activeSurface = activeSurface.parentElement;
+    }
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      for (const { element, previous } of inertElements)
+        element.inert = previous;
+    };
   }, [assistantOpen, preview]);
   useEffect(() => {
     const warn = (e: BeforeUnloadEvent) => {
@@ -278,8 +331,8 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
   useEffect(() => {
     if (!preview) return;
 
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const returnTrigger = previewTriggerRef.current;
+    const assistantTrigger = assistantTriggerRef.current;
     const focusFrame = window.requestAnimationFrame(() =>
       previewCloseButtonRef.current?.focus(),
     );
@@ -310,8 +363,12 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
     return () => {
       window.cancelAnimationFrame(focusFrame);
       window.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = previousOverflow;
-      window.requestAnimationFrame(() => previewTriggerRef.current?.focus());
+      window.requestAnimationFrame(() => {
+        (returnTrigger?.isConnected
+          ? returnTrigger
+          : assistantTrigger
+        )?.focus();
+      });
     };
   }, [preview]);
 
@@ -541,7 +598,8 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
             {articleDetailsTrigger}
 
             <button
-              aria-controls="consultant-ai-drawer"
+              aria-controls="consultant-ai-dialog"
+              aria-haspopup="dialog"
               aria-expanded={assistantOpen}
               className={`${styles.primary} ${styles.assistantTrigger}`}
               onClick={() => setAssistantOpen((open) => !open)}
@@ -740,7 +798,7 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
           </form>
         )}
       </div>
-      {error && (
+      {error && !assistantOpen && !preview && (
         <p role="alert" className={styles.error}>
           {error}
         </p>
@@ -938,229 +996,265 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
         </>
       )}
       {assistantOpen && sections.length > 0 && (
-        <aside
-          aria-label="Ask AI to improve this article"
-          className={styles.assistantDrawer}
-          id="consultant-ai-drawer"
-        >
-          <header className={styles.assistantHeader}>
-            <div>
-              <p className={styles.eyebrow}>Your writing partner</p>
-              <h2>Ask AI to improve this draft</h2>
-            </div>
-            <button
-              aria-label="Close Ask AI"
-              className={styles.previewClose}
-              onClick={() => {
-                setAssistantOpen(false);
-                assistantTriggerRef.current?.focus();
-              }}
-              type="button"
-            >
-              <X aria-hidden="true" size={20} />
-            </button>
-          </header>
-          <div className={styles.assistantBody}>
-            {proposal ? (
-              <div className={styles.assistantResult} role="status">
-                <span className={styles.assistantResultIcon}>
-                  <CheckCircle size={20} weight="fill" />
-                </span>
-                <h3>Your suggestion is ready</h3>
-                <p>
-                  {proposal.summary ||
-                    "Review the proposed article before replacing your current draft."}
+        <div className={assistantStyles.backdrop} hidden={!!preview}>
+          <section
+            aria-labelledby="consultant-ai-title"
+            aria-describedby="consultant-ai-context"
+            aria-modal="true"
+            role="dialog"
+            className={assistantStyles.dialog}
+            id="consultant-ai-dialog"
+            ref={assistantDialogRef}
+          >
+            <header className={assistantStyles.header}>
+              <h2 id="consultant-ai-title">
+                <Sparkle aria-hidden="true" size={32} weight="fill" />
+                Ask AI
+              </h2>
+              <button
+                aria-label="Close Ask AI"
+                className={assistantStyles.close}
+                ref={assistantCloseRef}
+                onClick={() => {
+                  setAssistantOpen(false);
+                  assistantTriggerRef.current?.focus();
+                }}
+                type="button"
+              >
+                <X aria-hidden="true" size={24} weight="light" />
+              </button>
+            </header>
+            <div className={assistantStyles.body}>
+              {!proposal && !(generating && aiJob) && (
+                <p className={assistantStyles.question}>
+                  What would you like to change?
                 </p>
-                {proposal.request && (
-                  <p className={styles.assistantRequest}>
-                    Your request: “{proposal.request}”
+              )}
+              <p className={assistantStyles.context} id="consultant-ai-context">
+                <FileText aria-hidden="true" size={22} />
+                <Microphone aria-hidden="true" size={22} />
+                <span>Using your draft and interview</span>
+              </p>
+              {error && (
+                <p className={assistantStyles.error} role="alert">
+                  {error}
+                </p>
+              )}
+              {proposal ? (
+                <div className={styles.assistantResult} role="status">
+                  <span className={styles.assistantResultIcon}>
+                    <CheckCircle size={20} weight="fill" />
+                  </span>
+                  <h3>Your suggestion is ready</h3>
+                  <p>
+                    {proposal.summary ||
+                      "Review the proposed article before replacing your current draft."}
                   </p>
-                )}
-                {(proposal.sources?.length ?? 0) > 0 && (
-                  <div className={styles.assistantSources}>
-                    <strong>Sources used</strong>
-                    {proposal.sources?.map((source) => (
-                      <a
-                        href={source.url}
-                        key={source.id}
-                        rel="noopener noreferrer"
-                        target="_blank"
-                      >
-                        {source.title}
-                      </a>
-                    ))}
-                  </div>
-                )}
-                {proposal.request &&
-                  /\b(source|citation|research|real.world|study|statistics?)\b/i.test(
-                    proposal.request,
-                  ) &&
-                  !proposal.sources?.length && (
-                    <p className={styles.assistantSourceNote}>
-                      No verifiable public source was found. Check the full
-                      proposal for any omitted examples.
+                  {proposal.request && (
+                    <p className={styles.assistantRequest}>
+                      Your request: “{proposal.request}”
                     </p>
                   )}
-                <button
-                  className={styles.primary}
-                  onClick={(event) =>
-                    openPreview(proposal, event.currentTarget)
-                  }
-                  type="button"
+                  {(proposal.sources?.length ?? 0) > 0 && (
+                    <div className={styles.assistantSources}>
+                      <strong>Sources used</strong>
+                      {proposal.sources?.map((source) => (
+                        <a
+                          href={source.url}
+                          key={source.id}
+                          rel="noopener noreferrer"
+                          target="_blank"
+                        >
+                          {source.title}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  {proposal.request &&
+                    /\b(source|citation|research|real.world|study|statistics?)\b/i.test(
+                      proposal.request,
+                    ) &&
+                    !proposal.sources?.length && (
+                      <p className={styles.assistantSourceNote}>
+                        No verifiable public source was found. Check the full
+                        proposal for any omitted examples.
+                      </p>
+                    )}
+                  <button
+                    className={styles.primary}
+                    onClick={(event) =>
+                      openPreview(proposal, event.currentTarget)
+                    }
+                    type="button"
+                  >
+                    Review full article
+                  </button>
+                </div>
+              ) : generating && aiJob ? (
+                <div
+                  aria-live="polite"
+                  className={styles.assistantProgress}
+                  role="status"
                 >
-                  Review full article
-                </button>
-              </div>
-            ) : generating && aiJob ? (
-              <div
-                aria-live="polite"
-                className={styles.assistantProgress}
-                role="status"
-              >
-                <p className={styles.assistantRequest}>
-                  Your request: “{article.job?.instruction}”
-                </p>
-                <span className={styles.spinner} aria-hidden="true" />
-                <h3>Preparing your preview</h3>
-                <ol>
-                  <li
-                    className={
-                      article.job?.stage === "plan" ? styles.stepCurrent : ""
-                    }
+                  <p className={styles.assistantRequest}>
+                    Your request: “{article.job?.instruction}”
+                  </p>
+                  <span className={styles.spinner} aria-hidden="true" />
+                  <h3>Preparing your preview</h3>
+                  <ol>
+                    <li
+                      className={
+                        article.job?.stage === "plan" ? styles.stepCurrent : ""
+                      }
+                    >
+                      Understanding the requested changes
+                    </li>
+                    <li
+                      className={
+                        article.job?.stage === "research"
+                          ? styles.stepCurrent
+                          : ""
+                      }
+                    >
+                      Finding sources when needed
+                    </li>
+                    <li
+                      className={
+                        article.job?.stage === "write" ? styles.stepCurrent : ""
+                      }
+                    >
+                      Writing the suggestion
+                    </li>
+                    <li
+                      className={
+                        article.job?.stage === "saving"
+                          ? styles.stepCurrent
+                          : ""
+                      }
+                    >
+                      Preparing the preview for review
+                    </li>
+                  </ol>
+                  <p>Your saved draft stays unchanged while this runs.</p>
+                </div>
+              ) : (
+                <form
+                  id="consultant-ai-form"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void run(requestAIChange);
+                  }}
+                >
+                  {aiJob && article.job?.state === "needs_clarification" && (
+                    <div
+                      className={styles.assistantClarification}
+                      role="status"
+                    >
+                      <strong>One detail before I make the change</strong>
+                      <p>{article.job.clarification_question}</p>
+                      <p>
+                        Add the detail to your request below, then generate a
+                        new preview.
+                      </p>
+                    </div>
+                  )}
+                  {aiJob && article.job?.state === "failed" && (
+                    <div className={styles.assistantFailure} role="alert">
+                      <strong>We couldn’t prepare the suggestion.</strong>
+                      <p className={styles.generationFailureText}>
+                        {article.job.error}
+                      </p>
+                      {!article.job.error?.startsWith(
+                        "Your draft changed while this suggestion was generated.",
+                      ) && (
+                        <button
+                          className={styles.secondary}
+                          disabled={busy}
+                          onClick={() =>
+                            void run(async () => {
+                              await api(
+                                `jobs/${article.job!.id}/retry`,
+                                "POST",
+                              );
+                              await reload();
+                            })
+                          }
+                          type="button"
+                        >
+                          Retry request
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  <label
+                    className={assistantStyles.label}
+                    htmlFor="consultant-ai-instruction"
                   >
-                    Understanding the requested changes
-                  </li>
-                  <li
-                    className={
-                      article.job?.stage === "understand"
-                        ? styles.stepCurrent
-                        : styles.stepComplete
-                    }
+                    Your request
+                  </label>
+                  <textarea
+                    id="consultant-ai-instruction"
+                    maxLength={1200}
+                    minLength={3}
+                    disabled={busy || !!generating}
+                    onChange={(event) => setInstruction(event.target.value)}
+                    placeholder="Describe the change you’d like to see…"
+                    ref={assistantInputRef}
+                    required
+                    value={instruction}
+                  />
+                  <div
+                    className={assistantStyles.suggestions}
+                    aria-label="Suggested requests"
                   >
-                    Reading your draft and interview
-                  </li>
-                  <li
-                    className={
-                      article.job?.stage === "research"
-                        ? styles.stepCurrent
-                        : ""
-                    }
-                  >
-                    Finding sources when needed
-                  </li>
-                  <li
-                    className={
-                      article.job?.stage === "write" ? styles.stepCurrent : ""
-                    }
-                  >
-                    Writing the suggestion
-                  </li>
-                  <li
-                    className={
-                      ["check", "repair"].includes(article.job?.stage ?? "")
-                        ? styles.stepCurrent
-                        : ""
-                    }
-                  >
-                    Checking the result
-                  </li>
-                </ol>
-                <p>Your saved draft stays unchanged while this runs.</p>
-              </div>
-            ) : (
-              <form
-                id="consultant-ai-form"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void run(requestAIChange);
-                }}
-              >
-                {aiJob && article.job?.state === "needs_clarification" && (
-                  <div className={styles.assistantClarification} role="status">
-                    <strong>One detail before I make the change</strong>
-                    <p>{article.job.clarification_question}</p>
-                    <p>
-                      Add the detail to your request below, then generate a new
-                      preview.
-                    </p>
-                  </div>
-                )}
-                {aiJob && article.job?.state === "failed" && (
-                  <div className={styles.assistantFailure} role="alert">
-                    <strong>We couldn’t prepare the suggestion.</strong>
-                    <p className={styles.generationFailureText}>
-                      {article.job.error}
-                    </p>
-                    {!article.job.error?.startsWith(
-                      "Your draft changed while this suggestion was generated.",
-                    ) && (
+                    {[
+                      {
+                        label: "Clearer opening",
+                        request: "Make the opening clearer",
+                      },
+                      {
+                        label: "Better structure",
+                        request: "Make the article more structured",
+                      },
+                      {
+                        label: "Add sourced examples",
+                        request: "Add real-world examples with sources",
+                      },
+                    ].map((suggestion) => (
                       <button
-                        className={styles.secondary}
-                        disabled={busy}
-                        onClick={() =>
-                          void run(async () => {
-                            await api(`jobs/${article.job!.id}/retry`, "POST");
-                            await reload();
-                          })
-                        }
+                        key={suggestion.label}
+                        disabled={busy || !!generating}
+                        onClick={() => {
+                          setInstruction(suggestion.request);
+                          assistantInputRef.current?.focus();
+                        }}
                         type="button"
                       >
-                        Retry request
+                        {suggestion.label}
                       </button>
-                    )}
+                    ))}
                   </div>
-                )}
-                <label
-                  className={styles.assistantLabel}
-                  htmlFor="consultant-ai-instruction"
+                </form>
+              )}
+            </div>
+            <footer className={assistantStyles.footer}>
+              <span>Your draft changes only after you approve.</span>
+              {!proposal && !(generating && aiJob) && (
+                <button
+                  className={`${styles.primary} ${assistantStyles.submit}`}
+                  disabled={
+                    busy || !!generating || instruction.trim().length < 3
+                  }
+                  form="consultant-ai-form"
+                  type="submit"
                 >
-                  What would you like to change?
-                </label>
-                <textarea
-                  id="consultant-ai-instruction"
-                  maxLength={1200}
-                  onChange={(event) => setInstruction(event.target.value)}
-                  placeholder="Describe a change you’d like to see in the article…"
-                  ref={assistantInputRef}
-                  required
-                  value={instruction}
-                />
-                <div className={styles.assistantSuggestions}>
-                  <span>Try asking</span>
-                  {[
-                    "Make the article more structured",
-                    "Add real-world examples with sources",
-                    "Make the opening clearer",
-                  ].map((suggestion) => (
-                    <button
-                      key={suggestion}
-                      onClick={() => {
-                        setInstruction(suggestion);
-                        assistantInputRef.current?.focus();
-                      }}
-                      type="button"
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
-              </form>
-            )}
-          </div>
-          <footer className={styles.assistantFooter}>
-            {!proposal && !(generating && aiJob) && (
-              <button
-                className={styles.primary}
-                disabled={busy || !!generating || instruction.trim().length < 3}
-                form="consultant-ai-form"
-                type="submit"
-              >
-                <Sparkle aria-hidden="true" size={18} /> Generate preview
-              </button>
-            )}
-            <span>Your draft changes only when you approve a preview.</span>
-          </footer>
-        </aside>
+                  <Sparkle aria-hidden="true" size={18} />{" "}
+                  {busy ? "Submitting…" : "Generate preview"}
+                </button>
+              )}
+            </footer>
+          </section>
+        </div>
       )}
       {preview && (
         <div
@@ -1200,6 +1294,11 @@ export function ConsultantArticleScreen({ articleId }: { articleId: string }) {
               </button>
             </header>
 
+            {error && (
+              <p className={assistantStyles.previewError} role="alert">
+                {error}
+              </p>
+            )}
             {(preview.summary || (preview.sources?.length ?? 0) > 0) && (
               <div className={styles.previewSummary}>
                 {preview.summary && <p>{preview.summary}</p>}

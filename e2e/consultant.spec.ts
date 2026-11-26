@@ -848,10 +848,8 @@ test("draft proposals require explicit acceptance and export the accepted versio
     path: `test-results/consultant-ask-ai-${test.info().project.name}.png`,
     fullPage: true,
   });
-  await page
-    .getByRole("button", { name: "Make the article more structured" })
-    .click();
-  await expect(page.getByLabel("What would you like to change?")).toHaveValue(
+  await page.getByRole("button", { name: "Better structure" }).click();
+  await expect(page.getByLabel("Your request")).toHaveValue(
     "Make the article more structured",
   );
   await page.getByRole("button", { name: "Generate preview" }).click();
@@ -1147,7 +1145,7 @@ test("Ask AI asks for missing detail without making a proposal", async ({
     page.getByRole("button", { name: "Review full article" }),
   ).toHaveCount(0);
   await page
-    .getByLabel("What would you like to change?")
+    .getByLabel("Your request")
     .fill(
       "Add the point that each next step needs one owner to the conclusion",
     );

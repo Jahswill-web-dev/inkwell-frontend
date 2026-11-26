@@ -213,15 +213,13 @@ it("preserves the existing export formats and copies article text", async () => 
 it("opens Ask AI and requests a reviewable preview while retaining the current draft", async () => {
   await openArticle();
   fireEvent.click(screen.getByRole("button", { name: "Ask AI" }));
-  const assistant = screen.getByRole("complementary", {
-    name: "Ask AI to improve this article",
-  });
+  const assistant = screen.getByRole("dialog", { name: "Ask AI" });
   expect(assistant).toHaveTextContent(
-    "Your draft changes only when you approve a preview.",
+    "Your draft changes only after you approve.",
   );
   fireEvent.change(
     within(assistant).getByRole("textbox", {
-      name: "What would you like to change?",
+      name: "Your request",
     }),
     { target: { value: "Make the opening clearer" } },
   );
@@ -247,9 +245,161 @@ it("closes Ask AI with Escape and returns focus to its toolbar control", async (
   fireEvent.click(trigger);
   fireEvent.keyDown(window, { key: "Escape" });
   expect(
-    screen.queryByRole("complementary", {
-      name: "Ask AI to improve this article",
-    }),
+    screen.queryByRole("dialog", { name: "Ask AI" }),
   ).not.toBeInTheDocument();
   expect(trigger).toHaveFocus();
+});
+
+it("keeps keyboard focus in the modal, preserves a request on close, and restores scrolling", async () => {
+  await openArticle();
+  const originalOverflow = document.body.style.overflow;
+  const trigger = screen.getByRole("button", { name: "Ask AI" });
+  fireEvent.click(trigger);
+  const dialog = screen.getByRole("dialog", { name: "Ask AI" });
+  expect(dialog).toHaveAttribute("aria-modal", "true");
+  expect(document.body.style.overflow).toBe("hidden");
+  const input = within(dialog).getByRole("textbox", { name: "Your request" });
+  expect(input).toHaveFocus();
+  fireEvent.click(
+    within(dialog).getByRole("button", { name: "Better structure" }),
+  );
+  expect(input).toHaveValue("Make the article more structured");
+  expect(input).toHaveFocus();
+  const submit = within(dialog).getByRole("button", {
+    name: "Generate preview",
+  });
+  const close = within(dialog).getByRole("button", { name: "Close Ask AI" });
+  submit.focus();
+  fireEvent.keyDown(window, { key: "Tab" });
+  expect(close).toHaveFocus();
+  fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+  expect(submit).toHaveFocus();
+  fireEvent.click(close);
+  expect(trigger).toHaveFocus();
+  expect(document.body.style.overflow).toBe(originalOverflow);
+  fireEvent.click(trigger);
+  expect(screen.getByRole("textbox", { name: "Your request" })).toHaveValue(
+    "Make the article more structured",
+  );
+});
+
+it("shows submission errors inside the modal and retains the request for retry", async () => {
+  await openArticle();
+  fireEvent.click(screen.getByRole("button", { name: "Ask AI" }));
+  fireEvent.click(screen.getByRole("button", { name: "Clearer opening" }));
+  api.mockRejectedValueOnce(
+    new Error("The draft changed. Reload and try again."),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Generate preview" }));
+  const dialog = screen.getByRole("dialog", { name: "Ask AI" });
+  expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+    "The draft changed.",
+  );
+  expect(
+    within(dialog).getByRole("textbox", { name: "Your request" }),
+  ).toHaveValue("Make the opening clearer");
+  expect(
+    within(dialog).getByRole("button", { name: "Generate preview" }),
+  ).toBeEnabled();
+});
+
+it("hands a prepared suggestion to comparison and applies it only after approval", async () => {
+  const replacement = {
+    ...article.sections[0],
+    editor_state: editorState("Clear ownership makes handoffs work."),
+  };
+  article.revisions = [
+    {
+      id: "proposal",
+      kind: "proposal",
+      sections: [replacement],
+      gaps: [],
+      created_at: "2026-11-26T12:01:00Z",
+      request: "Make the opening clearer",
+      summary: "Clarified the opening.",
+      findings: [],
+    },
+  ];
+  article.job = {
+    id: "ai-job",
+    state: "succeeded",
+    stage: "complete",
+    attempts: 1,
+    request_kind: "ask_ai",
+    error: null,
+  };
+  const defaultApi = api.getMockImplementation()!;
+  api.mockImplementation(
+    async (path: string, method?: string, body?: Record<string, unknown>) => {
+      if (path.endsWith("/apply")) {
+        article.sections = [replacement];
+        article.revisions = [];
+      }
+      return defaultApi(path, method, body);
+    },
+  );
+  await openArticle();
+  fireEvent.click(screen.getByRole("button", { name: "Review AI suggestion" }));
+  fireEvent.click(screen.getByRole("button", { name: "Review full article" }));
+  expect(
+    screen.queryByRole("dialog", { name: "Ask AI" }),
+  ).not.toBeInTheDocument();
+  expect(article.sections[0].editor_state).toContain(
+    "A decision needs an owner.",
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Use this version" }));
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith(
+      "articles/article/revisions/proposal/apply",
+      "POST",
+      undefined,
+      { "If-Unmodified-Since": article.draft_updated_at },
+    ),
+  );
+  await waitFor(() =>
+    expect(screen.getByLabelText("Edit body")).toHaveValue(
+      "Clear ownership makes handoffs work.",
+    ),
+  );
+  expect(
+    screen.queryByRole("dialog", { name: "Ask AI" }),
+  ).not.toBeInTheDocument();
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Ask AI" })).toHaveFocus(),
+  );
+  expect(document.body.style.overflow).not.toBe("hidden");
+});
+
+it("keeps a failed approval visible in the preview without changing the draft", async () => {
+  article.revisions = [
+    {
+      id: "proposal",
+      kind: "proposal",
+      sections: [
+        {
+          ...article.sections[0],
+          editor_state: editorState("A proposed opening."),
+        },
+      ],
+      gaps: [],
+      created_at: "2026-11-26T12:01:00Z",
+      findings: [],
+    },
+  ];
+  await openArticle();
+  fireEvent.click(screen.getByRole("button", { name: "Review AI suggestion" }));
+  fireEvent.click(screen.getByRole("button", { name: "Review full article" }));
+  api.mockRejectedValueOnce(
+    new Error("This draft changed. Generate a new preview."),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Use this version" }));
+  const preview = screen.getByRole("dialog", {
+    name: "Preview suggested rewrite",
+  });
+  expect(await within(preview).findByRole("alert")).toHaveTextContent(
+    "This draft changed.",
+  );
+  expect(article.sections[0].editor_state).toContain(
+    "A decision needs an owner.",
+  );
 });

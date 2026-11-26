@@ -1,0 +1,154 @@
+.root {
+  display: inline-block;
+  width: 360px;
+  max-width: 100%;
+  min-width: 0;
+  vertical-align: middle;
+  font-family: var(--font-manrope), "Segoe UI", sans-serif;
+}
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 54px;
+  padding: 10px 14px;
+  border: 1px solid #aeb5c6;
+  border-radius: 8px;
+  background: var(--color-ink-surface);
+  color: var(--color-ink-navy);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+}
+.trigger > span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.trigger svg {
+  flex-shrink: 0;
+}
+.trigger:hover:not(:disabled),
+.trigger[aria-expanded="true"] {
+  border-color: var(--color-ink-navy);
+}
+.trigger:focus-visible,
+.option:focus-visible {
+  outline: 3px solid #f06789;
+  outline-offset: 3px;
+}
+.trigger:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+.menu {
+  position: fixed;
+  z-index: 100;
+  width: 360px;
+  padding: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--color-ink-line);
+  border-radius: 10px;
+  background: var(--color-ink-surface);
+  color: var(--color-ink-navy);
+  box-shadow:
+    0 10px 28px rgb(3 11 36 / 10%),
+    0 2px 5px rgb(3 11 36 / 4%);
+  font-family: var(--font-manrope), "Segoe UI", sans-serif;
+}
+.menu .caption {
+  margin: 0;
+  padding: 8px 10px 10px;
+  color: var(--color-ink-muted);
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+.option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 54px;
+  padding: 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-ink-navy);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+}
+.option > span {
+  flex: 1;
+}
+.option svg {
+  flex-shrink: 0;
+}
+.option[aria-checked="true"] {
+  background: #fcf0f3;
+}
+.option[aria-checked="true"] svg:last-child {
+  color: var(--color-ink-crimson);
+}
+.option:hover:not([aria-disabled="true"]) {
+  background: var(--color-ink-blue-soft);
+}
+.option[aria-disabled="true"] {
+  opacity: 0.65;
+  cursor: wait;
+}
+.menu .error,
+.menu .status {
+  margin: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.error {
+  color: var(--color-ink-crimson-dark);
+}
+.status {
+  color: var(--color-ink-muted);
+}
+.spinner {
+  animation: rotate 1s linear infinite;
+}
+@keyframes rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 640px) {
+  .trigger {
+    gap: 10px;
+    padding: 9px 12px;
+    font-size: 14px;
+  }
+  .trigger svg:first-child {
+    width: 22px;
+    height: 22px;
+  }
+  .option {
+    font-size: 15px;
+    min-height: 48px;
+  }
+  .menu .caption {
+    font-size: 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}

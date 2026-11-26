@@ -157,6 +157,11 @@
   justify-content: space-between;
   gap: 32px;
 }
+.workspaceExperience {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 24px;
+}
 
 .eyebrow {
   margin: 0 0 7px;

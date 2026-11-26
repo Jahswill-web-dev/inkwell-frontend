@@ -194,16 +194,17 @@ test("consultant dashboard presents articles as a responsive workspace", async (
 
   await page.goto("/consultant");
   await expect(
-    page.getByRole("heading", { name: "What’s on your mind?" }),
+    page.getByRole("heading", { name: "My articles", level: 1 }),
   ).toBeVisible();
-  await expect(page.getByText("1 article", { exact: true })).toBeVisible();
-  await expect(page.getByText("In Review", { exact: true })).toBeVisible();
   await expect(
-    page.getByText("Review and refine your draft before exporting it."),
+    page.getByText("1 article shown", { exact: true }),
+  ).toBeAttached();
+  await expect(
+    page.getByText("Ready to edit", { exact: true }).last(),
   ).toBeVisible();
   await expect(
     page.getByRole("link", {
-      name: "Continue editing: How to write better articles",
+      name: "Open article: How to write better articles",
     }),
   ).toHaveAttribute("href", `/consultant/articles/${articleId}`);
   await expect(page.getByRole("link", { name: "New article" })).toHaveAttribute(
@@ -550,19 +551,18 @@ test("minimal article opens a voice-only interview and queues its draft", async 
     return route.fulfill({ json: {} });
   });
   await page.goto("/consultant/new");
-  await expect(page.getByRole("heading", { name: "Your idea" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "What would you like to write about?" }),
+  ).toBeVisible();
   await expect(
     page.getByText("Shape the draft", { exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("radio", { name: /Standard.*800–1,200 words/ }),
-  ).toBeChecked();
+  await expect(page.getByLabel("Length")).toHaveValue("standard");
   await page.getByLabel("Working title").fill("Better handoffs");
   await page
     .getByLabel("What is it about?")
     .fill("Tools cannot solve unclear ownership.");
-  await page.getByRole("button", { name: "Start my interview" }).click();
-  await page.getByRole("button", { name: "Prepare my interview" }).click();
+  await page.getByRole("button", { name: "Continue to interview" }).click();
   await expect(
     page.getByRole("button", { name: "Check microphone" }),
   ).toHaveCount(0);
@@ -764,7 +764,7 @@ test("draft proposals require explicit acceptance and export the accepted versio
   await page.getByRole("button", { name: "Review AI suggestion" }).click();
   await page.getByRole("button", { name: "Review full article" }).click();
   const preview = page.getByRole("dialog", {
-    name: "Preview suggested rewrite",
+    name: "Review AI suggestion",
   });
   await expect(preview).toBeVisible();
   await expect(preview.getByRole("article").last()).toContainText(
@@ -775,7 +775,12 @@ test("draft proposals require explicit acceptance and export the accepted versio
   await expect(
     preview.getByRole("link", { name: "Case study" }).first(),
   ).toHaveAttribute("href", "https://example.org/study");
-  await preview.getByRole("button", { name: "Compare with current" }).click();
+  await preview.getByRole("switch", { name: "Show changes" }).uncheck();
+  await expect(preview.locator("ins, del")).toHaveCount(0);
+  await expect(preview.getByRole("article")).toContainText(
+    "I call that expensive confusion.",
+  );
+  await preview.getByRole("switch", { name: "Show changes" }).check();
   await expect(
     preview
       .getByRole("article")
@@ -790,7 +795,7 @@ test("draft proposals require explicit acceptance and export the accepted versio
     fullPage: true,
   });
   await expect(
-    preview.getByRole("button", { name: "Reject change" }),
+    preview.getByRole("button", { name: "Reject suggestion" }),
   ).toBeInViewport();
   await expect(
     preview.getByRole("button", { name: "Use this version" }),
@@ -805,10 +810,10 @@ test("draft proposals require explicit acceptance and export the accepted versio
     page.getByText("This is my original draft.", { exact: true }),
   ).toHaveCount(0);
   const articlePreview = page.getByRole("region", {
-    name: "Article preview editor",
+    name: "Article editor",
   });
   await expect(
-    page.getByRole("button", { name: "Preview", exact: true }),
+    page.getByRole("button", { name: "Article", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   const articleTitle = articlePreview.getByRole("heading", {
     name: "Better handoffs",
@@ -834,7 +839,7 @@ test("draft proposals require explicit acceptance and export the accepted versio
   await expect(markdownView).toContainText(
     "[Case study](https://example.org/study)",
   );
-  await page.getByRole("button", { name: "Preview", exact: true }).click();
+  await page.getByRole("button", { name: "Article", exact: true }).click();
   await expect(
     articlePreview.getByText("I call that expensive confusion.", {
       exact: false,
@@ -848,10 +853,8 @@ test("draft proposals require explicit acceptance and export the accepted versio
     path: `test-results/consultant-ask-ai-${test.info().project.name}.png`,
     fullPage: true,
   });
-  await page
-    .getByRole("button", { name: "Make the article more structured" })
-    .click();
-  await expect(page.getByLabel("What would you like to change?")).toHaveValue(
+  await page.getByRole("button", { name: "Better structure" }).click();
+  await expect(page.getByLabel("Your request")).toHaveValue(
     "Make the article more structured",
   );
   await page.getByRole("button", { name: "Generate preview" }).click();
@@ -982,12 +985,12 @@ test("draft proposals require explicit acceptance and export the accepted versio
   await page.getByRole("button", { name: "Markdown", exact: true }).click();
   await expect(markdownView).toContainText("Edited in Preview.");
   await expect(markdownView).toContainText("# Better handoffs");
-  await page.getByRole("button", { name: "Preview", exact: true }).click();
+  await page.getByRole("button", { name: "Article", exact: true }).click();
   await expect(contentEditor).toContainText("Edited in Preview.");
   await page.getByRole("button", { name: "Save changes" }).click();
   await page.reload();
   await expect(
-    page.getByRole("region", { name: "Article preview editor" }),
+    page.getByRole("region", { name: "Article editor" }),
   ).toContainText("Edited in Preview.");
   await page.screenshot({
     path: `test-results/consultant-draft-${test.info().project.name}.png`,
@@ -1069,11 +1072,11 @@ test("rejecting an AI suggestion keeps the current draft", async ({ page }) => {
   await page.getByRole("button", { name: "Review AI suggestion" }).click();
   await page.getByRole("button", { name: "Review full article" }).click();
   await page
-    .getByRole("dialog", { name: "Preview suggested rewrite" })
-    .getByRole("button", { name: "Reject change" })
+    .getByRole("dialog", { name: "Review AI suggestion" })
+    .getByRole("button", { name: "Reject suggestion" })
     .click();
   await expect(
-    page.getByRole("dialog", { name: "Preview suggested rewrite" }),
+    page.getByRole("dialog", { name: "Review AI suggestion" }),
   ).toBeHidden();
   await expect(page.getByText("Keep my draft.")).toBeVisible();
   await expect(
@@ -1147,7 +1150,7 @@ test("Ask AI asks for missing detail without making a proposal", async ({
     page.getByRole("button", { name: "Review full article" }),
   ).toHaveCount(0);
   await page
-    .getByLabel("What would you like to change?")
+    .getByLabel("Your request")
     .fill(
       "Add the point that each next step needs one owner to the conclusion",
     );
@@ -1222,7 +1225,7 @@ test("comparison identifies moved sections by identity", async ({ page }) => {
   await page.getByRole("button", { name: "Review AI suggestion" }).click();
   await page.getByRole("button", { name: "Review full article" }).click();
   const dialog = page.getByRole("dialog", {
-    name: "Preview suggested rewrite",
+    name: "Review AI suggestion",
   });
   await expect(dialog.getByText("Moved from section 2")).toBeVisible();
   await expect(dialog.getByText("Moved from section 1")).toBeVisible();

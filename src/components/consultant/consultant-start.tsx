@@ -1,5 +1,12 @@
 "use client";
-import { ArrowRight, CaretDown, FileText, Plus } from "@phosphor-icons/react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  CaretDown,
+  FileText,
+  MagnifyingGlass,
+  Plus,
+} from "@phosphor-icons/react";
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -10,29 +17,24 @@ import {
 import styles from "./consultant.module.css";
 
 function articleStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    setup: "Idea saved",
+    waiting_for_client: "Awaiting interview",
+    interview_in_progress: "Interview in progress",
+    ready_to_draft: "Ready to draft",
+    drafting: "Drafting",
+    in_review: "Ready to edit",
+    ready_to_publish: "Ready to edit",
+    published: "Published",
+  };
+  if (labels[status]) return labels[status];
   return status
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function articleSummary(status: string) {
-  const summaries: Record<string, string> = {
-    setup: "Add the context Inkwell needs to begin your interview.",
-    waiting_for_client:
-      "Waiting for the interview responses that shape this article.",
-    interview_in_progress:
-      "Continue the conversation that will shape this article.",
-    ready_to_draft: "Your interview is complete and ready to become a draft.",
-    drafting: "Inkwell is turning your interview into a structured draft.",
-    in_review: "Review and refine your draft before exporting it.",
-    ready_to_publish: "Your article is ready to edit, export, or publish.",
-    published: "Your article is complete and ready to revisit anytime.",
-  };
-  return summaries[status] ?? "Continue working on your article.";
-}
-
 function articleActionLabel(status: string) {
-  if (status === "in_review") return "Continue editing";
+  if (status === "in_review") return "Open article";
   if (status === "ready_to_publish") return "Open article";
   if (status === "interview_in_progress") return "Resume interview";
   if (status === "setup") return "Start interview";
@@ -46,10 +48,22 @@ export function ConsultantDashboard() {
     { id: string; title: string; status: string; updated_at: string }[] | null
   >(null);
   const [error, setError] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [query, setQuery] = useState("");
   useEffect(() => {
     Promise.all([
       api<Profile>("profile"),
-      api<{ items: NonNullable<typeof articles> }>("articles"),
+      (async () => {
+        const items: NonNullable<typeof articles> = [];
+        let page;
+        do {
+          page = await api<{ items: NonNullable<typeof articles> }>(
+            `articles?offset=${items.length}&limit=100`,
+          );
+          items.push(...page.items);
+        } while (page.items.length === 100);
+        return { items };
+      })(),
     ])
       .then(([p, a]) => {
         if (!p.onboarding_complete) router.replace("/consultant/onboarding");
@@ -57,16 +71,25 @@ export function ConsultantDashboard() {
       })
       .catch((e) => setError(e.message));
   }, [router]);
+  const visibleArticles = articles?.filter((article) => {
+    const ready = ["in_review", "ready_to_publish"].includes(article.status);
+    const matchesFilter =
+      filter === "all" ||
+      (filter === "ready" ? ready : !ready && article.status !== "published");
+    return (
+      matchesFilter &&
+      article.title
+        .toLocaleLowerCase()
+        .includes(query.trim().toLocaleLowerCase())
+    );
+  });
   return (
     <>
       <header className={styles.dashboardHero}>
         <div className={styles.dashboardIntro}>
           <p className={styles.eyebrow}>Your ideas, in your voice</p>
-          <h1>What’s on your mind?</h1>
-          <p>
-            Talk through your ideas. Get a structured article that sounds like
-            you.
-          </p>
+          <h1 id="consultant-articles-title">My articles</h1>
+          <p>Your ideas, shaped into articles in your voice.</p>
         </div>
         <Link
           className={`${styles.primary} ${styles.newArticleButton}`}
@@ -85,15 +108,45 @@ export function ConsultantDashboard() {
         aria-labelledby="consultant-articles-title"
         className={styles.articleLibrary}
       >
-        <header className={styles.articleLibraryHeader}>
-          <h2 id="consultant-articles-title">My articles</h2>
-          {articles && (
-            <span>
-              {articles.length} {articles.length === 1 ? "article" : "articles"}
-            </span>
-          )}
-        </header>
-        {!articles ? (
+        <div className={styles.libraryToolbar}>
+          <div
+            className={styles.libraryFilters}
+            role="group"
+            aria-label="Filter articles"
+          >
+            {[
+              ["all", "All articles"],
+              ["progress", "In progress"],
+              ["ready", "Ready to edit"],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={filter === value}
+                onClick={() => setFilter(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <label className={styles.librarySearch}>
+            <MagnifyingGlass size={21} aria-hidden="true" />
+            <span className={styles.visuallyHidden}>Search your articles</span>
+            <input
+              type="search"
+              placeholder="Search your articles"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
+        </div>
+        {error && !articles ? (
+          <div className={styles.articleLibraryState}>
+            <p>
+              Your articles could not be loaded. Refresh the page to try again.
+            </p>
+          </div>
+        ) : !articles ? (
           <div className={styles.articleLibraryState}>
             <p role="status">Loading your articles…</p>
           </div>
@@ -105,10 +158,28 @@ export function ConsultantDashboard() {
               <p>Share an idea and Inkwell will help you shape the draft.</p>
             </div>
           </div>
+        ) : visibleArticles?.length === 0 ? (
+          <div className={styles.articleLibraryState} role="status">
+            <MagnifyingGlass size={28} aria-hidden="true" />
+            <div>
+              <strong>No matching articles</strong>
+              <p>Try another search or choose a different filter.</p>
+            </div>
+            <button
+              className={styles.resetFilters}
+              type="button"
+              onClick={() => {
+                setQuery("");
+                setFilter("all");
+              }}
+            >
+              Clear filters
+            </button>
+          </div>
         ) : (
           <>
             <div className={styles.articleList}>
-              {articles.map((article) => {
+              {visibleArticles?.map((article) => {
                 const actionLabel = articleActionLabel(article.status);
                 return (
                   <Link
@@ -122,13 +193,6 @@ export function ConsultantDashboard() {
                     </span>
                     <span className={styles.articleIdentity}>
                       <strong>{article.title}</strong>
-                      <span>{articleSummary(article.status)}</span>
-                    </span>
-                    <span className={styles.articleMeta}>
-                      <span className={styles.articleStatus}>
-                        <span aria-hidden="true" />
-                        {articleStatusLabel(article.status)}
-                      </span>
                       <time dateTime={article.updated_at}>
                         Updated{" "}
                         {new Date(article.updated_at).toLocaleDateString(
@@ -136,10 +200,18 @@ export function ConsultantDashboard() {
                           {
                             month: "short",
                             day: "numeric",
-                            year: "numeric",
+                            ...(new Date(article.updated_at).getFullYear() !==
+                            new Date().getFullYear()
+                              ? { year: "numeric" as const }
+                              : {}),
                           },
                         )}
                       </time>
+                    </span>
+                    <span className={styles.articleMeta}>
+                      <span className={styles.articleStatus}>
+                        {articleStatusLabel(article.status)}
+                      </span>
                     </span>
                     <span className={styles.articleAction}>
                       {actionLabel}
@@ -149,8 +221,9 @@ export function ConsultantDashboard() {
                 );
               })}
             </div>
-            <p className={styles.articleLibraryHint}>
-              Open any article to continue where you left off.
+            <p className={styles.visuallyHidden} role="status">
+              {visibleArticles?.length}{" "}
+              {visibleArticles?.length === 1 ? "article" : "articles"} shown
             </p>
           </>
         )}
@@ -256,12 +329,21 @@ export function ConsultantProfileForm({
     </>
   );
 }
+const articleLengths = [
+  ["short", "Short", "400–700 words"],
+  ["standard", "Standard", "800–1,200 words"],
+  ["long", "Long", "1,200–1,800 words"],
+  ["extended", "Extended", "1,800–3,000 words"],
+  ["in_depth", "In-depth", "3,000–5,000 words"],
+] as const;
+
 export function ConsultantNewArticle() {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [audience, setAudience] = useState("");
   const [length, setLength] = useState("standard");
+  const [createdArticleId, setCreatedArticleId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -275,91 +357,91 @@ export function ConsultantNewArticle() {
     setBusy(true);
     setError("");
     try {
-      const a = await api<{ id: string }>("articles", "POST", {
-        title: values.get("title"),
-        description: values.get("description"),
-        audience,
-        takeaway: values.get("takeaway") ?? "",
-        length: values.get("length") ?? "standard",
-      });
-      router.push(`/consultant/articles/${a.id}`);
+      let articleId = createdArticleId;
+      if (!articleId) {
+        const article = await api<{ id: string }>("articles", "POST", {
+          title,
+          description,
+          audience,
+          takeaway: values.get("takeaway") ?? "",
+          length,
+        });
+        articleId = article.id;
+        setCreatedArticleId(articleId);
+      }
+      const interview = await api<{ id: string }>(
+        `articles/${articleId}/interviews`,
+        "POST",
+      );
+      router.push(`/consultant/interviews/${interview.id}`);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
     }
   }
+  const selectedLength = articleLengths.find(([value]) => value === length)!;
   return (
     <div className={styles.newArticlePage}>
+      <Link className={styles.newArticleBack} href="/consultant">
+        <ArrowLeft size={20} aria-hidden="true" /> Back to my articles
+      </Link>
       <header className={styles.newArticleIntro}>
         <p className={styles.eyebrow}>A new conversation</p>
         <h1>What would you like to write about?</h1>
-        <p>Start with an idea. We’ll help you find the words.</p>
+        <p>Start with an idea. We’ll explore it together.</p>
       </header>
       <form className={styles.newArticleForm} onSubmit={submit}>
-        <section className={styles.newArticleSurface}>
-          <div className={styles.briefSection}>
-            <header className={styles.briefSectionHeader}>
-              <span className={styles.briefSectionNumber} aria-hidden="true">
-                1
-              </span>
-              <h2>Your idea</h2>
-              <span className={styles.briefSectionTag}>Required</span>
-            </header>
-            <div className={styles.briefFields}>
-              <div className={styles.briefField}>
-                <div className={styles.briefLabelRow}>
-                  <label htmlFor="consultant-article-title">
-                    Working title
-                  </label>
-                  <span aria-hidden="true">{title.length}/200</span>
-                </div>
-                <input
-                  id="consultant-article-title"
-                  name="title"
-                  required
-                  maxLength={200}
-                  placeholder="Why better tools won’t fix broken handoffs"
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                />
-              </div>
-              <div className={styles.briefField}>
-                <div className={styles.briefLabelRow}>
-                  <label htmlFor="consultant-article-description">
-                    What is it about?
-                  </label>
-                  <span aria-hidden="true">
-                    {description.length.toLocaleString()}/20,000
-                  </span>
-                </div>
-                <textarea
-                  id="consultant-article-description"
-                  required
-                  name="description"
-                  maxLength={20000}
-                  placeholder="Describe the idea, problem, or opinion you want to explore."
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                />
-              </div>
+        <fieldset
+          className={styles.ideaFields}
+          disabled={busy || Boolean(createdArticleId)}
+        >
+          <legend className={styles.visuallyHidden}>Your article idea</legend>
+          <div className={styles.canvasField}>
+            <div className={styles.briefLabelRow}>
+              <label htmlFor="consultant-article-title">Working title</label>
+              <span>Required</span>
             </div>
+            <input
+              id="consultant-article-title"
+              name="title"
+              required
+              maxLength={200}
+              placeholder="Why better tools won’t fix broken handoffs"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+            />
           </div>
-
-          <details className={styles.briefPreferences} open>
+          <div className={`${styles.canvasField} ${styles.ideaDescription}`}>
+            <div className={styles.briefLabelRow}>
+              <label htmlFor="consultant-article-description">
+                What is it about?
+              </label>
+              <span>Required</span>
+            </div>
+            <textarea
+              id="consultant-article-description"
+              name="description"
+              required
+              maxLength={20000}
+              placeholder="Share the idea, problem, or opinion you want to explore."
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+            />
+          </div>
+          <details className={styles.briefPreferences}>
             <summary>
-              <span className={styles.briefSectionNumber} aria-hidden="true">
-                2
-              </span>
               <span className={styles.briefPreferencesTitle}>
-                <strong>Shape the draft</strong>
-                <span className={styles.briefSectionTag}>Optional</span>
+                <span>
+                  <strong>Shape the draft</strong>
+                  <span className={styles.optionalLabel}>Optional</span>
+                </span>
+                <small>{selectedLength[1]} length</small>
               </span>
               <CaretDown
                 aria-hidden="true"
                 className={styles.briefPreferencesCaret}
-                size={18}
-                weight="bold"
+                size={19}
               />
             </summary>
             <div className={styles.briefPreferenceFields}>
@@ -369,6 +451,7 @@ export function ConsultantNewArticle() {
                 </label>
                 <input
                   id="consultant-article-audience"
+                  placeholder="Who is this for?"
                   value={audience}
                   onChange={(event) => setAudience(event.target.value)}
                   maxLength={500}
@@ -385,64 +468,44 @@ export function ConsultantNewArticle() {
                   placeholder="What should they understand or do afterward?"
                 />
               </div>
-              <fieldset className={styles.lengthChoices}>
-                <legend>Length</legend>
-                <div>
-                  {(
-                    [
-                      ["short", "Short", "400–700 words"],
-                      ["standard", "Standard", "800–1,200 words"],
-                      ["long", "Long", "1,200–1,800 words"],
-                    ] as const
-                  ).map(([value, label, words]) => (
-                    <label
-                      className={
-                        length === value
-                          ? `${styles.lengthChoice} ${styles.lengthChoiceSelected}`
-                          : styles.lengthChoice
-                      }
-                      key={value}
-                    >
-                      <span>
-                        <strong>{label}</strong>
-                        <small>{words}</small>
-                      </span>
-                      <input
-                        checked={length === value}
-                        name="length"
-                        onChange={() => setLength(value)}
-                        type="radio"
-                        value={value}
-                      />
-                    </label>
+              <div className={styles.briefField}>
+                <label htmlFor="consultant-article-length">Length</label>
+                <select
+                  id="consultant-article-length"
+                  name="length"
+                  value={length}
+                  onChange={(event) => setLength(event.target.value)}
+                  aria-describedby="consultant-length-help"
+                >
+                  {articleLengths.map(([value, label, words]) => (
+                    <option key={value} value={value}>
+                      {label} · {words}
+                    </option>
                   ))}
-                </div>
-              </fieldset>
-              <p className={styles.briefHelp}>
-                We’ll use only what your interview supports, even if that means
-                a shorter draft.
-              </p>
+                </select>
+                <p id="consultant-length-help" className={styles.briefHelp}>
+                  Length is a guide. Your interview gives the article its
+                  substance.
+                </p>
+              </div>
             </div>
           </details>
-
-          {error && (
-            <p
-              className={`${styles.error} ${styles.newArticleError}`}
-              role="alert"
-            >
-              {error}
-            </p>
-          )}
-          <footer className={styles.newArticleFooter}>
-            <p>Next: a guided interview about your idea.</p>
-            <button className={styles.primary} disabled={busy}>
-              {busy ? "Saving your idea…" : "Start my interview"}
-              {!busy && (
-                <ArrowRight aria-hidden="true" size={19} weight="bold" />
-              )}
-            </button>
-          </footer>
-        </section>
+        </fieldset>
+        {error && (
+          <p className={styles.error} role="alert">
+            {createdArticleId
+              ? "Your idea is saved. Please try continuing to your interview again. "
+              : ""}
+            {error}
+          </p>
+        )}
+        <footer className={styles.newArticleFooter}>
+          <p>Next: prepare for a guided conversation.</p>
+          <button className={styles.primary} disabled={busy}>
+            {busy ? "Preparing your interview…" : "Continue to interview"}
+            {!busy && <ArrowRight aria-hidden="true" size={20} />}
+          </button>
+        </footer>
       </form>
     </div>
   );

@@ -1,4 +1,4 @@
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useRealtimeInterview } from "./use-realtime-interview";
 
@@ -8,6 +8,7 @@ const {
   elevenOptions,
   endSessionMock,
   startSessionMock,
+  playback,
 } = vi.hoisted(() => ({
   associateSessionMock: vi.fn().mockResolvedValue(undefined),
   createCallMock: vi.fn().mockResolvedValue({
@@ -18,6 +19,19 @@ const {
   elevenOptions: { current: undefined as Record<string, unknown> | undefined },
   endSessionMock: vi.fn(),
   startSessionMock: vi.fn(),
+  playback: {
+    callback: undefined as
+      ((state: "speaking" | "quiet" | "blocked") => void) | undefined,
+    attach: vi.fn(),
+    close: vi.fn(),
+  },
+}));
+
+vi.mock("./audio-playback-observer", () => ({
+  createAudioPlaybackObserver: (callback: typeof playback.callback) => {
+    playback.callback = callback;
+    return { attach: playback.attach, close: playback.close, resume: vi.fn() };
+  },
 }));
 
 vi.mock("@/lib/articles/client-interview-api", () => ({
@@ -53,7 +67,7 @@ class MockPeerConnection {
   iceGatheringState = "complete";
   localDescription = { sdp: "offer" };
   onconnectionstatechange: (() => void) | null = null;
-  ontrack: (() => void) | null = null;
+  ontrack: ((event: RTCTrackEvent) => void) | null = null;
   addTrack = vi.fn();
   close = vi.fn();
   createOffer = vi.fn().mockResolvedValue({ type: "offer", sdp: "offer" });
@@ -73,6 +87,9 @@ beforeEach(() => {
   startSessionMock.mockClear();
   endSessionMock.mockClear();
   elevenOptions.current = undefined;
+  playback.callback = undefined;
+  playback.attach.mockClear();
+  playback.close.mockClear();
   vi.stubGlobal("RTCPeerConnection", MockPeerConnection);
   vi.stubGlobal(
     "Audio",
@@ -90,17 +107,88 @@ beforeEach(() => {
     value: {
       getUserMedia: vi.fn().mockResolvedValue({
         getTracks: () => [{ readyState: "live", stop: vi.fn() }],
+        getAudioTracks: () => [
+          { readyState: "live", enabled: true, stop: vi.fn() },
+        ],
       }),
     },
   });
 });
 
 afterEach(() => {
+  cleanup();
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
 describe("Live interview events", () => {
+  it("observes remote audio and saves question fragments on playback quiet", async () => {
+    const save = vi.fn().mockResolvedValue(undefined);
+    const onPlayback = vi.fn();
+    const onTranscriptChange = vi.fn();
+    const onEvent = vi.fn();
+    const { result } = renderHook(() =>
+      useRealtimeInterview("test-token", "openai_webrtc", {
+        observePlayback: true,
+        onTranscriptTurn: save,
+        onTranscriptChange,
+        onPlayback,
+        onEvent,
+      }),
+    );
+    act(() => result.current.start());
+    await waitFor(() =>
+      expect(MockPeerConnection.latest.setRemoteDescription).toHaveBeenCalled(),
+    );
+    expect(playback.close).not.toHaveBeenCalled();
+    const remoteStream = {} as MediaStream;
+    act(() => {
+      MockPeerConnection.latest.ontrack?.({
+        streams: [remoteStream],
+      } as unknown as RTCTrackEvent);
+      MockPeerConnection.latest.channel.receive({ type: "session.started" });
+      playback.callback?.("speaking");
+      MockPeerConnection.latest.channel.receive({
+        type: "session.output_transcript.delta",
+        event_id: "question-fragment",
+        delta: "What changed?",
+      });
+    });
+    expect(playback.attach).toHaveBeenCalledWith(
+      expect.any(Object),
+      remoteStream,
+    );
+    expect(result.current.activity).toBe("speaking");
+    expect(save).not.toHaveBeenCalled();
+    expect(onTranscriptChange).toHaveBeenCalledWith(
+      expect.objectContaining({ text: "What changed?", saved: false }),
+    );
+    await act(async () => {
+      playback.callback?.("quiet");
+    });
+    expect(result.current.activity).toBe("listening");
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        itemId: "question-fragment",
+        text: "What changed?",
+      }),
+    );
+    expect(onTranscriptChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ saved: true }),
+    );
+    expect(onPlayback).toHaveBeenLastCalledWith({
+      state: "quiet",
+      voiceSessionId: "11111111-1111-4111-8111-111111111111",
+    });
+    act(() => result.current.stop());
+    expect(playback.close).toHaveBeenCalledOnce();
+    onEvent.mockClear();
+    act(() =>
+      MockPeerConnection.latest.channel.receive({ type: "session.started" }),
+    );
+    expect(onEvent).not.toHaveBeenCalled();
+  });
+
   it("saves Live transcript fragments without item IDs when the interview ends", async () => {
     const save = vi.fn().mockResolvedValue(undefined);
     const { result } = renderHook(() =>

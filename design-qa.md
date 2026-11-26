@@ -1,107 +1,51 @@
-# Export popover design QA
-
-## Evidence
-
-- Source visual truth: `C:\Users\Dell\.codex\generated_images\01a154e2-7c44-7b43-b8f9-abd270d9f29c\exec-3e2f4737-feab-4a4f-81c5-9d79b9b20b27.png`
-- Browser-rendered desktop implementation: `C:\Users\Dell\Documents\useinkwell\inkwell-frontend\test-results\consultant-export-open-chromium.png`
-- Focused desktop component: `C:\Users\Dell\Documents\useinkwell\inkwell-frontend\test-results\consultant-export-popover-chromium.png`
-- Focused mobile component: `C:\Users\Dell\Documents\useinkwell\inkwell-frontend\test-results\consultant-export-popover-mobile-chromium.png`
-- Combined comparison: `C:\Users\Dell\Documents\useinkwell\inkwell-frontend\test-results\consultant-export-design-comparison.png`
-- State: export popover open after a successful Copy to clipboard action.
-- Desktop viewport: 1280 x 720 CSS px at device scale factor 1. The full-page capture is 1280 x 762 px and the focused popover is 601 x 397 px.
-- Mobile viewport: Pixel 5 emulation at 393 x 727 CSS px and device scale factor 2.75. The focused popover capture is 993 x 1095 px.
-- Source pixels: 1536 x 1024. The concept crop and implementation full view were proportionally resized into the 1480 x 700 comparison canvas; no fidelity judgment was based on raw pixel density.
-
-## Full-view comparison
-
-The implementation preserves the selected concept's hierarchy: a crimson-accented Export trigger opens a white anchored surface; the editorial heading and supporting text lead into one emphasized copy action and two quieter download rows. The production version is intentionally more compact in the existing consultant toolbar, while preserving the concept's visual weight and scan order. The popover remains fully visible in both tested responsive layouts.
-
-## Focused comparison
-
-The focused captures confirm the Newsreader/Manrope typography pairing, warm paper and white surfaces, navy text, crimson emphasis, fine dividers, restrained radius and shadow, Phosphor icons, descriptive row copy, and inline Copied confirmation. No raster product assets are present in the source; vector UI icons appropriately use the existing Phosphor library.
-
-## Findings
-
-No actionable P0, P1, or P2 differences remain.
-
-- Fonts and typography: display and UI font roles, weights, wrapping, and hierarchy match the concept at production scale.
-- Spacing and layout rhythm: the anchor, header padding, highlighted row, separators, row spacing, radius, and elevation are consistent and responsive.
-- Colors and visual tokens: cream, white, navy, muted ink, and crimson semantic states follow existing Inkwell tokens and the selected design.
-- Image and icon fidelity: there are no photographic or illustrative assets. Icons come from the project's Phosphor icon package and remain sharp at both densities.
-- Copy and content: labels and descriptions match the selected direction and explain each export outcome.
-- Accessibility and interaction: the trigger exposes expanded state and menu semantics; Escape closes the popover; disabled, hover, focus, success, and download states work.
-
-## Comparison history
-
-1. Initial comparison found one P2 state mismatch: keyboard focus changed the copied row to a blue surface, while the selected design retained a warm crimson tint.
-2. The primary row's hover and focus styling was corrected to `#fff0f1`.
-3. Post-fix desktop and mobile captures show the copied state using the intended warm tint. Copy feedback and Markdown download both pass, and the browser console reports no errors.
-
-## Verification
-
-- TypeScript typecheck passed.
-- ESLint passed for the changed consultant component and E2E test.
-- Desktop and mobile Chromium interaction tests passed: 2 tests.
-- Primary interactions tested: open, Escape close, copy feedback, Markdown download, and responsive rendering.
-- Browser console errors checked: none.
-
-## Follow-up polish
-
-No blocking follow-up is required. A future iteration could add an optional keyboard shortcut only after the product implements that shortcut behavior.
+# AI suggestion review — approved option 2
 
 final result: passed
 
-# Consultant landing page redesign
+## Findings and fixes
 
-## Evidence
+- Resolved P2, reading hierarchy: the initial title included “broken” on the first line and inherited paragraph line height made the tracked content substantially taller than the source. Constrained the title measure, set explicit review prose line height, and adjusted legend spacing. `desktop-first.jpg` / `comparison-first.png` show the initial state; `desktop-final.jpg`, `comparison-final.png`, and `comparison-reading.png` show the corrected render.
+- Resolved P2, return behavior: the former preview close reopened the Ask AI modal. “Back to article” and Escape now close both review and assistant, preserve the proposal, restore scrolling and focus the article toolbar trigger. Browser verification and an integration test cover this behavior.
+- Resolved P2, error visibility: approval errors rendered at the top of the reading content could be missed after scrolling. Errors now stay in the fixed footer beside the decision controls. `conflict-mobile.jpg` shows a stale-draft error with both actions reachable; the alert was measured within the 390 × 844 viewport.
+- Resolved P2, narrow controls: reduced compact control sizes below 360px so Back to article and Show changes share one row and neither approval label wraps. `mobile-small.jpg` and `mobile-small-scrolled.jpg` show the 320 × 568 view at the start and end of the article, with the action bar fixed in place.
+- No actionable P0/P1/P2 findings remain.
 
-- Selected expanded visual: `C:\Users\Dell\.codex\generated_images\01a154e2-7c44-7b43-b8f9-abd270d9f29c\exec-47fa36be-42bc-4d47-bd19-33160dd9d581.png`.
-- Browser-rendered desktop: `C:\Users\Dell\Documents\useinkwell\inkwell-frontend\test-results\consultant-landing-desktop-full.png` at 1280 CSS px width.
-- Browser-rendered mobile: `C:\Users\Dell\Documents\useinkwell\inkwell-frontend\test-results\consultant-landing-mobile.png` at 393 CSS px width.
+## Source and comparison evidence
 
-## Comparison
+Source: `design-evidence/consultant-review/approved-option-2.png`, the second displayed mockup in the latest review ideation set, with a full-page reading surface and inline change markers.
 
-The implementation keeps the selected conversation-first hero, product previews, cream/navy/crimson palette, and serif editorial typography. The previously short middle section is now three spacious alternating chapters: conversation, first draft, and final review. Export and a final call to action extend the journey without adding unsupported claims. At desktop width, the interview and draft previews sit side by side so both are legible. On mobile they stack with a small overlap; the draft title and copy remain readable.
+The source and final desktop render are each 1487 × 1058 pixels, at a matching CSS viewport and 1x density. `comparison-final.png` pairs source left and implementation right at equal 744 × 529 reductions. `comparison-reading.png` pairs corresponding 900 × 680 article crops at equal 675 × 510 reductions. Both combined comparisons were opened and inspected. The initial comparison is retained as `comparison-first.png`.
 
-The design concept uses more illustrative product framing than the live components. The implementation uses the existing Inkwell voice-orb asset and faithful static interface previews; all actions on the landing page link to the consultant sign-up or in-page sections. No P0, P1, or P2 visual differences remain after the mobile hero adjustment.
+Other evidence: `clean-view.jpg`, `mobile.jpg` (390 × 844), `tablet.jpg` (834 × 1194), `mobile-small.jpg` and `mobile-small-scrolled.jpg` (320 × 568), and `conflict-mobile.jpg`. The final narrow captures used a fresh preview tab at the target viewport after an earlier resized-browser capture contained compositor artifacts. The fresh capture and DOM measurements agree: content width 320px, footer entirely inside the viewport, and article body scrolls independently.
 
-## Verification
+Previous Ask AI modal QA is archived as `previous-ask-ai-qa.md`.
 
-- TypeScript passed.
-- Landing unit tests: 6 passed.
-- Consultant landing browser tests: 6 passed, 2 expected viewport skips. Desktop and mobile had no horizontal overflow.
-- ESLint passed with 2 existing warnings in unrelated files.
+## Required fidelity surfaces
 
-final result: passed
+Typography: existing Newsreader and Manrope. The editorial title wraps before “broken handoffs”; serif prose and section headings retain the selected hierarchy. Explicit line height prevents surrounding application styles from changing the reading rhythm. Mobile scales the title and controls without horizontal overflow.
 
-# Consultant voice interview design QA
+Spacing/layout: full-page review surface, existing brand/navigation language, compact review toolbar, centered reading column, one Show changes switch, and a fixed footer. The body scrolls while Back to article and approval actions stay accessible. No duplicate current/proposed article panels or boxed diff summaries remain.
 
-## Evidence
+Colors/tokens: existing navy, crimson, warm paper, white, muted and divider tokens. Removed text has rose highlighting and strikethrough; added text has pale green highlighting. Text labels and screen-reader annotations communicate the changes independently of color.
 
-- Selected design: `C:\Users\Dell\.codex\generated_images\01a154e2-7c44-7b43-b8f9-abd270d9f29c\exec-6ea6c868-90e0-4626-9f57-c607881ce61d.png`
-- Browser-rendered desktop: `C:\Users\Dell\Documents\useinkwell\inkwell-frontend\test-results\voice-interview-desktop.jpg` at 1440 × 1024 CSS px.
-- Browser-rendered mobile: `C:\Users\Dell\Documents\useinkwell\inkwell-frontend\test-results\voice-interview-mobile.jpg` at 390 × 844 CSS px.
-- Rendered state: connecting, using a mock interview without a live voice provider. The selected design shows the listening state.
+Assets/icons: no bitmap artwork or generated screenshot is embedded in the interface. The existing wordmark, Phosphor ArrowLeft and standard form controls are used. Source bitmap is design evidence only.
 
-## Comparison
+Copy/content: request and summary are data-driven. Both original and proposed content are preserved in the change view; the clean view contains only the proposal. The real second-paragraph edit removes more words than the illustrative mock shows, so its mark is intentionally longer. Full rewrites, section deletion, additions and moves remain reviewable. Source links, lists and inline formatting are preserved. The footer describes approval accurately, and its actions apply or reject the complete proposal.
 
-The implementation follows the selected centered composition: small crimson eyebrow, editorial title and supporting copy, luminous crimson/navy orb with an in-orb voice status, elapsed time, and Mute, Pause, and Finish controls. It uses the existing Inkwell page header and fonts. The orb scales down on phone and short viewports so the primary action stays visible. Status-specific animation is present for listening and speaking, and reduced-motion settings disable it.
+P3 differences: small font-rasterization/icon and navigation-spacing differences remain; the precise change spans follow the actual source/proposal rather than copying incomplete marks from the generated bitmap. These do not change hierarchy or behavior.
 
-The browser comparison found one P2 mobile issue: the Finish action initially sat below the 844 px fold. The orb size was reduced at that viewport; the final capture shows all controls inside the screen. No remaining P0, P1, or P2 differences were found.
+## Behavior and validation
 
-## Verification
+The real ConsultantArticleScreen now hosts ConsultantReview. Existing apply/reject endpoints and version headers are retained. Applying is blocked when there are unsaved edits. Closing preserves the suggestion; rejection preserves the current draft; approval replaces the complete draft. Background content remains inert and focus returns to the article control.
 
-- TypeScript, ESLint, and Prettier checks passed.
-- Focused consultant interview browser test passed in desktop and mobile Chrome: 2 tests.
-- The browser preview confirmed layout and connecting state. A live microphone-to-provider conversation was outside this mock preview.
+Browser interaction verification used a temporary development-only sample article with isolated in-memory API responses through the real request client and article component. It exercised opening, tracked/clean toggle, closing, Escape, rejection, approval on a narrow screen, restored focus/scrolling, and a simulated stale-draft response. A second temporary render of the actual review component was used solely to obtain a clean narrow-viewport visual capture and verify scrolling. Both temporary preview files were removed. No stored user article or live model call was changed or triggered. Final browser error logs were empty.
 
-final result: passed
+26 focused tests passed: 12 article integration tests, 6 review tests and 8 generation tests. Review coverage includes rich links/formatting, unsafe URL handling, complete section deletions/full rewrites with new IDs, moves without false text changes, clean-view content, dirty-state approval protection, and long rewrite preservation. Long sections use a bounded block comparison instead of the previous unbounded word-level matrix. TypeScript and targeted ESLint passed. Existing Playwright labels/selectors were updated; the Playwright CLI suite was not run.
 
-## Generation performance page
+## Checklist
 
-- Selected visual: `C:\Users\Dell\.codex\generated_images\01a154e2-7c44-7b43-b8f9-abd270d9f29c\exec-f7137729-6259-48ed-b1fc-298f1a750353.png`.
-- Rendered desktop comparison: `C:\Users\Dell\Documents\useinkwell\inkwell-frontend\test-results\performance-desktop.png`, captured with the timeline expanded at 1440px width.
-- The page follows the selected editorial heading, cream/navy/crimson palette, four filters, compact job ledger, and inline attempt timeline. It keeps the application's existing navigation and uses actual model names from records. Historical jobs explicitly say “Detailed timing unavailable” while retaining stored totals.
-- Desktop and mobile interaction checks passed. The ledger scrolls horizontally on narrow screens and controls retain visible keyboard focus.
-
-final result: passed
+- [x] Build the exact second displayed review concept.
+- [x] Preserve the existing backend proposal and approval contracts.
+- [x] Compare source and render together at matching dimensions.
+- [x] Verify tracked/clean views, complete removals, responsive controls and recovery.
+- [x] Preserve user data and remove temporary preview routes.

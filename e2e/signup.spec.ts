@@ -4,7 +4,6 @@ test("renders the responsive signup experience without overflow", async ({
   page,
 }) => {
   await page.goto("/signup");
-  await page.getByRole("button", { name: "Continue" }).click();
 
   await expect(
     page.getByRole("heading", {
@@ -17,6 +16,8 @@ test("renders the responsive signup experience without overflow", async ({
   await expect(page.getByLabel("Email address")).toBeVisible();
   await expect(page.getByLabel("Username")).toBeVisible();
   await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
+  await expect(page.getByRole("radio")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Continue" })).toHaveCount(0);
 
   const hasOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth > window.innerWidth + 1,
@@ -28,7 +29,6 @@ test("validates signup details and toggles password visibility", async ({
   page,
 }) => {
   await page.goto("/signup");
-  await page.getByRole("button", { name: "Continue" }).click();
 
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page.getByText("Enter a valid email address.")).toBeVisible();
@@ -57,7 +57,7 @@ test("registers through the same-origin endpoint and opens onboarding", async ({
       email: "writer@example.com",
       username: "writer_01",
       password: "thoughtful-password",
-      experience: "marketing",
+      experience: "consultant",
     });
     await route.fulfill({
       status: 201,
@@ -67,14 +67,14 @@ test("registers through the same-origin endpoint and opens onboarding", async ({
           id: "46a42280-6ad8-4bb6-a29c-1604adbf0c31",
           email: "writer@example.com",
           username: "writer_01",
+          preferred_experience: "consultant",
           created_at: "2026-08-11T12:00:00Z",
           updated_at: "2026-08-11T12:00:00Z",
         },
       }),
     });
   });
-  await page.goto("/signup");
-  await page.getByRole("button", { name: "Continue" }).click();
+  await page.goto("/signup?experience=marketing&step=choose");
 
   await page.getByLabel("Email address").fill(" Writer@Example.com ");
   await page.getByLabel("Username").fill("writer_01");
@@ -83,7 +83,39 @@ test("registers through the same-origin endpoint and opens onboarding", async ({
     .fill("thoughtful-password");
   await page.getByRole("button", { name: "Create account" }).click();
 
-  await expect(page).toHaveURL(/\/onboarding$/);
+  await expect(page).toHaveURL(/\/consultant\/onboarding$/);
+});
+
+test("shows an unavailable message when consultant signup is disabled", async ({
+  page,
+}) => {
+  await page.route("**/api/auth/register", async (route) => {
+    expect(route.request().postDataJSON().experience).toBe("consultant");
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({
+        error: {
+          code: "consultant_disabled",
+          message: "Consultant signup is not available yet.",
+        },
+      }),
+    });
+  });
+  await page.goto("/signup");
+  await page.getByLabel("Email address").fill("writer@example.com");
+  await page.getByLabel("Username").fill("writer_01");
+  await page
+    .getByLabel("Password", { exact: true })
+    .fill("thoughtful-password");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByRole("alert")).toHaveText(
+    "Signup is temporarily unavailable. Please try again later.",
+  );
+  await expect(page).toHaveURL(/\/signup$/);
+  await expect(page.getByLabel("Email address")).toHaveValue(
+    "writer@example.com",
+  );
 });
 
 test("shows duplicate username errors returned by registration", async ({
@@ -102,7 +134,6 @@ test("shows duplicate username errors returned by registration", async ({
     });
   });
   await page.goto("/signup");
-  await page.getByRole("button", { name: "Continue" }).click();
 
   await page.getByLabel("Email address").fill("writer@example.com");
   await page.getByLabel("Username").fill("writer_01");

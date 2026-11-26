@@ -10,6 +10,16 @@ import type {
   InterviewTranscriptTurn,
   VoiceTransport,
 } from "@/lib/articles/client-interview-api";
+import {
+  createAudioPlaybackObserver,
+  type AudioPlaybackState,
+} from "./audio-playback-observer";
+
+export type LiveTranscriptTurn = InterviewTranscriptTurn & { saved: boolean };
+export type PlaybackObservation = {
+  state: AudioPlaybackState;
+  voiceSessionId: string | null;
+};
 
 export type RealtimeInterviewStatus =
   "idle" | "connecting" | "connected" | "reconnecting" | "error";
@@ -27,6 +37,13 @@ type RealtimeInterviewOptions = {
   createSession?: typeof createVoiceInterviewSession;
   onComplete?: (reason: RealtimeCompletionReason) => void;
   onTranscriptTurn?: (turn: InterviewTranscriptTurn) => Promise<void>;
+  observePlayback?: boolean;
+  onTranscriptChange?: (turn: LiveTranscriptTurn) => void;
+  onPlayback?: (observation: PlaybackObservation) => void;
+  onEvent?: (
+    event: Record<string, unknown>,
+    voiceSessionId: string | null,
+  ) => void;
 };
 
 const FINAL_AUDIO_CLOSE_DELAY_MS = 2_000;
@@ -45,7 +62,7 @@ function logVoiceDiagnostic(
   fields: Record<string, boolean | number | string | null> = {},
 ) {
   // Keep diagnostics useful without exposing the invitation token or transcript text.
-  console.info("[Inkwell voice]", {
+  console.info(`[Inkwell voice: ${event}]`, {
     event,
     at: new Date().toISOString(),
     ...fields,
@@ -97,6 +114,10 @@ export function useRealtimeInterview(
     onComplete,
     onTranscriptTurn,
     createSession,
+    observePlayback = false,
+    onTranscriptChange,
+    onPlayback,
+    onEvent,
   }: RealtimeInterviewOptions = {},
 ) {
   const createSessionRef = useRef(createSession);
@@ -111,6 +132,16 @@ export function useRealtimeInterview(
   const completionPendingRef = useRef(false);
   const onCompleteRef = useRef(onComplete);
   const onTranscriptTurnRef = useRef(onTranscriptTurn);
+  const observersRef = useRef({ onTranscriptChange, onPlayback, onEvent });
+  useEffect(() => {
+    observersRef.current = { onTranscriptChange, onPlayback, onEvent };
+  }, [onTranscriptChange, onPlayback, onEvent]);
+  const playbackObserverRef =
+    useRef<ReturnType<typeof createAudioPlaybackObserver>>(null);
+  const [audioBlocked, setAudioBlocked] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
   const seenTranscriptItemsRef = useRef(new Set<string>());
   const transcriptBuffersRef = useRef(
     new Map<
@@ -134,6 +165,7 @@ export function useRealtimeInterview(
   const externalSessionIdRef = useRef<string | null>(null);
   const generationRef = useRef(0);
   const activeRef = useRef(false);
+  const mutedRef = useRef(false);
   const statusRef = useRef<RealtimeInterviewStatus>("idle");
   const attemptRef = useRef<(reconnecting: boolean) => void>(() => {});
   const scheduleReconnectRef = useRef<(message: string) => void>(() => {});
@@ -175,6 +207,8 @@ export function useRealtimeInterview(
       connection.close();
     }
     if (audioRef.current) {
+      playbackObserverRef.current?.close();
+      playbackObserverRef.current = null;
       audioRef.current.pause();
       audioRef.current.srcObject = null;
       audioRef.current = null;
@@ -185,6 +219,8 @@ export function useRealtimeInterview(
     streamRef.current = null;
   }, []);
   const persistOutbox = useCallback(() => {
+    if (outboxRef.current.size || transcriptBuffersRef.current.size)
+      setSaveStatus("saving");
     try {
       const turns = Array.from(outboxRef.current.values());
       if (turns.length)
@@ -194,6 +230,42 @@ export function useRealtimeInterview(
       // The in-memory queue still covers a recoverable connection interruption.
     }
   }, [token]);
+
+  const preparePlayback = useCallback(() => {
+    if (playbackObserverRef.current) return;
+    playbackObserverRef.current = createAudioPlaybackObserver((state) => {
+      if (!activeRef.current) return;
+      logVoiceDiagnostic("playback_observed", { state });
+      if (state === "blocked") setAudioBlocked(true);
+      else {
+        setAudioBlocked(false);
+        setActivity(state === "speaking" ? "speaking" : "listening");
+      }
+      if (state === "quiet") {
+        for (const [key, buffer] of transcriptBuffersRef.current) {
+          if (buffer.speaker !== "interviewer") continue;
+          window.clearTimeout(buffer.timer);
+          transcriptBuffersRef.current.delete(key);
+          outboxRef.current.set(buffer.itemId, {
+            itemId: buffer.itemId,
+            speaker: buffer.speaker,
+            text: buffer.text,
+            provider: "openai_live",
+            voiceSessionId: voiceSessionIdRef.current ?? undefined,
+          });
+        }
+        persistOutbox();
+        void flushRef.current().catch(() => undefined);
+      }
+      observersRef.current.onPlayback?.({
+        state,
+        voiceSessionId: voiceSessionIdRef.current,
+      });
+    });
+    logVoiceDiagnostic("playback_observer_created", {
+      available: playbackObserverRef.current !== null,
+    });
+  }, [persistOutbox]);
 
   const scheduleCompletion = useCallback(
     (reason: RealtimeCompletionReason) => {
@@ -260,6 +332,10 @@ export function useRealtimeInterview(
             ? { voiceSessionId: voiceSessionIdRef.current }
             : {}),
         });
+        observersRef.current.onTranscriptChange?.({
+          ...outboxRef.current.get(itemId)!,
+          saved: false,
+        });
         persistOutbox();
         void flushRef.current().catch(() => undefined);
       },
@@ -284,6 +360,7 @@ export function useRealtimeInterview(
               pendingTurnCount: outboxRef.current.size - 1,
             });
           } catch (error) {
+            setSaveStatus("error");
             logVoiceDiagnostic("transcript_save_failed", {
               callAttemptId: callAttemptIdRef.current,
               errorName: error instanceof Error ? error.name : typeof error,
@@ -291,9 +368,11 @@ export function useRealtimeInterview(
             throw error;
           }
           outboxRef.current.delete(itemId);
+          observersRef.current.onTranscriptChange?.({ ...turn, saved: true });
         }
         persistOutbox();
       }
+      if (transcriptBuffersRef.current.size === 0) setSaveStatus("saved");
     };
     const promise = flush();
     flushPromiseRef.current = promise;
@@ -424,18 +503,58 @@ export function useRealtimeInterview(
             return;
           }
           streamRef.current = stream;
+          stream.getAudioTracks().forEach((track) => {
+            track.enabled = !mutedRef.current;
+          });
         }
         const connection = new RTCPeerConnection();
         connectionRef.current = connection;
         const remoteAudio = new Audio();
         remoteAudio.autoplay = true;
         audioRef.current = remoteAudio;
+        if (observePlayback) {
+          try {
+            // Reconnection can happen without a gesture. Keep the normal audio
+            // path usable if observation is unsupported or needs a user gesture.
+            if (!playbackObserverRef.current) preparePlayback();
+          } catch {
+            playbackObserverRef.current?.close();
+            playbackObserverRef.current = null;
+          }
+        }
         stream
           .getTracks()
           .forEach((track) => connection.addTrack(track, stream));
         connection.ontrack = (event) => {
+          logVoiceDiagnostic("remote_audio_track_received", {
+            streams: event.streams.length,
+            observing: playbackObserverRef.current !== null,
+          });
           remoteAudio.srcObject = event.streams[0];
-          void remoteAudio.play().catch(() => undefined);
+          if (observePlayback && event.streams[0]) {
+            try {
+              playbackObserverRef.current?.attach(
+                remoteAudio,
+                event.streams[0],
+              );
+            } catch (error) {
+              logVoiceDiagnostic("playback_observer_failed", {
+                errorName: error instanceof Error ? error.name : "unknown",
+              });
+              playbackObserverRef.current?.close();
+              playbackObserverRef.current = null;
+            }
+          }
+          void remoteAudio
+            .play()
+            .then(() => setAudioBlocked(false))
+            .catch(() => {
+              setAudioBlocked(true);
+              observersRef.current.onPlayback?.({
+                state: "blocked",
+                voiceSessionId: voiceSessionIdRef.current,
+              });
+            });
         };
         connection.onconnectionstatechange = () => {
           if (generation !== generationRef.current || !activeRef.current)
@@ -488,6 +607,8 @@ export function useRealtimeInterview(
           });
         });
         events.addEventListener("message", (message) => {
+          if (generation !== generationRef.current || !activeRef.current)
+            return;
           let event: unknown;
           try {
             event = JSON.parse(String(message.data));
@@ -508,12 +629,17 @@ export function useRealtimeInterview(
             type?: string;
             error?: { code?: string; type?: string };
           };
+          observersRef.current.onEvent?.(
+            event as Record<string, unknown>,
+            voiceSessionIdRef.current,
+          );
           if (
             [
               "session.output_audio.delta",
               "response.output_audio.delta",
               "output_audio_buffer.started",
-            ].includes(liveEvent.type ?? "")
+            ].includes(liveEvent.type ?? "") &&
+            !observePlayback
           )
             setActivity("speaking");
           const outputAudioFinished = [
@@ -522,8 +648,9 @@ export function useRealtimeInterview(
             "output_audio_buffer.stopped",
           ].includes(liveEvent.type ?? "");
           if (
-            outputAudioFinished ||
-            liveEvent.type === "input_audio_buffer.speech_started"
+            !observePlayback &&
+            (outputAudioFinished ||
+              liveEvent.type === "input_audio_buffer.speech_started")
           )
             setActivity("listening");
           if (liveEvent.type === "error") {
@@ -567,6 +694,10 @@ export function useRealtimeInterview(
               ...(voiceSessionIdRef.current
                 ? { voiceSessionId: voiceSessionIdRef.current }
                 : {}),
+            });
+            observersRef.current.onTranscriptChange?.({
+              ...outboxRef.current.get(liveEvent.item_id)!,
+              saved: false,
             });
             persistOutbox();
             void flushRef.current().catch(() => undefined);
@@ -652,6 +783,16 @@ export function useRealtimeInterview(
               }, 1_500);
               transcriptBuffersRef.current.set(key, buffer);
             }
+            const current = transcriptBuffersRef.current.get(key)!;
+            observersRef.current.onTranscriptChange?.({
+              itemId: current.itemId,
+              speaker,
+              text: current.text,
+              saved: false,
+              provider: "openai_live",
+              voiceSessionId: voiceSessionIdRef.current ?? undefined,
+            });
+            setSaveStatus("saving");
             return;
           }
           const toolItem =
@@ -754,6 +895,8 @@ export function useRealtimeInterview(
       token,
       transport,
       startElevenSession,
+      observePlayback,
+      preparePlayback,
     ],
   );
   useEffect(() => {
@@ -763,6 +906,7 @@ export function useRealtimeInterview(
   }, [attemptConnection]);
 
   const start = useCallback(() => {
+    if (observePlayback) preparePlayback();
     activeRef.current = true;
     callAttemptIdRef.current = createDiagnosticId();
     voiceSessionIdRef.current = null;
@@ -776,7 +920,7 @@ export function useRealtimeInterview(
       online: navigator.onLine,
     });
     attemptRef.current(false);
-  }, []);
+  }, [observePlayback, preparePlayback]);
   const stop = useCallback(
     (reason: VoiceEndReason = "component_unmounted") => {
       logVoiceDiagnostic("voice_call_stopped", {
@@ -808,6 +952,8 @@ export function useRealtimeInterview(
       persistOutbox();
       clearTimers();
       closeTransport();
+      playbackObserverRef.current?.close();
+      playbackObserverRef.current = null;
       releaseMicrophone();
       seenTranscriptItemsRef.current.clear();
       setInterviewStatus("idle");
@@ -838,11 +984,21 @@ export function useRealtimeInterview(
 
   const [muted, setMuted] = useState(false);
   const toggleMute = () => {
-    const next = !muted;
+    const next = !mutedRef.current;
+    mutedRef.current = next;
     streamRef.current?.getAudioTracks().forEach((track) => {
       track.enabled = !next;
     });
     setMuted(next);
+  };
+  const resumeAudio = async () => {
+    try {
+      await playbackObserverRef.current?.resume();
+      await audioRef.current?.play();
+      setAudioBlocked(false);
+    } catch {
+      setAudioBlocked(true);
+    }
   };
   return {
     error,
@@ -853,6 +1009,9 @@ export function useRealtimeInterview(
     muted,
     toggleMute,
     activity,
+    audioBlocked,
+    resumeAudio,
+    saveStatus,
   };
 }
 

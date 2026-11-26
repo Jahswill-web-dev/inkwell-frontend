@@ -105,7 +105,13 @@ export async function POST(request: Request) {
         error.response?.data,
       );
 
-      if ((status === 409 || status === 422) && backendError.success) {
+      if (
+        backendError.success &&
+        (status === 409 ||
+          status === 422 ||
+          (status === 503 &&
+            backendError.data.error.code === "consultant_disabled"))
+      ) {
         return NextResponse.json(backendError.data, { status });
       }
     }

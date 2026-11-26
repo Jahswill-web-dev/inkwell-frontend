@@ -440,6 +440,38 @@
 .editorParagraph {
   margin: 0 0 22px;
 }
+.editorialSection .editorContent {
+  color: var(--color-ink-navy);
+  font-size: 22px;
+  line-height: 1.5;
+}
+.editorialSection .editorParagraph {
+  margin-bottom: 25px;
+  line-height: 1.6;
+}
+.editorialSection > h2,
+.editorialSection .sectionTitleInput {
+  margin: 28px 0 10px;
+  color: var(--color-ink-navy);
+  font-size: 38px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.editorialSection textarea.sectionTitleInput {
+  overflow: hidden;
+  resize: none;
+}
+@media (max-width: 640px) {
+  .editorialSection .editorContent {
+    font-size: 20px;
+    line-height: 1.55;
+  }
+  .editorialSection > h2,
+  .editorialSection .sectionTitleInput {
+    font-size: 28px;
+    margin: 28px 0 16px;
+  }
+}
 
 .editorHeading,
 .editorSubheading {

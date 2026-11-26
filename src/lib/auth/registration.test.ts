@@ -10,10 +10,22 @@ describe("registrationSchema", () => {
         password: "  password with spaces  ",
       }),
     ).toEqual({
+      experience: "consultant",
       email: "writer@example.com",
       username: "writer_01",
       password: "  password with spaces  ",
     });
+  });
+
+  it("preserves explicit marketing registration for compatible API clients", () => {
+    expect(
+      registrationSchema.parse({
+        email: "writer@example.com",
+        username: "writer_01",
+        password: "password",
+        experience: "marketing",
+      }).experience,
+    ).toBe("marketing");
   });
 
   it.each(["Writer_01", " writer_01", "writer-01", "ab"])(

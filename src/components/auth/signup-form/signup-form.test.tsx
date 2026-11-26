@@ -29,10 +29,6 @@ afterEach(cleanup);
 
 beforeEach(() => {
   window.history.replaceState(null, "", "/signup");
-  vi.stubGlobal(
-    "fetch",
-    vi.fn().mockResolvedValue({ json: async () => ({ enabled: true }) }),
-  );
   postMock.mockReset();
   pushMock.mockReset();
   postMock.mockResolvedValue({ data: { user: {} }, status: 201 });
@@ -51,19 +47,28 @@ async function fillValidForm() {
 }
 
 describe("SignupForm", () => {
-  it("offers company and personal usage choices", async () => {
+  it.each([
+    "/signup",
+    "/signup?experience=marketing&step=choose",
+    "/signup?experience=consultant&step=choose",
+  ])("opens the account form directly at %s", (url) => {
+    window.history.replaceState(null, "", url);
     render(<SignupForm />);
-
     expect(
-      screen.getByText("For my company or marketing team"),
+      screen.getByRole("heading", { name: "Create your account" }),
     ).toBeVisible();
-    expect(await screen.findByText("For myself")).toBeVisible();
-    expect(screen.queryByText("I’m a consultant")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Email address")).toBeVisible();
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Continue" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Back/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("clearly marks Google sign-up as unavailable", async () => {
     render(<SignupForm />);
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(
       screen.getByRole("button", { name: "Google sign-up is coming soon" }),
@@ -77,7 +82,6 @@ describe("SignupForm", () => {
 
   it("shows useful validation for invalid details", async () => {
     render(<SignupForm />);
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await userEvent.click(
       screen.getByRole("button", { name: "Create account" }),
@@ -95,7 +99,6 @@ describe("SignupForm", () => {
 
   it("rejects uppercase and whitespace in usernames", async () => {
     render(<SignupForm />);
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await userEvent.type(
       screen.getByLabelText("Email address"),
@@ -120,7 +123,6 @@ describe("SignupForm", () => {
 
   it("lets a user reveal and hide their password", async () => {
     render(<SignupForm />);
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     const password = screen.getByLabelText("Password", { exact: true });
 
     await userEvent.type(password, "thoughtful-password");
@@ -137,7 +139,6 @@ describe("SignupForm", () => {
 
   it("submits normalized data and opens onboarding", async () => {
     render(<SignupForm />);
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     await fillValidForm();
 
     await userEvent.click(
@@ -151,12 +152,12 @@ describe("SignupForm", () => {
           email: "writer@example.com",
           username: "writer_01",
           password: "thoughtful-password",
-          experience: "marketing",
+          experience: "consultant",
         },
         { headers: { "Content-Type": "application/json" } },
       ),
     );
-    expect(pushMock).toHaveBeenCalledWith("/onboarding");
+    expect(pushMock).toHaveBeenCalledWith("/consultant/onboarding");
   });
 
   it("disables submission while a registration request is pending", async () => {
@@ -168,7 +169,6 @@ describe("SignupForm", () => {
         }),
     );
     render(<SignupForm />);
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     await fillValidForm();
 
     await userEvent.click(
@@ -183,7 +183,9 @@ describe("SignupForm", () => {
     expect(postMock).toHaveBeenCalledOnce();
 
     resolveRequest({ data: { user: {} }, status: 201 });
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/onboarding"));
+    await waitFor(() =>
+      expect(pushMock).toHaveBeenCalledWith("/consultant/onboarding"),
+    );
   });
 
   it.each([
@@ -195,7 +197,6 @@ describe("SignupForm", () => {
       response: { data: { error: { code, message } } },
     });
     render(<SignupForm />);
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     await fillValidForm();
 
     await userEvent.click(
@@ -229,7 +230,6 @@ describe("SignupForm", () => {
       },
     });
     render(<SignupForm />);
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     await fillValidForm();
 
     await userEvent.click(
@@ -247,7 +247,6 @@ describe("SignupForm", () => {
   it("shows a retryable alert when registration is unavailable", async () => {
     postMock.mockRejectedValue({ isAxiosError: true });
     render(<SignupForm />);
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     await fillValidForm();
 
     await userEvent.click(
@@ -263,8 +262,12 @@ describe("SignupForm", () => {
   });
 });
 
-it("persists consultant selection across reload and submits it", async () => {
-  window.history.replaceState(null, "", "/signup?experience=consultant");
+it("ignores a legacy marketing selection and registers a consultant", async () => {
+  window.history.replaceState(
+    null,
+    "",
+    "/signup?experience=marketing&step=account",
+  );
   render(<SignupForm />);
   await screen.findByLabelText("Email address");
   await fillValidForm();
@@ -273,4 +276,28 @@ it("persists consultant selection across reload and submits it", async () => {
     expect(pushMock).toHaveBeenCalledWith("/consultant/onboarding"),
   );
   expect(postMock.mock.calls[0][1].experience).toBe("consultant");
+});
+
+it("keeps signup on the form when consultant signup is disabled", async () => {
+  postMock.mockRejectedValue({
+    isAxiosError: true,
+    response: {
+      status: 503,
+      data: {
+        error: {
+          code: "consultant_disabled",
+          message: "Consultant signup is not available yet.",
+        },
+      },
+    },
+  });
+  render(<SignupForm />);
+  await fillValidForm();
+  await userEvent.click(screen.getByRole("button", { name: "Create account" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Signup is temporarily unavailable. Please try again later.",
+  );
+  expect(postMock).toHaveBeenCalledOnce();
+  expect(postMock.mock.calls[0][1].experience).toBe("consultant");
+  expect(pushMock).not.toHaveBeenCalled();
 });

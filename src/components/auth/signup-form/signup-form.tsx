@@ -3,7 +3,7 @@
 import axios from "axios";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useState, useEffect } from "react";
+import { type FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button/button";
 import { FormField } from "@/components/ui/form-field/form-field";
 import {
@@ -74,6 +74,13 @@ function getApiErrors(error: unknown): {
 
   const { code, details } = parsed.data.error;
 
+  if (code === "consultant_disabled") {
+    return {
+      errors: {},
+      message: "Signup is temporarily unavailable. Please try again later.",
+    };
+  }
+
   if (code === "email_already_registered") {
     return {
       errors: { email: "An account with this email already exists." },
@@ -107,50 +114,6 @@ function getApiErrors(error: unknown): {
 }
 
 export function SignupForm() {
-  const [experience, setExperience] = useState<"marketing" | "consultant">(
-    "marketing",
-  );
-  const [step, setStep] = useState<"choose" | "account">("choose");
-  const [consultantEnabled, setConsultantEnabled] = useState(false);
-  useEffect(() => {
-    const saved = new URL(window.location.href).searchParams.get("experience");
-    const timer = window.setTimeout(() => {
-      if (saved === "consultant" || saved === "marketing") {
-        setExperience(saved);
-        setStep(
-          new URL(window.location.href).searchParams.get("step") === "choose"
-            ? "choose"
-            : "account",
-        );
-      }
-    }, 0);
-    fetch("/api/consultant/availability")
-      .then((r) => r.json())
-      .then((value) => setConsultantEnabled(value.enabled === true))
-      .catch(() => {});
-    return () => window.clearTimeout(timer);
-  }, []);
-  function choose() {
-    const url = new URL(window.location.href);
-    url.searchParams.set("experience", experience);
-    url.searchParams.set("step", "account");
-    window.history.replaceState(null, "", url);
-    setStep("account");
-  }
-
-  function selectExperience(value: "marketing" | "consultant") {
-    setExperience(value);
-    const url = new URL(window.location.href);
-    url.searchParams.set("experience", value);
-    url.searchParams.set("step", "choose");
-    window.history.replaceState(null, "", url);
-  }
-  function back() {
-    setStep("choose");
-    const url = new URL(window.location.href);
-    url.searchParams.set("step", "choose");
-    window.history.replaceState(null, "", url);
-  }
   const router = useRouter();
   const [errors, setErrors] = useState<SignupErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -169,16 +132,10 @@ export function SignupForm() {
 
     setIsSubmitting(true);
     try {
-      await axios.post<RegistrationSuccess>(
-        "/api/auth/register",
-        { ...result.data, experience },
-        {
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-      router.push(
-        experience === "consultant" ? "/consultant/onboarding" : "/onboarding",
-      );
+      await axios.post<RegistrationSuccess>("/api/auth/register", result.data, {
+        headers: { "Content-Type": "application/json" },
+      });
+      router.push("/consultant/onboarding");
     } catch (error) {
       const apiErrors = getApiErrors(error);
       setErrors(apiErrors.errors);
@@ -188,77 +145,8 @@ export function SignupForm() {
     }
   };
 
-  if (step === "choose")
-    return (
-      <div>
-        <header className={styles.formHeader}>
-          <h2>How will you use Inkwell?</h2>
-          <p>You can use both experiences and switch later.</p>
-        </header>
-        <fieldset
-          style={{
-            display: "grid",
-            gap: 16,
-            border: 0,
-            padding: 0,
-            marginBottom: 24,
-          }}
-        >
-          <legend className="sr-only">Choose your experience</legend>
-          <label
-            style={{
-              padding: 20,
-              border: "1px solid #d5d5cf",
-              borderRadius: 12,
-            }}
-          >
-            <input
-              type="radio"
-              name="experience"
-              checked={experience === "marketing"}
-              onChange={() => selectExperience("marketing")}
-            />{" "}
-            <strong>For my company or marketing team</strong>
-            <p>Interview clients and turn their expertise into articles.</p>
-          </label>
-          {consultantEnabled && (
-            <label
-              style={{
-                padding: 20,
-                border: "1px solid #d5d5cf",
-                borderRadius: 12,
-              }}
-            >
-              <input
-                type="radio"
-                name="experience"
-                checked={experience === "consultant"}
-                onChange={() => selectExperience("consultant")}
-              />{" "}
-              <strong>For myself</strong>
-              <p>
-                Talk through your own ideas and turn them into articles in your
-                voice.
-              </p>
-            </label>
-          )}
-        </fieldset>
-        <Button fullWidth onClick={choose}>
-          Continue
-        </Button>
-        <p className={styles.accountPrompt}>
-          Already have an account? <Link href="/login">Sign in</Link>
-        </p>
-      </div>
-    );
   return (
     <div>
-      <button type="button" onClick={back}>
-        ← Back ·{" "}
-        {experience === "consultant"
-          ? "For myself"
-          : "Company or marketing team"}
-      </button>
       <header className={styles.formHeader}>
         <h2>Create your account</h2>
         <p>Start writing better articles with AI that works with you.</p>

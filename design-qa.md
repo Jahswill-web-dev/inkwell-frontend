@@ -1,51 +1,50 @@
-# AI suggestion review — approved option 2
+# Experience switcher — approved option 1
 
 final result: passed
 
 ## Findings and fixes
 
-- Resolved P2, reading hierarchy: the initial title included “broken” on the first line and inherited paragraph line height made the tracked content substantially taller than the source. Constrained the title measure, set explicit review prose line height, and adjusted legend spacing. `desktop-first.jpg` / `comparison-first.png` show the initial state; `desktop-final.jpg`, `comparison-final.png`, and `comparison-reading.png` show the corrected render.
-- Resolved P2, return behavior: the former preview close reopened the Ask AI modal. “Back to article” and Escape now close both review and assistant, preserve the proposal, restore scrolling and focus the article toolbar trigger. Browser verification and an integration test cover this behavior.
-- Resolved P2, error visibility: approval errors rendered at the top of the reading content could be missed after scrolling. Errors now stay in the fixed footer beside the decision controls. `conflict-mobile.jpg` shows a stale-draft error with both actions reachable; the alert was measured within the 390 × 844 viewport.
-- Resolved P2, narrow controls: reduced compact control sizes below 360px so Back to article and Show changes share one row and neither approval label wraps. `mobile-small.jpg` and `mobile-small-scrolled.jpg` show the 320 × 568 view at the start and end of the article, with the action bar fixed in place.
-- No actionable P0/P1/P2 findings remain.
+- Resolved P2, opening focus: the first browser run left focus on the trigger because the menu was still hidden when focus moved. Focus now moves after positioning has made the popup visible. A subsequent browser run confirmed the selected menuitemradio receives focus; arrows and Escape work from there.
+- Resolved P2, Tab navigation: the first keyboard test showed focus landing on the document body after closing the portaled menu. Tab and Shift+Tab now close the menu and move relative to its trigger, skipping hidden/inert controls and navigation hidden by responsive CSS. The enclosing review is not dismissed by the menu’s Escape key.
+- Resolved P2, narrow review header: the initial 320px render truncated “Consultant.” Gave the review’s switcher wrapper an explicit bounded width and prevented flex shrinking. The post-fix live browser capture showed the full label; measured trigger width was 170px and label client/scroll widths were both 84px. The menu fit from x=16 to x=304 in a 320px viewport.
+- No actionable P0/P1/P2 visual issues remain. P3 differences from the bitmap are small icon geometry, font rasterization, border curvature and approximately 5% component-width variation at desktop scale.
 
-## Source and comparison evidence
+## Source and evidence
 
-Source: `design-evidence/consultant-review/approved-option-2.png`, the second displayed mockup in the latest review ideation set, with a full-page reading surface and inline change markers.
+Selected source: `design-evidence/experience-switcher/approved-option-1.png`, the first displayed image in the latest three-option set. It shows one compact dropdown design in consultant and content marketing contexts.
 
-The source and final desktop render are each 1487 × 1058 pixels, at a matching CSS viewport and 1x density. `comparison-final.png` pairs source left and implementation right at equal 744 × 529 reductions. `comparison-reading.png` pairs corresponding 900 × 680 article crops at equal 675 × 510 reductions. Both combined comparisons were opened and inspected. The initial comparison is retained as `comparison-first.png`.
+Desktop source and rendered captures are 1487 × 1058 at a matching CSS viewport and 1x density. `consultant-final.jpg` captures the consultant selection and `marketing-final.jpg` captures the marketing selection. Only one real menu stays open at a time. `both-contexts.jpg` combines the upper 590px of the consultant capture and lower 468px of the marketing capture into a comparison board showing both states, matching the source specimen’s presentation. This combined bitmap is evidence only, not application UI.
 
-Other evidence: `clean-view.jpg`, `mobile.jpg` (390 × 844), `tablet.jpg` (834 × 1194), `mobile-small.jpg` and `mobile-small-scrolled.jpg` (320 × 568), and `conflict-mobile.jpg`. The final narrow captures used a fresh preview tab at the target viewport after an earlier resized-browser capture contained compositor artifacts. The fresh capture and DOM measurements agree: content width 320px, footer entirely inside the viewport, and article body scrolls independently.
+`comparison-full.png` pairs source left and render right at equal 744 × 529 reductions. `comparison-menu.png` pairs corresponding 420 × 265 crops at native scale. Both combined comparisons were opened and inspected. The surrounding specimen content is synthetic context; only the switcher is the design target. Existing application typography, article controls and dashboard content are not redesigned to imitate incidental differences in the generated background.
 
-Previous Ask AI modal QA is archived as `previous-ask-ai-qa.md`.
+Additional evidence: `consultant-first.jpg`, `marketing-first.jpg`, `error.jpg`, `review-desktop.jpg`, `mobile-consultant.jpg`, `mobile-marketing.jpg`, and `mobile-review.jpg`. Standard phone checks used a 390 × 844 CSS viewport; content width was 375px with a 15px scrollbar, without horizontal overflow. The menu measured x=16..374. The narrow 320 × 568 view was also inspected live and measured as described above. A corrupted saved narrow screenshot from the browser compositor was discarded; the live capture and measured geometry supplied the narrow check. A fresh isolated review-component preview produced the clean saved `mobile-review.jpg`.
+
+Previous review QA is archived as `previous-review-qa.md`.
 
 ## Required fidelity surfaces
 
-Typography: existing Newsreader and Manrope. The editorial title wraps before “broken handoffs”; serif prose and section headings retain the selected hierarchy. Explicit line height prevents surrounding application styles from changing the reading rhythm. Mobile scales the title and controls without horizontal overflow.
+Typography: the shared trigger, caption and options use existing Manrope with identical weights and sizes in both experiences. Labels remain single-line; mobile sizes adapt. Existing Newsreader page headings remain unchanged.
 
-Spacing/layout: full-page review surface, existing brand/navigation language, compact review toolbar, centered reading column, one Show changes switch, and a fixed footer. The body scrolls while Back to article and approval actions stay accessible. No duplicate current/proposed article panels or boxed diff summaries remain.
+Spacing/layout: icon, active label and chevron form one outlined trigger. The matching white popover has a quiet caption and two rows, with a selected checkmark and pale rose highlight. Desktop width is 360px and mobile width is bounded by 16px screen gutters. The menu repositions on resize/scroll, can open above a low trigger, and closes when its anchor leaves the viewport. The marketing switcher sits above the workspace header, aligned right. The review header allows the shared control to shrink to its bounded mobile width without clipping its label.
 
-Colors/tokens: existing navy, crimson, warm paper, white, muted and divider tokens. Removed text has rose highlighting and strikethrough; added text has pale green highlighting. Text labels and screen-reader annotations communicate the changes independently of color.
+Colors/tokens: existing navy, crimson, warm paper, white, muted and divider colors. Crimson marks selection; pale blue is a hover surface. Custom focus styling replaces the browser-native blue selection appearance. Reduced-motion preferences disable the loading icon animation.
 
-Assets/icons: no bitmap artwork or generated screenshot is embedded in the interface. The existing wordmark, Phosphor ArrowLeft and standard form controls are used. Source bitmap is design evidence only.
+Assets/icons: existing Phosphor User, Buildings, CaretDown, Check and CircleNotch icons; no generated bitmap, handcrafted icon or screenshot is embedded in the product.
 
-Copy/content: request and summary are data-driven. Both original and proposed content are preserved in the change view; the clean view contains only the proposal. The real second-paragraph edit removes more words than the illustrative mock shows, so its mark is intentionally longer. Full rewrites, section deletion, additions and moves remain reviewable. Source links, lists and inline formatting are preserved. The footer describes approval accurately, and its actions apply or reject the complete proposal.
-
-P3 differences: small font-rasterization/icon and navigation-spacing differences remain; the precise change spans follow the actual source/proposal rather than copying incomplete marks from the generated bitmap. These do not change hierarchy or behavior.
+Copy/content: retained “Consultant” and “Content marketing.” The popup caption is “Switch experience.” No new settings, billing, account or workspace-management features were added.
 
 ## Behavior and validation
 
-The real ConsultantArticleScreen now hosts ConsultantReview. Existing apply/reject endpoints and version headers are retained. Applying is blocked when there are unsaved edits. Closing preserves the suggestion; rejection preserves the current draft; approval replaces the complete draft. Background content remains inert and focus returns to the article control.
+All existing instances use ExperienceSwitcher: consultant layout, the article-review header and marketing WorkspaceHeader. The same implementation and CSS control all placements. The existing PUT experience request, saved preference behavior, destinations and route refresh are retained. Clicking the active option closes without a request. Loading prevents duplicate writes; failure keeps the previous selection and a visible retryable error. The menu is portaled to the nearest dialog when present so review keyboard handling and inert-background behavior remain compatible; otherwise it uses document.body.
 
-Browser interaction verification used a temporary development-only sample article with isolated in-memory API responses through the real request client and article component. It exercised opening, tracked/clean toggle, closing, Escape, rejection, approval on a narrow screen, restored focus/scrolling, and a simulated stale-draft response. A second temporary render of the actual review component was used solely to obtain a clean narrow-viewport visual capture and verify scrolling. Both temporary preview files were removed. No stored user article or live model call was changed or triggered. Final browser error logs were empty.
+35 focused checks passed across switcher, consultant article/review, and marketing dashboard tests. Switcher tests cover both selections and directions, no-op active selection, keyboard navigation, outside dismissal, pending requests and recovery. TypeScript, targeted ESLint, formatting and whitespace checks passed.
 
-26 focused tests passed: 12 article integration tests, 6 review tests and 8 generation tests. Review coverage includes rich links/formatting, unsafe URL handling, complete section deletions/full rewrites with new IDs, moves without false text changes, clean-view content, dirty-state approval protection, and long rewrite preservation. Long sections use a bounded block comparison instead of the previous unbounded word-level matrix. TypeScript and targeted ESLint passed. Existing Playwright labels/selectors were updated; the Playwright CLI suite was not run.
+Browser checks used temporary development-only contexts with the real shared components and an isolated failing response for the experience endpoint. They verified both selection marks, current-option dismissal, arrows/Escape/Tab, errors, popup placement, phone layout and review containment. Successful persistence/navigation is covered by mocked integration tests; no real user’s preference was switched. Browser error logs were empty. Both temporary preview routes were removed. Backend source/API contracts and authentication rules are unchanged.
 
 ## Checklist
 
-- [x] Build the exact second displayed review concept.
-- [x] Preserve the existing backend proposal and approval contracts.
-- [x] Compare source and render together at matching dimensions.
-- [x] Verify tracked/clean views, complete removals, responsive controls and recovery.
-- [x] Preserve user data and remove temporary preview routes.
+- [x] Implement the exact first displayed concept.
+- [x] Use the same component in consultant, review and marketing contexts.
+- [x] Preserve switching behavior and provide keyboard/loading/error handling.
+- [x] Compare source and render in full and focused views.
+- [x] Inspect responsive states, retain evidence and remove preview routes.

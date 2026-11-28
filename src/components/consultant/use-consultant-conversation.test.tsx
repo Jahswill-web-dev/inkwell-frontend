@@ -72,6 +72,132 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+it.each([false, true])(
+  "reconciles late question details (GET initially fails: %s)",
+  async (fails) => {
+    const interview = {
+      ...initial(),
+      current_question: null,
+      pending_question: null,
+    };
+    state = { current_question: null, pending_question: null };
+    const { result } = renderHook(() =>
+      useConsultantConversation("interview", interview, true),
+    );
+    if (fails) api.mockRejectedValueOnce(new Error("Network unavailable"));
+    await act(async () =>
+      result.current.onEvent({ type: "session.started" }, "session"),
+    );
+    expect(result.current.questionError).toBe(fails);
+    act(() => result.current.onTranscriptChange({ ...turn, saved: true }));
+    act(() => {
+      result.current.onPlayback({
+        state: "speaking",
+        voiceSessionId: "session",
+      });
+      result.current.onPlayback({ state: "quiet", voiceSessionId: "session" });
+    });
+    expect(result.current.question).toBeNull();
+
+    state = { current_question: null, pending_question: question };
+    await act(async () => result.current.refresh());
+    expect(result.current.question?.id).toBe("question");
+    expect(api).toHaveBeenCalledWith(expect.any(String), "POST", {
+      status: "delivered",
+      transcript_item_ids: ["spoken"],
+    });
+    expect(result.current.questionError).toBe(false);
+  },
+);
+
+it("does not reuse completed playback for a later question with identical words", async () => {
+  const interview = initial();
+  const { result } = renderHook(() =>
+    useConsultantConversation("interview", interview, true),
+  );
+  await act(async () =>
+    result.current.onEvent({ type: "session.started" }, "session"),
+  );
+  act(() => result.current.onTranscriptChange({ ...turn, saved: true }));
+  await act(async () => {
+    result.current.onPlayback({ state: "speaking", voiceSessionId: "session" });
+    result.current.onPlayback({ state: "quiet", voiceSessionId: "session" });
+  });
+  const delivered = state.current_question;
+  state = {
+    current_question: delivered,
+    pending_question: { ...question, id: "repeated", sequence: 3 },
+  };
+  await act(async () => result.current.refresh());
+  expect(result.current.question?.id).toBe("question");
+  expect(api.mock.calls.filter((call) => call[1] === "POST")).toHaveLength(1);
+});
+
+it("reconciles matching captions arriving after quiet and waits for their save", async () => {
+  const interview = initial();
+  const { result } = renderHook(() =>
+    useConsultantConversation("interview", interview, true),
+  );
+  await act(async () =>
+    result.current.onEvent({ type: "session.started" }, "session"),
+  );
+  act(() => {
+    result.current.onPlayback({ state: "speaking", voiceSessionId: "session" });
+    result.current.onPlayback({ state: "quiet", voiceSessionId: "session" });
+    result.current.onTranscriptChange({
+      ...turn,
+      text: "Thanks. What happened",
+    });
+  });
+  expect(result.current.question?.id).toBe("previous");
+  act(() => result.current.onTranscriptChange(turn));
+  expect(result.current.question?.id).toBe("question");
+  expect(api.mock.calls.some((call) => call[1] === "POST")).toBe(false);
+  await act(async () =>
+    result.current.onTranscriptChange({ ...turn, saved: true }),
+  );
+  expect(result.current.question?.status).toBe("delivered");
+});
+
+it.each(["blocked", "interrupted", "replaced"])(
+  "does not use late captions after playback was %s",
+  async (reason) => {
+    const interview = initial();
+    const { result } = renderHook(() =>
+      useConsultantConversation("interview", interview, true),
+    );
+    await act(async () =>
+      result.current.onEvent({ type: "session.started" }, "session"),
+    );
+    act(() =>
+      result.current.onPlayback({
+        state: "speaking",
+        voiceSessionId: "session",
+      }),
+    );
+    await act(async () => {
+      if (reason === "blocked")
+        result.current.onPlayback({
+          state: "blocked",
+          voiceSessionId: "session",
+        });
+      if (reason === "interrupted")
+        result.current.onEvent(
+          { type: "input_audio_buffer.speech_started" },
+          "session",
+        );
+      if (reason === "replaced")
+        result.current.onEvent({ type: "session.started" }, "new-session");
+      result.current.onPlayback({ state: "quiet", voiceSessionId: "session" });
+      result.current.onTranscriptChange({ ...turn, saved: true });
+    });
+    expect(result.current.question?.id).toBe("previous");
+    expect(api.mock.calls.some((call) => call[2]?.status === "delivered")).toBe(
+      false,
+    );
+  },
+);
+
 it("requires actual playback plus matching saved words before delivery acknowledgment", async () => {
   const interview = initial();
   const { result } = renderHook(() =>

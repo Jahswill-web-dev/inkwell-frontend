@@ -66,6 +66,7 @@ export function useConsultantConversation(
   const turnsRef = useRef(new Map<string, LiveTranscriptTurn>());
   const sessionRef = useRef<string | null>(null);
   const playingRef = useRef(false);
+  const completedPlaybackRef = useRef(false);
   const interruptedRef = useRef(false);
   const heardRef = useRef(new Set<string>());
   const interruptedQuestionsRef = useRef(new Set<string>());
@@ -79,13 +80,37 @@ export function useConsultantConversation(
   const epochRef = useRef(0);
   const mountedRef = useRef(true);
   const initialRef = useRef<string | null>(null);
+  const flushRef = useRef<() => Promise<void>>(async () => {});
   const publishPreview = useCallback(() => {
     const pending = questionsRef.current.pending_question;
+    const fragments = pending
+      ? questionEvidence(pending, [...turnsRef.current.values()])
+      : [];
+    // Playback, captions and the question GET travel independently. Retain a
+    // completed playback observation so late captions/GETs can reconcile it.
+    if (
+      pending &&
+      pending.voice_session_id === sessionRef.current &&
+      completedPlaybackRef.current &&
+      fragments.length > 0 &&
+      !interruptedQuestionsRef.current.has(pending.id) &&
+      !heardRef.current.has(pending.id)
+    ) {
+      completedPlaybackRef.current = false;
+      heardRef.current.add(pending.id);
+      proofRef.current = {
+        question: pending,
+        ids: fragments.map((turn) => turn.itemId),
+        status: "delivered",
+      };
+      void flushRef.current();
+    }
     const visible =
       pending &&
       pending.voice_session_id === sessionRef.current &&
-      questionEvidence(pending, [...turnsRef.current.values()]).length > 0 &&
+      fragments.length > 0 &&
       (playingRef.current || heardRef.current.has(pending.id)) &&
+      !interruptedRef.current &&
       !interruptedQuestionsRef.current.has(pending.id);
     if (mountedRef.current) setPreviewQuestion(visible ? pending : null);
   }, []);
@@ -171,7 +196,6 @@ export function useConsultantConversation(
       deliveryRef.current = null;
     }
   }, [interviewId, applyQuestions]);
-  const flushRef = useRef(flushDelivery);
   useEffect(() => {
     flushRef.current = flushDelivery;
   }, [flushDelivery]);
@@ -213,6 +237,7 @@ export function useConsultantConversation(
       if (voiceSessionId && sessionRef.current !== voiceSessionId) {
         sessionRef.current = voiceSessionId;
         playingRef.current = false;
+        completedPlaybackRef.current = false;
         publishPreview();
         interruptedRef.current = false;
         void refresh();
@@ -226,6 +251,7 @@ export function useConsultantConversation(
       ) {
         if (playingRef.current) {
           interruptedRef.current = true;
+          completedPlaybackRef.current = false;
           const pending = questionsRef.current.pending_question;
           if (pending && pending.voice_session_id === voiceSessionId) {
             interruptedQuestionsRef.current.add(pending.id);
@@ -240,7 +266,12 @@ export function useConsultantConversation(
         }
       }
       const nested = event.event as { item?: { name?: string } } | undefined;
-      if (nested?.item?.name === "present_question") void refresh();
+      const item = event.item as { name?: string } | undefined;
+      if (
+        nested?.item?.name === "present_question" ||
+        item?.name === "present_question"
+      )
+        void refresh();
     },
     [refresh, publishPreview],
   );
@@ -250,6 +281,7 @@ export function useConsultantConversation(
       if (!voiceSessionId || voiceSessionId !== sessionRef.current) return;
       if (state === "speaking") {
         playingRef.current = true;
+        completedPlaybackRef.current = false;
         interruptedRef.current = false;
         publishPreview();
         return;
@@ -257,24 +289,8 @@ export function useConsultantConversation(
       const complete =
         state === "quiet" && playingRef.current && !interruptedRef.current;
       playingRef.current = false;
-      const pending = questionsRef.current.pending_question;
-      if (!pending || pending.voice_session_id !== voiceSessionId) return;
-      const fragments = questionEvidence(pending, [
-        ...turnsRef.current.values(),
-      ]);
-      if (
-        complete &&
-        fragments.length &&
-        !interruptedQuestionsRef.current.has(pending.id)
-      ) {
-        heardRef.current.add(pending.id);
-        proofRef.current = {
-          question: pending,
-          ids: fragments.map((turn) => turn.itemId),
-          status: "delivered",
-        };
-        void flushRef.current();
-      }
+      if (state === "blocked") completedPlaybackRef.current = false;
+      else if (complete) completedPlaybackRef.current = true;
       publishPreview();
     },
     [publishPreview],
@@ -283,6 +299,7 @@ export function useConsultantConversation(
   const interrupt = useCallback(() => {
     interruptedRef.current = true;
     playingRef.current = false;
+    completedPlaybackRef.current = false;
     publishPreview();
   }, [publishPreview]);
   const disconnect = useCallback(() => {
